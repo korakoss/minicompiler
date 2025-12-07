@@ -194,11 +194,13 @@ impl Parser {
         let result = match self.peek() {
 
             Token::Plus => {
+                self.consume();
                 let second_expr = self.parse_expression();
                 Expression::BinOp { op: BinaryOperationType::Add , left: Box::new(expr), right: Box::new(second_expr)}
             }
             
             Token::Minus => {
+                self.consume();
                 let second_expr = self.parse_expression();
                 Expression::BinOp { op: BinaryOperationType::Sub, left: Box::new(expr), right: Box::new(second_expr)}
             }
