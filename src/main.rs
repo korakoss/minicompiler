@@ -166,13 +166,12 @@ impl Parser {
         self.position += 1;
         token
     }
-
-    fn parse_expression(&mut self) -> Expression {
-
-        let expr = match self.peek() {
+    
+    fn parse_expression_with_precedence(&mut self, min_precedence: i32) -> Expression {
+        
+        let expr = match self.consume() {
             
             Token::LeftParen => {
-                self.consume();
                 let expr = self.parse_expression();
                 if !matches!(self.consume(), Token::RightParen) {
                     panic!("Expected ')'");
@@ -180,15 +179,9 @@ impl Parser {
                 expr
             }
 
-            Token::IntLiteral(_) => {
-                let Token::IntLiteral(int) = self.consume() else {panic!("Expected int literal")};
-                Expression::IntLiteral(int)
-            }
+            Token::IntLiteral(int) => {Expression::IntLiteral(int)}
             
-            Token::Identifier(_) => {
-                let Token::Identifier(name) = self.consume() else {panic!("Expected identifier")};
-                Expression::Variable(name)
-            }
+            Token::Identifier(name) => {Expression::Variable(name)}
 
             _ => {
                 let tok = self.consume();
@@ -220,6 +213,10 @@ impl Parser {
             }
         };
         result
+    }
+
+    fn parse_expression(&mut self) -> Expression {
+        self.parse_expression_with_precedence(0)
     }
 
     fn parse_statement(&mut self) -> Statement {
