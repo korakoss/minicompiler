@@ -7,7 +7,7 @@ use std::env;
 enum BinaryOperationType {
     Add, 
     Sub, 
-    //Mul, 
+    Mul, 
     //Div,
     //Less, 
     //Greater, 
@@ -51,7 +51,8 @@ enum Token {
     Assign,
     Plus,
     Minus,
-    
+    Multiply,
+
     // Delimiters
     Semicolon,
     LeftParen,
@@ -89,6 +90,9 @@ fn lex(program: &str) -> Vec<Token> {
             chars.next();
         } else if c == '-' {
             tokens.push(Token::Minus);
+            chars.next();
+        } else if c=='*' {
+            tokens.push(Token::Multiply);
             chars.next();
         } else if c == ';' {
             tokens.push(Token::Semicolon);
@@ -205,6 +209,12 @@ impl Parser {
                 let second_expr = self.parse_expression();
                 Expression::BinOp { op: BinaryOperationType::Sub, left: Box::new(expr), right: Box::new(second_expr)}
             }
+            Token::Multiply => {
+                self.consume();
+                let second_expr = self.parse_expression();
+                Expression::BinOp { op: BinaryOperationType::Mul, left: Box::new(expr), right: Box::new(second_expr)}
+            }
+
             _ => {
                 expr 
             }
@@ -296,10 +306,13 @@ impl Compiler {
                     BinaryOperationType::Add => {
                         self.emit("    add r0, r1, r0");
                     }
-
                     BinaryOperationType::Sub => {
                         self.emit("    sub r0, r1, r0");   // x1-x0 because x1: left x0:right
                     }
+                    BinaryOperationType::Mul => {
+                        self.emit("    mul r0, r1, r0");   
+                    }
+
                 }
             }
         }
