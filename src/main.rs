@@ -1,13 +1,16 @@
+use std::collections::HashMap;
+
+
 #[derive(Debug)]
 enum BinaryOperationType {
     Add, 
     Sub, 
-    Mul, 
-    Div,
-    Less, 
-    Greater, 
-    Equal, 
-    NotEqual
+    //Mul, 
+    //Div,
+    //Less, 
+    //Greater, 
+    //Equal, 
+    //NotEqual
 }
 
 #[derive(Debug)]
@@ -267,6 +270,79 @@ impl Parser {
         }
         
         Program { statements }
+    }
+}
+
+
+struct Compiler {
+    output: String,
+    stack_offsets: HashMap<String, i32>,
+}
+
+impl Compiler {
+
+    fn emit(&mut self, line: &str) {
+        self.output.push_str(line);
+        self.output.push('\n');
+    }
+
+    fn compile_expression(&mut self, expression: &Expression) {
+       
+        match expression {
+     
+            Expression::IntLiteral(n) => {
+                self.emit(&format!("    mov x0,#{}", n));   // Load the value into the main
+                                                            // register 
+
+            }
+
+            Expression::Variable(varname) => {
+                let offset = self.stack_offsets.get(varname).expect("Undefined variable");
+                self.emit(&format!("    ldr x0, [x29, #-{}]", offset));    // 
+            }
+
+            Expression::BinOp{op, left, right} => {
+                self.compile_expression(left);
+                self.emit("     str x0, [sp, #-16]!"); // Store left's value on stack
+                self.compile_expression(right);
+                self.emit("     ldr x1, [sp], #16");
+
+                match op {
+                    BinaryOperationType::Add => {
+                        self.emit("     add x0, x1, x0");
+                    }
+
+                    BinaryOperationType::Sub => {
+                        self.emit("     sub x0, x1, x0");   // x1-x0 because x1: left x0:right
+                    }
+                }
+            }
+        }
+
+    }
+
+    fn compile_statement(&mut self, statement: &Statement) {
+            
+        match statement {
+            
+            Statement::Assign { varname, value } => {
+                let var_offset = self.stack_offsets.get(varname).expect("Undefined variable");
+                self.compile_expression(expression);
+                self.emit(&format!("     str x0, [x29, #-{}]", var_offset));
+            }
+        }
+    }
+
+    fn compile_program(&mut self, program: Program) -> String {
+        // emit header
+        //emit prologue
+        
+        for statement in &program.statements {
+            self.compile_statement(statement);
+        }
+
+        //emit epilogue
+        self.output  
     }
 }
 
