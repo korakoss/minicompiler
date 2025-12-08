@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fs;
+use std::env;
 
 
 #[derive(Debug)]
@@ -34,7 +36,7 @@ enum Statement {
         value: Box<Expression>
     },
 
-    Print(Box<Expression>),
+    //Print(Box<Expression>),
 }
 
 #[derive(Debug)]
@@ -60,7 +62,7 @@ enum Token {
     Identifier(String),
     
     // Keywords
-    Print,
+    //Print,
     
     // Special
     EOF,
@@ -112,26 +114,22 @@ fn lex(program: &str) -> Vec<Token> {
             let value = num_str.parse::<i32>().unwrap();
             tokens.push(Token::IntLiteral(value));
         }
-        // Identifiers and keywords
-        else if c.is_alphabetic() {
-            let mut ident = String::new();
+
+        // Identifiers
+        // TODO: keywords would come here later
+        else if c.is_ascii_alphabetic() {
+            let mut identifier = String::new();
             while let Some(&ch) = chars.peek() {
-                if ch.is_alphanumeric() || ch == '_' {
-                    ident.push(ch);
+                if ch.is_ascii_alphanumeric() || ch == '_' {
+                    identifier.push(ch);
                     chars.next();
                 } else {
                     break;
                 }
             }
-            
-            // Check if it's a keyword
-            let token = match ident.as_str() {
-                "print" => Token::Print,
-                _ => Token::Identifier(ident),
-            };
-            tokens.push(token);
+            tokens.push(Token::Identifier(identifier));
         }
-        // Unknown character
+
         else {
             panic!("Unexpected character: {}", c);
         }
@@ -215,27 +213,9 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Statement {
+        
         match self.peek() {
-            Token::Print => {
-                self.consume();  
-                
-                if !matches!(self.consume(), Token::LeftParen) {
-                    panic!("Expected '(' after print");
-                }
-
-                let expr = self.parse_expression();
-                
-                if !matches!(self.consume(), Token::RightParen) {
-                    panic!("Expected ')'");
-                }
-
-                if !matches!(self.consume(), Token::Semicolon) {
-                    panic!("Expected ';'");
-                }
-
-                Statement::Print(Box::new(expr))
-            }
-            
+                        
             Token::Identifier(_) => {
                 let varname = match self.consume() {
                     Token::Identifier(name) => name,
@@ -251,14 +231,15 @@ impl Parser {
                 if !matches!(self.consume(), Token::Semicolon) {
                     panic!("Expected ';'");
                 }
-
+                
                 Statement::Assign {
                     varname,
                     value: Box::new(expr)
                 }
+
             }
             
-            _ => panic!("Expected statement")
+            other => {panic!("Expected statement, got: {:?} at position {}", other, self.position);}
         }
     }    
 
@@ -281,6 +262,10 @@ struct Compiler {
 
 impl Compiler {
 
+    fn new() -> Self {
+        Compiler { output: String::new(), stack_offsets: HashMap::new()}
+    }
+
     fn emit(&mut self, line: &str) {
         self.output.push_str(line);
         self.output.push('\n');
@@ -291,29 +276,29 @@ impl Compiler {
         match expression {
      
             Expression::IntLiteral(n) => {
-                self.emit(&format!("    mov x0,#{}", n));   // Load the value into the main
+                self.emit(&format!("    mov r0,#{}", n));   // Load the value into the main
                                                             // register 
 
             }
 
             Expression::Variable(varname) => {
                 let offset = self.stack_offsets.get(varname).expect("Undefined variable");
-                self.emit(&format!("    ldr x0, [x29, #-{}]", offset));    // 
+                self.emit(&format!("    ldr r0, [fp, #-{}]", offset));    // 
             }
 
             Expression::BinOp{op, left, right} => {
                 self.compile_expression(left);
-                self.emit("     str x0, [sp, #-16]!"); // Store left's value on stack
+                self.emit("    push {r0}");// Store left's value on stack
                 self.compile_expression(right);
-                self.emit("     ldr x1, [sp], #16");
+                self.emit("    pop {r1}");
 
                 match op {
                     BinaryOperationType::Add => {
-                        self.emit("     add x0, x1, x0");
+                        self.emit("    add r0, r1, r0");
                     }
 
                     BinaryOperationType::Sub => {
-                        self.emit("     sub x0, x1, x0");   // x1-x0 because x1: left x0:right
+                        self.emit("    sub r0, r1, r0");   // x1-x0 because x1: left x0:right
                     }
                 }
             }
@@ -326,39 +311,62 @@ impl Compiler {
         match statement {
             
             Statement::Assign { varname, value } => {
-                let var_offset = self.stack_offsets.get(varname).expect("Undefined variable");
-                self.compile_expression(expression);
-                self.emit(&format!("     str x0, [x29, #-{}]", var_offset));
+
+                self.compile_expression(value);
+
+                if let Some(&var_offset) = self.stack_offsets.get(varname) {
+                    // The variable already exists -> we use its address
+                    self.emit(&format!("    str r0, [fp, #-{}]", var_offset));
+                } else {
+                    // New variable: allocate it space on the stack
+                    let new_offset = self.stack_offsets.values().max().unwrap_or(&0) + 8;
+                    self.stack_offsets.insert(varname.clone(), new_offset);
+                    self.emit(&format!("    str r0, [fp, #-{}]", new_offset));
+                }
             }
         }
     }
 
     fn compile_program(&mut self, program: Program) -> String {
-        // emit header
-        //emit prologue
+        // Header
+        self.emit(".global main");
+        self.emit(".align 4");
+        self.emit("main:");
+
+        // Prologue
+        self.emit("    push {fp, lr}");     //save fp and return address
+        self.emit("    mov fp, sp");                  //fp = sp
+        self.emit("    sub sp, sp, #256");             //reserving space (TBD: actually count the variables
         
+        // Compiling statements
         for statement in &program.statements {
             self.compile_statement(statement);
         }
 
-        //emit epilogue
-        self.output  
+        // Epilogue
+        self.emit("    add sp, sp, #256");         // TBD: actual variable offsets!
+        self.emit("    pop {fp, lr}");
+        self.emit("    bx lr");
+        // Reset fp
+        // Put x0 in RA
+        // Clean up stack
+        self.output.clone()  
     }
 }
 
 
 fn main() {
-
-    let program_text = "x=5; y = x + 3; print(42);"; 
+    
+    let args: Vec<String> = env::args().collect();
+    let code_filename = &args[1];
+    let assembly_filename = &args[2];
+    let program_text = &fs::read_to_string(code_filename).unwrap();
     let tokens = lex(program_text);
-    //println!("Tokens:");
-    //for token in &tokens {
-    //    println!("  {:?}", token);
-    //}
-
     let mut parser = Parser {tokens, position: 0};
     let program = parser.parse_program();
-    println!(" {:?}", program);
+    let mut compiler = Compiler::new();
+    let assembly = compiler.compile_program(program);
+    fs::write(assembly_filename, assembly).unwrap();
 }
 
 
