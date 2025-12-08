@@ -166,53 +166,65 @@ impl Parser {
         self.position += 1;
         token
     }
-    
-    fn parse_expression_with_precedence(&mut self, min_precedence: i32) -> Expression {
+
+    fn parse_primitive(&mut self) -> Expression {
         
-        let expr = match self.consume() {
+         match self.consume() {
+            
+            Token::IntLiteral(int) => {Expression::IntLiteral(int)}
+
+            Token::Identifier(name) => {Expression::Variable(name)}
             
             Token::LeftParen => {
-                let expr = self.parse_expression();
+                let paren_expr = self.parse_expression();
                 if !matches!(self.consume(), Token::RightParen) {
                     panic!("Expected ')'");
                 } 
-                expr
+                paren_expr
             }
-
-            Token::IntLiteral(int) => {Expression::IntLiteral(int)}
-            
-            Token::Identifier(name) => {Expression::Variable(name)}
 
             _ => {
                 let tok = self.consume();
                 panic!("Unexpected token while parsing expression: {:?}", tok);
             }
-        };
+        }
+    }
 
-        let result = match self.peek() {
+    fn get_binop_precedence(&mut self, op_token: Token) -> i8 {
+        match op_token {
+            Token::Plus| Token::Minus => 1,
+            Token::Multiply => 2,
+            _ => -1, 
+        }
+    }
 
-            Token::Plus => {
-                self.consume();
-                let second_expr = self.parse_expression();
-                Expression::BinOp { op: BinaryOperationType::Add , left: Box::new(expr), right: Box::new(second_expr)}
-            }
-            
-            Token::Minus => {
-                self.consume();
-                let second_expr = self.parse_expression();
-                Expression::BinOp { op: BinaryOperationType::Sub, left: Box::new(expr), right: Box::new(second_expr)}
-            }
-            Token::Multiply => {
-                self.consume();
-                let second_expr = self.parse_expression();
-                Expression::BinOp { op: BinaryOperationType::Mul, left: Box::new(expr), right: Box::new(second_expr)}
-            }
+    fn convert_binop(&mut self, op_token: Token) -> BinaryOperationType {
 
-            _ => {
-                expr 
+        // Can we subtype these enums?
+        match op_token {
+            Token::Plus => BinaryOperationType::Add,
+            Token::Minus => BinaryOperationType::Sub,
+            Token::Multiply => BinaryOperationType::Mul,
+            _ => panic!("Expected binary operator toke"),
+        }
+    }
+   
+    fn parse_expression_with_precedence(&mut self, current_level: i8) -> Expression {
+        
+        let mut current_expr = self.parse_primitive(); 
+
+        while matches!(self.peek(), Token::Plus | Token::Minus | Token::Multiply) {
+            let prec = self.get_binop_precedence(self.peek().clone());
+            if prec < current_level {
+                break;
             }
-        };
-        result
+            let optoken = self.consume();
+            let op = self.convert_binop(optoken);
+            let next_expr = self.parse_expression_with_precedence(prec+1);
+            current_expr = Expression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr)};
+
+        }
+        current_expr 
     }
 
     fn parse_expression(&mut self) -> Expression {
