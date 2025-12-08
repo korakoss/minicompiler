@@ -36,6 +36,12 @@ enum Statement {
         value: Box<Expression>
     },
 
+    Branch {
+        cond: Box<Expression>,
+        then_branch: Box<Statement>,
+        else_branch: Box<Statement>,
+    }
+
     //Print(Box<Expression>),
 }
 
@@ -57,13 +63,16 @@ enum Token {
     Semicolon,
     LeftParen,
     RightParen,
+    LeftBrace,
+    RightBrace,
     
-    // Values (with associated data)
+    // Values 
     IntLiteral(i32),
     Identifier(String),
     
     // Keywords
     //Print,
+    If,
     
     // Special
     EOF,
@@ -103,6 +112,12 @@ fn lex(program: &str) -> Vec<Token> {
         } else if c == ')' {
             tokens.push(Token::RightParen);
             chars.next();
+        } else if c == '{' {
+            tokens.push(Token::LeftBrace);
+            chars.next();
+        } else if c == '}' {
+            tokens.push(Token::RightBrace);
+            chars.next();
         }
         // Numbers
         else if c.is_ascii_digit() {
@@ -122,16 +137,20 @@ fn lex(program: &str) -> Vec<Token> {
         // Identifiers
         // TODO: keywords would come here later
         else if c.is_ascii_alphabetic() {
-            let mut identifier = String::new();
+            let mut word = String::new();
             while let Some(&ch) = chars.peek() {
                 if ch.is_ascii_alphanumeric() || ch == '_' {
-                    identifier.push(ch);
+                    word.push(ch);
                     chars.next();
                 } else {
                     break;
                 }
             }
-            tokens.push(Token::Identifier(identifier));
+            if word == "if" {
+                tokens.push(Token::If);
+            } else {
+                tokens.push(Token::Identifier(word));
+            } 
         }
 
         else {
