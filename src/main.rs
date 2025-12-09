@@ -9,9 +9,10 @@ enum BinaryOperationType {
     Sub, 
     Mul, 
     Equals,
-    Less,       // < 
-    //Div,
+    Less,       // left < right 
     //Greater, 
+    //Div (later, when floats ig?),
+    //Modulo
     //NotEqual
 }
 
@@ -26,6 +27,8 @@ enum Expression {
        left: Box<Expression>,
        right: Box<Expression>,
     },
+
+    // UnaryOp (eg. negation)
 }
 
 #[derive(Debug)]
