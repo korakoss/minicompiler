@@ -27,7 +27,7 @@ enum Expression {
        left: Box<Expression>,
        right: Box<Expression>,
     },
-
+    
     // UnaryOp (eg. negation)
 }
 
@@ -44,7 +44,8 @@ enum Statement {
 
     If {
         condition: Box<Expression>,
-        body: Vec<Statement>
+        if_body: Vec<Statement>,
+        else_body: Option<Vec<Statement>>,
     },
     
     While {
@@ -84,6 +85,7 @@ enum Token {
     // Keywords
     //Print,
     If,
+    Else,
     While,
     
     // Special
@@ -170,6 +172,8 @@ fn lex(program: &str) -> Vec<Token> {
             }
             if word == "if" {
                 tokens.push(Token::If);
+            } else if word == "else" {
+                tokens.push(Token::Else);
             } else if word == "while" {
                 tokens.push(Token::While);
             } else {
@@ -323,12 +327,30 @@ impl Parser {
                 if !matches!(self.consume(), Token::RightBrace) {
                     panic!("Expected closing brace");
                 }
-
-                Statement::If { 
-                    condition: Box::new(cond), 
-                    body: body,
+                if matches!(self.peek(), Token::Else) {
+                    self.consume();
+                    if !matches!(self.consume(), Token::LeftBrace) {
+                        panic!("Expected opening brace");
+                    }
+                    let else_body = self.parse_block();
+                    if !matches!(self.consume(), Token::RightBrace) {
+                        panic!("Expected closing brace");
+                    }
+                    return Statement::If{
+                        condition: Box::new(cond),
+                        if_body: body,
+                        else_body: Some(else_body),
+                    }
+   
+                } else {
+                    return Statement::If { 
+                        condition: Box::new(cond), 
+                        if_body: body,
+                        else_body: None,
+                    }
                 }
             }
+
             Token::While => {
                 self.consume();
                 let cond = self.parse_expression();
@@ -365,7 +387,7 @@ impl Parser {
 struct Compiler {
     output: String,
     stack_offsets: HashMap<String, i32>,
-    label_counter: i32,
+    label_counter: i32,  // make some kind of function call that does increment + return previous, so it's safer
 }
 
 impl Compiler {
@@ -384,8 +406,7 @@ impl Compiler {
         match expression {
      
             Expression::IntLiteral(n) => {
-                self.emit(&format!("    mov r0,#{}", n));   // Load the value into the main
-                                                            // register 
+                self.emit(&format!("    mov r0,#{}", n));   // Load the value into the main register 
 
             }
 
@@ -445,18 +466,59 @@ impl Compiler {
                     self.emit(&format!("    str r0, [fp, #-{}]", new_offset));
                 }
             }
-            Statement::If {condition, body} => {
+            Statement::If {condition, if_body, else_body} => {
                 
+                // Get our label ordinal, increment
+                let counter_str = format!("{}", self.label_counter);
+                self.label_counter = self.label_counter + 1;
+                
+                // Create a label pointing to the address after if body or if _and_ else body, depending on case
+                let branching_end_label = format!("branching_end_{}", counter_str);
+
+                // Execute the expression that if conditions on, store result in r0
                 self.compile_expression(condition);
                 self.emit("    cmp r0, #0");
-                let label = format!("if_end_{}", self.label_counter);
-                self.label_counter = self.label_counter + 1;
-                self.emit(&format!("    beq {}", label));
-                for stmt in body {
-                    self.compile_statement(stmt);
-                } 
-                self.emit(&format!("{}:",label));
+                
+                
+                match else_body {
+                    
+                    Some(else_statements) => {
+                        
+                        let else_start_label = format!("else_start_{}", counter_str);
+                        
+                        // If the condition was false, we jump to the body of else
+                        self.emit(&format!("    beq {}", else_start_label));
+                        
+                        // If body code
+                        for stmt in if_body {
+                            self.compile_statement(stmt);
+                        }
+
+                        // After if body, unconditional jump to after the branch code
+                        self.emit(&format!("    b {}", branching_end_label));
+
+                        self.emit(&format!("{}:", else_start_label));
+                        for stmt in else_statements {
+                            self.compile_statement(stmt);
+                        }
+
+                    }
+                    
+                    None => {
+                        // If r0 was false, we jump to after the body
+                        self.emit(&format!("    beq {}", branching_end_label));
+
+                        // Body code
+                        for stmt in if_body {
+                            self.compile_statement(stmt);
+                        } 
+                    } 
+
+                }
+                // Set up label after all branching codes       
+                self.emit(&format!("{}:",branching_end_label));
             }
+            
             Statement::While {condition, body} => {
                 let start_label = format!("while_start_{}", self.label_counter);
                 let end_label = format!("while_end_{}", self.label_counter);
