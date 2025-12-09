@@ -330,12 +330,13 @@ impl Parser {
 struct Compiler {
     output: String,
     stack_offsets: HashMap<String, i32>,
+    label_counter: i32,
 }
 
 impl Compiler {
 
     fn new() -> Self {
-        Compiler { output: String::new(), stack_offsets: HashMap::new()}
+        Compiler { output: String::new(), stack_offsets: HashMap::new(), label_counter: 0}
     }
 
     fn emit(&mut self, line: &str) {
@@ -403,7 +404,18 @@ impl Compiler {
                     self.emit(&format!("    str r0, [fp, #-{}]", new_offset));
                 }
             }
-
+            Statement::If {condition, body} => {
+                
+                self.compile_expression(condition);
+                self.emit("    cmp r0, #0");
+                let label = format!("if_end_{}", self.label_counter);
+                self.label_counter = self.label_counter + 1;
+                self.emit(&format!("    beq {}", label));
+                for stmt in body {
+                    self.compile_statement(stmt);
+                } 
+                self.emit(&format!("{}:",label));
+            }
             _ => unreachable!()
         }
     }
