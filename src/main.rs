@@ -115,7 +115,6 @@ fn lex(program: &str) -> Vec<Token> {
                 chars.next();
             } else {
                 tokens.push(Token::Assign);
-                chars.next();
             }
         } else if c == '+' {
             tokens.push(Token::Plus);
@@ -411,7 +410,7 @@ impl Compiler {
         match expression {
      
             Expression::IntLiteral(n) => {
-                self.emit(&format!("    mov r0,#{}", n));   // Load the value into the main register 
+                self.emit(&format!("    ldr r0, ={}", n));   // Load the value into the main register 
 
             }
 
