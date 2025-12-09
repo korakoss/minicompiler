@@ -36,10 +36,9 @@ enum Statement {
         value: Box<Expression>
     },
 
-    Branch {
-        cond: Box<Expression>,
-        then_branch: Box<Statement>,
-        else_branch: Box<Statement>,
+    If {
+        condition: Box<Expression>,
+        body: Vec<Statement>
     }
 
     //Print(Box<Expression>),
@@ -259,6 +258,15 @@ impl Parser {
         self.parse_expression_with_precedence(0)
     }
 
+    fn parse_block(&mut self) -> Vec<Statement> {
+       let mut statements = Vec::new();
+        
+        while !matches!(self.peek(), Token::RightBrace){
+            statements.push(self.parse_statement());
+        }
+        statements
+    }
+
     fn parse_statement(&mut self) -> Statement {
         
         match self.peek() {
@@ -266,7 +274,7 @@ impl Parser {
             Token::Identifier(_) => {
                 let varname = match self.consume() {
                     Token::Identifier(name) => name,
-                    _ => unreachable!()
+                    _ => unreachable!() // WHAT? Refactor this sometime
                 };
                 
                 if !matches!(self.consume(), Token::Assign) {
@@ -284,6 +292,23 @@ impl Parser {
                     value: Box::new(expr)
                 }
 
+            }
+
+            Token::If => {
+                self.consume();
+                let cond = self.parse_expression();
+                if !matches!(self.consume(), Token::LeftBrace) {
+                    panic!("Expected opening brace");
+                }
+                let body = self.parse_block();
+                if !matches!(self.consume(), Token::RightBrace) {
+                    panic!("Expected closing brace");
+                }
+
+                Statement::If { 
+                    condition: Box::new(cond), 
+                    body: body,
+                }
             }
             
             other => {panic!("Expected statement, got: {:?} at position {}", other, self.position);}
@@ -354,7 +379,6 @@ impl Compiler {
                         self.emit("    mov r0, #0");
                         self.emit("    moveq r0, #1");
                     }
-                    _ => unreachable!()
                 }
             }
         }
@@ -379,6 +403,7 @@ impl Compiler {
                     self.emit(&format!("    str r0, [fp, #-{}]", new_offset));
                 }
             }
+
             _ => unreachable!()
         }
     }
