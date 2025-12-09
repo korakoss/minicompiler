@@ -8,9 +8,9 @@ enum BinaryOperationType {
     Add, 
     Sub, 
     Mul, 
-    Equals, 
+    Equals,
+    Less,       // < 
     //Div,
-    //Less, 
     //Greater, 
     //NotEqual
 }
@@ -31,6 +31,9 @@ enum Expression {
 #[derive(Debug)]
 enum Statement {
     
+    // NOTE: do we need to box exprs here???
+
+
     Assign {
         varname: String,
         value: Box<Expression>
@@ -39,8 +42,12 @@ enum Statement {
     If {
         condition: Box<Expression>,
         body: Vec<Statement>
+    },
+    
+    While {
+        condition: Box<Expression>,
+        body: Vec<Statement>,
     }
-
     //Print(Box<Expression>),
 }
 
@@ -58,6 +65,7 @@ enum Token {
     Minus,
     Multiply,
     Equals,
+    Less,
 
     // Delimiters
     Semicolon,
@@ -73,6 +81,7 @@ enum Token {
     // Keywords
     //Print,
     If,
+    While,
     
     // Special
     EOF,
@@ -90,6 +99,7 @@ fn lex(program: &str) -> Vec<Token> {
             continue;
         }
         
+        // TODO: refactor this to something acceptable looking, like a match or hashm
         // TODO: refactor out the chars.next()-s?
         // Single-character tokens
         if c == '=' {
@@ -125,7 +135,10 @@ fn lex(program: &str) -> Vec<Token> {
         } else if c == '}' {
             tokens.push(Token::RightBrace);
             chars.next();
-        }
+        } else if c == '<' {
+            tokens.push(Token::Less);
+            chars.next();
+        } 
         // Numbers
         else if c.is_ascii_digit() {
             let mut num_str = String::new();
@@ -154,6 +167,8 @@ fn lex(program: &str) -> Vec<Token> {
             }
             if word == "if" {
                 tokens.push(Token::If);
+            } else if word == "while" {
+                tokens.push(Token::While);
             } else {
                 tokens.push(Token::Identifier(word));
             } 
@@ -219,19 +234,20 @@ impl Parser {
         match op_token {
             Token::Plus| Token::Minus => 1,
             Token::Multiply => 2,
-            Token::Equals => 0,
+            Token::Equals | Token::Less => 0,
             _ => -1, 
         }
     }
 
     fn convert_binop(&mut self, op_token: Token) -> BinaryOperationType {
-
-        // Can we subtype these enums?
+        
+        // TODO: do this nicer, like a hashmap or sth
         match op_token {
             Token::Plus => BinaryOperationType::Add,
             Token::Minus => BinaryOperationType::Sub,
             Token::Multiply => BinaryOperationType::Mul,
             Token::Equals => BinaryOperationType::Equals,
+            Token::Less => BinaryOperationType::Less,
             _ => panic!("Expected binary operator toke"),
         }
     }
@@ -240,7 +256,7 @@ impl Parser {
         
         let mut current_expr = self.parse_primitive(); 
 
-        while matches!(self.peek(), Token::Plus | Token::Minus | Token::Multiply | Token::Equals) {
+        while matches!(self.peek(), Token::Plus | Token::Minus | Token::Multiply | Token::Equals | Token::Less) {
             let prec = self.get_binop_precedence(self.peek().clone());
             if prec < current_level {
                 break;
@@ -310,7 +326,23 @@ impl Parser {
                     body: body,
                 }
             }
-            
+            Token::While => {
+                self.consume();
+                let cond = self.parse_expression();
+                if !matches!(self.consume(), Token::LeftBrace) {
+                    panic!("Expected opening brace");
+                }
+                let body = self.parse_block();
+                if !matches!(self.consume(), Token::RightBrace) {
+                    panic!("Expected closing brace");
+                }
+
+                Statement::While { 
+                    condition: Box::new(cond), 
+                    body: body,
+                }
+            }
+
             other => {panic!("Expected statement, got: {:?} at position {}", other, self.position);}
         }
     }    
@@ -380,6 +412,12 @@ impl Compiler {
                         self.emit("    mov r0, #0");
                         self.emit("    moveq r0, #1");
                     }
+                    BinaryOperationType::Less=> {
+                        self.emit("    cmp r1, r0");
+                        self.emit("    mov r0, #0");
+                        self.emit("    movlt r0, #1");
+                    }
+
                 }
             }
         }
@@ -416,6 +454,29 @@ impl Compiler {
                 } 
                 self.emit(&format!("{}:",label));
             }
+            Statement::While {condition, body} => {
+                let start_label = format!("while_start_{}", self.label_counter);
+                let end_label = format!("while_end_{}", self.label_counter);
+                self.label_counter = self.label_counter + 1;
+
+                self.emit(&format!("{}:", start_label));
+                
+                // Loop head: compute condition, if false then jump to end label
+                self.compile_expression(condition);
+                self.emit("    cmp r0, #0");
+                self.emit(&format!("    beq {}", end_label));
+
+                // Loop body
+                for stmt in body {
+                    self.compile_statement(stmt);
+                }
+                
+                // At the end of loop body, unconditionally jump to start label
+                self.emit(&format!("    b {}", start_label));
+
+                self.emit(&format!("{}:", end_label));
+            }
+
             _ => unreachable!()
         }
     }
