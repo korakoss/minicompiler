@@ -8,10 +8,10 @@ enum BinaryOperationType {
     Add, 
     Sub, 
     Mul, 
+    Equals, 
     //Div,
     //Less, 
     //Greater, 
-    //Equal, 
     //NotEqual
 }
 
@@ -58,6 +58,7 @@ enum Token {
     Plus,
     Minus,
     Multiply,
+    Equals,
 
     // Delimiters
     Semicolon,
@@ -90,10 +91,17 @@ fn lex(program: &str) -> Vec<Token> {
             continue;
         }
         
+        // TODO: refactor out the chars.next()-s?
         // Single-character tokens
         if c == '=' {
-            tokens.push(Token::Assign);
             chars.next();
+            if chars.peek() == Some(&'=') {
+                tokens.push(Token::Equals);
+                chars.next();
+            } else {
+                tokens.push(Token::Assign);
+                chars.next();
+            }
         } else if c == '+' {
             tokens.push(Token::Plus);
             chars.next();
@@ -134,8 +142,7 @@ fn lex(program: &str) -> Vec<Token> {
             tokens.push(Token::IntLiteral(value));
         }
 
-        // Identifiers
-        // TODO: keywords would come here later
+        // Alphanumeric strings: keywords or identifiers
         else if c.is_ascii_alphabetic() {
             let mut word = String::new();
             while let Some(&ch) = chars.peek() {
@@ -213,6 +220,7 @@ impl Parser {
         match op_token {
             Token::Plus| Token::Minus => 1,
             Token::Multiply => 2,
+            Token::Equals => 0,
             _ => -1, 
         }
     }
@@ -224,6 +232,7 @@ impl Parser {
             Token::Plus => BinaryOperationType::Add,
             Token::Minus => BinaryOperationType::Sub,
             Token::Multiply => BinaryOperationType::Mul,
+            Token::Equals => BinaryOperationType::Equals,
             _ => panic!("Expected binary operator toke"),
         }
     }
@@ -232,7 +241,7 @@ impl Parser {
         
         let mut current_expr = self.parse_primitive(); 
 
-        while matches!(self.peek(), Token::Plus | Token::Minus | Token::Multiply) {
+        while matches!(self.peek(), Token::Plus | Token::Minus | Token::Multiply | Token::Equals) {
             let prec = self.get_binop_precedence(self.peek().clone());
             if prec < current_level {
                 break;
@@ -340,7 +349,12 @@ impl Compiler {
                     BinaryOperationType::Mul => {
                         self.emit("    mul r0, r1, r0");   
                     }
-
+                    BinaryOperationType::Equals => {
+                        self.emit("    cmp r1, r0");
+                        self.emit("    mov r0, #0");
+                        self.emit("    moveq r0, #1");
+                    }
+                    _ => unreachable!()
                 }
             }
         }
@@ -365,6 +379,7 @@ impl Compiler {
                     self.emit(&format!("    str r0, [fp, #-{}]", new_offset));
                 }
             }
+            _ => unreachable!()
         }
     }
 
@@ -403,8 +418,10 @@ fn main() {
     let assembly_filename = &args[2];
     let program_text = &fs::read_to_string(code_filename).unwrap();
     let tokens = lex(program_text);
+    println!("{:?}", tokens);
     let mut parser = Parser {tokens, position: 0};
     let program = parser.parse_program();
+    println!("{:?}", program);
     let mut compiler = Compiler::new();
     let assembly = compiler.compile_program(program);
     fs::write(assembly_filename, assembly).unwrap();
