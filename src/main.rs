@@ -10,9 +10,9 @@ enum BinaryOperationType {
     Mul, 
     Equals,
     Less,       // left < right 
+    Modulo
     //Greater, 
     //Div (later, when floats ig?),
-    //Modulo
     //NotEqual
 }
 
@@ -70,6 +70,7 @@ enum Token {
     Multiply,
     Equals,
     Less,
+    Modulo,
 
     // Delimiters
     Semicolon,
@@ -142,6 +143,9 @@ fn lex(program: &str) -> Vec<Token> {
             chars.next();
         } else if c == '<' {
             tokens.push(Token::Less);
+            chars.next();
+        } else if c == '%' {
+            tokens.push(Token::Modulo);
             chars.next();
         } 
         // Numbers
@@ -240,7 +244,7 @@ impl Parser {
     fn get_binop_precedence(&mut self, op_token: Token) -> i8 {
         match op_token {
             Token::Plus| Token::Minus => 1,
-            Token::Multiply => 2,
+            Token::Multiply | Token::Modulo => 2,
             Token::Equals | Token::Less => 0,
             _ => -1, 
         }
@@ -255,6 +259,7 @@ impl Parser {
             Token::Multiply => BinaryOperationType::Mul,
             Token::Equals => BinaryOperationType::Equals,
             Token::Less => BinaryOperationType::Less,
+            Token::Modulo => BinaryOperationType::Modulo,
             _ => panic!("Expected binary operator toke"),
         }
     }
@@ -263,7 +268,7 @@ impl Parser {
         
         let mut current_expr = self.parse_primitive(); 
 
-        while matches!(self.peek(), Token::Plus | Token::Minus | Token::Multiply | Token::Equals | Token::Less) {
+        while matches!(self.peek(), Token::Plus | Token::Minus | Token::Multiply | Token::Equals | Token::Less | Token::Modulo) {
             let prec = self.get_binop_precedence(self.peek().clone());
             if prec < current_level {
                 break;
@@ -441,7 +446,11 @@ impl Compiler {
                         self.emit("    mov r0, #0");
                         self.emit("    movlt r0, #1");
                     }
-
+                    BinaryOperationType::Modulo => {
+                        self.emit("    sdiv r2, r1, r0"); // r2 <- int(left/right)  [-upwards for negative]  
+                        self.emit("    mul r2, r0, r2");   // r2 <- right * int(left/right)
+                        self.emit("    sub r0, r1, r2");
+                    }
                 }
             }
         }
