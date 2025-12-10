@@ -178,19 +178,16 @@ fn lex(program: &str) -> Vec<Token> {
                     break;
                 }
             }
-            if word == "if" {
-                tokens.push(Token::If);
-            } else if word == "else" {
-                tokens.push(Token::Else);
-            } else if word == "while" {
-                tokens.push(Token::While);
-            } else if word == "break" {
-                tokens.push(Token::Break);
-            } else if word == "continue" {
-                tokens.push(Token::Continue);
-            } else {
-                tokens.push(Token::Identifier(word));
-            } 
+
+            let token = match word.as_str() {
+                "if" => Token::If,
+                "else" => Token::Else,
+                "while" => Token::While,
+                "break" => Token::Break,
+                "continue" => Token::Continue,
+                _ => Token::Identifier(word),
+            };  
+            tokens.push(token); 
         }
 
         else {
