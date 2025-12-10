@@ -2,16 +2,15 @@ Things to do in the next few weeks
 
 
 # Next steps (XII.10 prolly)
-
-- add support for signed integers 
-    - mostly a lexing issue i think -- need to parse the pattern -[intliteral]
-- add _break_ and _continue_
+- add _continue_
 
 
 # Prob easy but not that necessary
 - add commenting -- eg //
 - add __print__
     - esp. because echo $? chops off at 256, but generally nice for debugging
+- add support for signed integers 
+    - mostly a lexing issue i think -- need to parse the pattern -[intliteral]
 
 
 # Cleaning up before the storm

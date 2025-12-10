@@ -51,7 +51,9 @@ enum Statement {
     While {
         condition: Box<Expression>,
         body: Vec<Statement>,
-    }
+    },
+
+    Break,
     //Print(Box<Expression>),
 }
 
@@ -88,6 +90,7 @@ enum Token {
     If,
     Else,
     While,
+    Break,
     
     // Special
     EOF,
@@ -179,6 +182,8 @@ fn lex(program: &str) -> Vec<Token> {
                 tokens.push(Token::Else);
             } else if word == "while" {
                 tokens.push(Token::While);
+            } else if word == "break" {
+                tokens.push(Token::Break);
             } else {
                 tokens.push(Token::Identifier(word));
             } 
@@ -201,6 +206,8 @@ struct Parser {
 
 
 impl Parser {
+
+    // TODO: might consider creating some kind of .expect()
     
     fn is_at_end(&self) -> bool {
         self.position >= self.tokens.len() 
@@ -301,7 +308,7 @@ impl Parser {
             Token::Identifier(_) => {
                 let varname = match self.consume() {
                     Token::Identifier(name) => name,
-                    _ => unreachable!() // WHAT? Refactor this sometime
+                    _ => unreachable!() // WHAT? Refactor this sometime !!!!!!!!!!!!!!!!!!!!!!
                 };
                 
                 if !matches!(self.consume(), Token::Assign) {
@@ -372,6 +379,15 @@ impl Parser {
                 }
             }
 
+            Token::Break => {         
+                self.consume();
+
+                if !matches!(self.consume(), Token::Semicolon) {
+                    panic!("Expected ';'");
+                }
+                Statement::Break
+            }
+
             other => {panic!("Expected statement, got: {:?} at position {}", other, self.position);}
         }
     }    
@@ -392,12 +408,13 @@ struct Compiler {
     output: String,
     stack_offsets: HashMap<String, i32>,
     label_counter: i32,  // make some kind of function call that does increment + return previous, so it's safer
+    loop_end_label_stack: Vec<String>,
 }
 
 impl Compiler {
 
     fn new() -> Self {
-        Compiler { output: String::new(), stack_offsets: HashMap::new(), label_counter: 0}
+        Compiler { output: String::new(), stack_offsets: HashMap::new(), label_counter: 0, loop_end_label_stack: Vec::new()}
     }
 
     fn emit(&mut self, line: &str) {
@@ -530,7 +547,9 @@ impl Compiler {
             Statement::While {condition, body} => {
                 let start_label = format!("while_start_{}", self.label_counter);
                 let end_label = format!("while_end_{}", self.label_counter);
+
                 self.label_counter = self.label_counter + 1;
+                self.loop_end_label_stack.push(end_label.clone());
 
                 self.emit(&format!("{}:", start_label));
                 
@@ -548,8 +567,23 @@ impl Compiler {
                 self.emit(&format!("    b {}", start_label));
 
                 self.emit(&format!("{}:", end_label));
-            }
 
+                self.loop_end_label_stack.pop();
+            }
+            
+            Statement::Break => {
+                
+                match self.loop_end_label_stack.last() {
+                    
+                    None => {
+                        panic!("Detected break statement outside of loop body"); 
+                    }
+
+                    Some(end_label) => {
+                        self.emit(&format!("    b {}", end_label));
+                    }
+                } 
+            }
             _ => unreachable!()
         }
     }
