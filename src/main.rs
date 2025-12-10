@@ -224,6 +224,15 @@ impl Parser {
         self.position += 1;
         token
     }
+    
+    fn expect_token(&self, token: Token) {
+        // Inteded use is for unparametric Tokens (normally delimiters)
+        // Might check if we can make this work for parametrics, dunno if needed
+        if !matches!(self.peek(), &token) {
+            panic!("Expected token {} at position {}, got token{}", token, self.position(), self.consume()); // NOTE: for correct position getting, important to do before consume
+        } 
+    }
+    
 
     fn parse_primitive(&mut self) -> Expression {
         
