@@ -208,7 +208,6 @@ struct Parser {
 
 impl Parser {
 
-    // TODO: might consider creating some kind of .expect()
     
     fn is_at_end(&self) -> bool {
         self.position >= self.tokens.len() 
@@ -225,11 +224,11 @@ impl Parser {
         token
     }
     
-    fn expect_token(&self, token: Token) {
-        // Inteded use is for unparametric Tokens (normally delimiters)
-        // Might check if we can make this work for parametrics, dunno if needed
-        if !matches!(self.peek(), &token) {
-            panic!("Expected token {} at position {}, got token{}", token, self.position(), self.consume()); // NOTE: for correct position getting, important to do before consume
+    // Inteded use is for unparametric Tokens (normally delimiters). TODO: might check if we can make this work for parametrics, dunno if needed
+    fn expect_token(&self, expected_token: Token) {
+        let peeked_token = self.peek();
+        if !matches!(peeked_token, expected_token) {
+            panic!("Expected token {:?} at position {}, got token {:?}.", expected_token, self.position, peeked_token); 
         } 
     }
     
@@ -237,19 +236,13 @@ impl Parser {
     fn parse_primitive(&mut self) -> Expression {
         
          match self.consume() {
-            
             Token::IntLiteral(int) => {Expression::IntLiteral(int)}
-
             Token::Identifier(name) => {Expression::Variable(name)}
-            
             Token::LeftParen => {
                 let paren_expr = self.parse_expression();
-                if !matches!(self.consume(), Token::RightParen) {
-                    panic!("Expected ')'");
-                } 
+                self.expect_token(Token::RightParen);
                 paren_expr
             }
-
             _ => {
                 let tok = self.consume();
                 panic!("Unexpected token while parsing expression: {:?}", tok);
@@ -257,6 +250,7 @@ impl Parser {
         }
     }
 
+    // TODO: maybe we should make a big binop info table with rows like: Token, Binoptype,precedence
     fn get_binop_precedence(&mut self, op_token: Token) -> i8 {
         match op_token {
             Token::Plus| Token::Minus => 1,
@@ -267,8 +261,6 @@ impl Parser {
     }
 
     fn convert_binop(&mut self, op_token: Token) -> BinaryOperationType {
-        
-        // TODO: do this nicer, like a hashmap or sth
         match op_token {
             Token::Plus => BinaryOperationType::Add,
             Token::Minus => BinaryOperationType::Sub,
@@ -320,43 +312,25 @@ impl Parser {
                     Token::Identifier(name) => name,
                     _ => unreachable!() // WHAT? Refactor this sometime !!!!!!!!!!!!!!!!!!!!!!
                 };
-                
-                if !matches!(self.consume(), Token::Assign) {
-                    panic!("Expected '=' at position {}", self.position);
-                }
-
-                let expr = self.parse_expression();
-
-                if !matches!(self.consume(), Token::Semicolon) {
-                    panic!("Expected ';'");
-                }
-                
+                self.expect_token(Token::Assign); 
+                let expr = self.parse_expression();               
                 Statement::Assign {
                     varname,
                     value: Box::new(expr)
                 }
-
             }
-
             Token::If => {
                 self.consume();
                 let cond = self.parse_expression();
-                if !matches!(self.consume(), Token::LeftBrace) {
-                    panic!("Expected opening brace");
-                }
+                self.expect_token(Token::LeftBrace);
                 let body = self.parse_block();
-                if !matches!(self.consume(), Token::RightBrace) {
-                    panic!("Expected closing brace");
-                }
+                self.expect_token(Token::RightBrace);
+                
                 if matches!(self.peek(), Token::Else) {
                     self.consume();
-                    if !matches!(self.consume(), Token::LeftBrace) {
-                        panic!("Expected opening brace");
-                    }
+                    self.expect_token(Token::LeftBrace);
                     let else_body = self.parse_block();
-                    if !matches!(self.consume(), Token::RightBrace) {
-                        panic!("Expected closing brace");
-                    }
+                    self.expect_token(Token::RightBrace);
                     return Statement::If{
                         condition: Box::new(cond),
                         if_body: body,
@@ -375,14 +349,9 @@ impl Parser {
             Token::While => {
                 self.consume();
                 let cond = self.parse_expression();
-                if !matches!(self.consume(), Token::LeftBrace) {
-                    panic!("Expected opening brace");
-                }
+                self.expect_token(Token::LeftBrace);
                 let body = self.parse_block();
-                if !matches!(self.consume(), Token::RightBrace) {
-                    panic!("Expected closing brace");
-                }
-
+                self.expect_token(Token::RightBrace);
                 Statement::While { 
                     condition: Box::new(cond), 
                     body: body,
@@ -391,19 +360,13 @@ impl Parser {
 
             Token::Break => {         
                 self.consume();
-
-                if !matches!(self.consume(), Token::Semicolon) {
-                    panic!("Expected ';'");
-                }
+                self.expect_token(Token::Semicolon);
                 Statement::Break
             }
             
             Token::Continue => {         
                 self.consume();
-
-                if !matches!(self.consume(), Token::Semicolon) {
-                    panic!("Expected ';' at position {}", self.position);
-                }
+                self.expect_token(Token::Semicolon);
                 Statement::Continue
             }
 
