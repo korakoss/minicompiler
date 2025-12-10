@@ -3,8 +3,10 @@ Things to do in the next few weeks
 
 # Next steps (XII.10 prolly)
 - add _continue_
-
-
+- debuggin
+	- add line nums to panics
+	- or even just print tokenization and AST human-readably
+		- we can make a simple recursive function to display it with indents?
 # Prob easy but not that necessary
 - add commenting -- eg //
 - add __print__

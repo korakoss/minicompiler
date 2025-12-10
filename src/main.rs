@@ -54,6 +54,7 @@ enum Statement {
     },
 
     Break,
+    Continue,
     //Print(Box<Expression>),
 }
 
@@ -91,6 +92,7 @@ enum Token {
     Else,
     While,
     Break,
+    Continue,
     
     // Special
     EOF,
@@ -184,6 +186,8 @@ fn lex(program: &str) -> Vec<Token> {
                 tokens.push(Token::While);
             } else if word == "break" {
                 tokens.push(Token::Break);
+            } else if word == "continue" {
+                tokens.push(Token::Continue);
             } else {
                 tokens.push(Token::Identifier(word));
             } 
@@ -312,7 +316,7 @@ impl Parser {
                 };
                 
                 if !matches!(self.consume(), Token::Assign) {
-                    panic!("Expected '='");
+                    panic!("Expected '=' at position {}", self.position);
                 }
 
                 let expr = self.parse_expression();
@@ -387,6 +391,15 @@ impl Parser {
                 }
                 Statement::Break
             }
+            
+            Token::Continue => {         
+                self.consume();
+
+                if !matches!(self.consume(), Token::Semicolon) {
+                    panic!("Expected ';' at position {}", self.position);
+                }
+                Statement::Continue
+            }
 
             other => {panic!("Expected statement, got: {:?} at position {}", other, self.position);}
         }
@@ -408,13 +421,14 @@ struct Compiler {
     output: String,
     stack_offsets: HashMap<String, i32>,
     label_counter: i32,  // make some kind of function call that does increment + return previous, so it's safer
+    loop_start_label_stack: Vec<String>,
     loop_end_label_stack: Vec<String>,
 }
 
 impl Compiler {
 
     fn new() -> Self {
-        Compiler { output: String::new(), stack_offsets: HashMap::new(), label_counter: 0, loop_end_label_stack: Vec::new()}
+        Compiler { output: String::new(), stack_offsets: HashMap::new(), label_counter: 0, loop_start_label_stack: Vec::new(), loop_end_label_stack: Vec::new()}
     }
 
     fn emit(&mut self, line: &str) {
@@ -432,7 +446,7 @@ impl Compiler {
             }
 
             Expression::Variable(varname) => {
-                let offset = self.stack_offsets.get(varname).expect("Undefined variable");
+                let offset = self.stack_offsets.get(varname).expect(&format!("Undefined variable: {}", &varname));
                 self.emit(&format!("    ldr r0, [fp, #-{}]", offset));    // 
             }
 
@@ -549,6 +563,8 @@ impl Compiler {
                 let end_label = format!("while_end_{}", self.label_counter);
 
                 self.label_counter = self.label_counter + 1;
+
+                self.loop_start_label_stack.push(start_label.clone());
                 self.loop_end_label_stack.push(end_label.clone());
 
                 self.emit(&format!("{}:", start_label));
@@ -567,7 +583,8 @@ impl Compiler {
                 self.emit(&format!("    b {}", start_label));
 
                 self.emit(&format!("{}:", end_label));
-
+                
+                self.loop_start_label_stack.pop();
                 self.loop_end_label_stack.pop();
             }
             
@@ -584,6 +601,21 @@ impl Compiler {
                     }
                 } 
             }
+            
+            Statement::Continue => {
+                
+                match self.loop_start_label_stack.last() {
+                    
+                    None => {
+                        panic!("Detected continue statement outside of loop body"); 
+                    }
+
+                    Some(start_label) => {
+                        self.emit(&format!("    b {}", start_label));
+                    }
+                } 
+            }
+
             _ => unreachable!()
         }
     }
@@ -623,7 +655,11 @@ fn main() {
     let assembly_filename = &args[2];
     let program_text = &fs::read_to_string(code_filename).unwrap();
     let tokens = lex(program_text);
-    println!("{:?}", tokens);
+
+    for tok in &tokens {
+        println!("{:?}", tok);
+    }
+
     let mut parser = Parser {tokens, position: 0};
     let program = parser.parse_program();
     println!("{:?}", program);
