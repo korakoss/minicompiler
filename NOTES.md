@@ -43,8 +43,6 @@ Or maybe some of them will be desirable anyway (eg. debugging functionalities li
 ## Cleaning up before the storm
 (see todo comments in code)
 (also just generally do a new pass over the whole code, I wrote it with worse Rust knowledge)
-- some things might not need to be boxed
-	- exprs in stmts maybe?
 - (maybe) rename some stuff
     - various enum variants
     - and BinaryOperationType

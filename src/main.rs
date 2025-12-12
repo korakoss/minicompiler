@@ -4,7 +4,7 @@ use std::env;
 
 
 #[derive(Debug)]
-enum BinaryOperationType {
+enum BinaryOperator {
     Add, 
     Sub, 
     Mul, 
@@ -23,7 +23,7 @@ enum Expression {
     Variable(String),
 
     BinOp {
-       op: BinaryOperationType,
+       op: BinaryOperator,
        left: Box<Expression>,
        right: Box<Expression>,
     },
@@ -244,14 +244,14 @@ impl Parser {
         }
     }
 
-    fn convert_binop(&mut self, op_token: Token) -> BinaryOperationType {
+    fn convert_binop(&mut self, op_token: Token) -> BinaryOperator {
         match op_token {
-            Token::Plus => BinaryOperationType::Add,
-            Token::Minus => BinaryOperationType::Sub,
-            Token::Multiply => BinaryOperationType::Mul,
-            Token::Equals => BinaryOperationType::Equals,
-            Token::Less => BinaryOperationType::Less,
-            Token::Modulo => BinaryOperationType::Modulo,
+            Token::Plus => BinaryOperator::Add,
+            Token::Minus => BinaryOperator::Sub,
+            Token::Multiply => BinaryOperator::Mul,
+            Token::Equals => BinaryOperator::Equals,
+            Token::Less => BinaryOperator::Less,
+            Token::Modulo => BinaryOperator::Modulo,
             _ => panic!("Expected binary operator toke"),
         }
     }
@@ -407,26 +407,26 @@ impl Compiler {
                 self.emit("    pop {r1}");
 
                 match op {
-                    BinaryOperationType::Add => {
+                    BinaryOperator::Add => {
                         self.emit("    add r0, r1, r0");
                     }
-                    BinaryOperationType::Sub => {
+                    BinaryOperator::Sub => {
                         self.emit("    sub r0, r1, r0");   // x1-x0 because x1: left x0:right
                     }
-                    BinaryOperationType::Mul => {
+                    BinaryOperator::Mul => {
                         self.emit("    mul r0, r1, r0");   
                     }
-                    BinaryOperationType::Equals => {
+                    BinaryOperator::Equals => {
                         self.emit("    cmp r1, r0");
                         self.emit("    mov r0, #0");
                         self.emit("    moveq r0, #1");
                     }
-                    BinaryOperationType::Less=> {
+                    BinaryOperator::Less=> {
                         self.emit("    cmp r1, r0");
                         self.emit("    mov r0, #0");
                         self.emit("    movlt r0, #1");
                     }
-                    BinaryOperationType::Modulo => {
+                    BinaryOperator::Modulo => {
                         self.emit("    sdiv r2, r1, r0"); // r2 <- int(left/right)  [-upwards for negative]  
                         self.emit("    mul r2, r0, r2");   // r2 <- right * int(left/right)
                         self.emit("    sub r0, r1, r2");
