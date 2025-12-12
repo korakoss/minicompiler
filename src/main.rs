@@ -39,17 +39,17 @@ enum Statement {
 
     Assign {
         varname: String,
-        value: Box<Expression>
+        value: Expression
     },
 
     If {
-        condition: Box<Expression>,
+        condition: Expression,
         if_body: Vec<Statement>,
         else_body: Option<Vec<Statement>>,
     },
     
     While {
-        condition: Box<Expression>,
+        condition: Expression,
         body: Vec<Statement>,
     },
 
@@ -297,7 +297,7 @@ impl Parser {
                 self.expect_token(Token::Semicolon);
                 Statement::Assign {
                     varname,
-                    value: Box::new(expr)
+                    value: expr
                 }
             }
             Token::If => {
@@ -311,14 +311,14 @@ impl Parser {
                     let else_body = self.parse_block();
                     self.expect_token(Token::RightBrace);
                     return Statement::If{
-                        condition: Box::new(cond),
+                        condition: cond,
                         if_body: body,
                         else_body: Some(else_body),
                     }
    
                 } else {
                     return Statement::If { 
-                        condition: Box::new(cond), 
+                        condition: cond, 
                         if_body: body,
                         else_body: None,
                     }
@@ -331,7 +331,7 @@ impl Parser {
                 let body = self.parse_block();
                 self.expect_token(Token::RightBrace);
                 Statement::While { 
-                    condition: Box::new(cond), 
+                    condition: cond, 
                     body: body,
                 }
             }
