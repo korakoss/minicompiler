@@ -64,7 +64,7 @@ struct Program {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Token {
     // Operators
     Assign,
@@ -104,71 +104,15 @@ fn lex(program: &str) -> Vec<Token> {
     let mut chars = program.chars().peekable();
     
     while let Some(&c) = chars.peek() {
-        // Skip whitespace
+
         if c.is_whitespace() {
             chars.next();
             continue;
         }
-        
-        // TODO: refactor this to something acceptable looking, like a match or hashm
-        // TODO: refactor out the chars.next()-s?
-        // Single-character tokens
-        if c == '=' {
-            chars.next();
-            if chars.peek() == Some(&'=') {
-                tokens.push(Token::Equals);
-                chars.next();
-            } else {
-                tokens.push(Token::Assign);
-            }
-        } else if c == '+' {
-            tokens.push(Token::Plus);
-            chars.next();
-        } else if c == '-' {
-            tokens.push(Token::Minus);
-            chars.next();
-        } else if c=='*' {
-            tokens.push(Token::Multiply);
-            chars.next();
-        } else if c == ';' {
-            tokens.push(Token::Semicolon);
-            chars.next();
-        } else if c == '(' {
-            tokens.push(Token::LeftParen);
-            chars.next();
-        } else if c == ')' {
-            tokens.push(Token::RightParen);
-            chars.next();
-        } else if c == '{' {
-            tokens.push(Token::LeftBrace);
-            chars.next();
-        } else if c == '}' {
-            tokens.push(Token::RightBrace);
-            chars.next();
-        } else if c == '<' {
-            tokens.push(Token::Less);
-            chars.next();
-        } else if c == '%' {
-            tokens.push(Token::Modulo);
-            chars.next();
-        } 
-        // Numbers
-        else if c.is_ascii_digit() {
-            let mut num_str = String::new();
-            while let Some(&ch) = chars.peek() {
-                if ch.is_ascii_digit() {
-                    num_str.push(ch);
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-            let value = num_str.parse::<i32>().unwrap();
-            tokens.push(Token::IntLiteral(value));
-        }
+
 
         // Alphanumeric strings: keywords or identifiers
-        else if c.is_ascii_alphabetic() {
+        if c.is_ascii_alphabetic() {
             let mut word = String::new();
             while let Some(&ch) = chars.peek() {
                 if ch.is_ascii_alphanumeric() || ch == '_' {
@@ -188,13 +132,53 @@ fn lex(program: &str) -> Vec<Token> {
                 _ => Token::Identifier(word),
             };  
             tokens.push(token); 
+        } 
+        
+        // Numbers
+        else if c.is_ascii_digit() {
+            let mut num_str = String::new();
+            while let Some(&ch) = chars.peek() {
+                if ch.is_ascii_digit() {
+                    num_str.push(ch);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            let value = num_str.parse::<i32>().unwrap();
+            tokens.push(Token::IntLiteral(value));
+        }
+
+        else if c == '=' {
+            chars.next();
+            if chars.peek() == Some(&'=') {
+                chars.next();
+                tokens.push(Token::Equals);
+            } else {
+                tokens.push(Token::Assign);
+            }
         }
 
         else {
-            panic!("Unexpected character: {}", c);
+            // Processing single character stuff
+            let token = match c {
+                '+' => Token::Plus,
+                '-' => Token::Minus,
+                '*' => Token::Multiply,
+                ';' => Token::Semicolon,
+                '(' => Token::LeftParen,
+                ')' => Token::RightParen,
+                '{' => Token::LeftBrace,
+                '}' => Token::RightBrace,
+                '<' => Token::Less,
+                '%' => Token::Modulo,
+                _ => {panic!("Unexpected character {} at position ",c)},
+            };
+            chars.next();
+            tokens.push(token);
         }
-    }
-    
+        
+    } 
     tokens.push(Token::EOF);
     tokens
 }
@@ -225,28 +209,28 @@ impl Parser {
     }
     
     // Inteded use is for unparametric Tokens (normally delimiters). TODO: might check if we can make this work for parametrics, dunno if needed
-    fn expect_token(&self, expected_token: Token) {
-        let peeked_token = self.peek();
-        if !matches!(peeked_token, expected_token) {
-            panic!("Expected token {:?} at position {}, got token {:?}.", expected_token, self.position, peeked_token); 
-        } 
+    fn expect_token(&mut self, expected_token: Token) {
+        if self.peek() != &expected_token {
+            panic!("Expected token {:?} at position {}, got token {:?}.", expected_token, self.position, self.peek()); 
+        }
+        self.consume();
     }
     
 
     fn parse_primitive(&mut self) -> Expression {
         
          match self.consume() {
-            Token::IntLiteral(int) => {Expression::IntLiteral(int)}
-            Token::Identifier(name) => {Expression::Variable(name)}
+            Token::IntLiteral(int) => {Expression::IntLiteral(int)},
+            Token::Identifier(name) => {Expression::Variable(name)},
             Token::LeftParen => {
                 let paren_expr = self.parse_expression();
                 self.expect_token(Token::RightParen);
                 paren_expr
-            }
+            },
             _ => {
                 let tok = self.consume();
-                panic!("Unexpected token while parsing expression: {:?}", tok);
-            }
+                panic!("Unexpected token {:?} during expression parsing at position {:?}", tok, self.position);
+            },
         }
     }
 
@@ -313,7 +297,8 @@ impl Parser {
                     _ => unreachable!() // WHAT? Refactor this sometime !!!!!!!!!!!!!!!!!!!!!!
                 };
                 self.expect_token(Token::Assign); 
-                let expr = self.parse_expression();               
+                let expr = self.parse_expression(); 
+                self.expect_token(Token::Semicolon);
                 Statement::Assign {
                     varname,
                     value: Box::new(expr)
