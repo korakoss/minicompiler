@@ -36,17 +36,8 @@ Or maybe some of them will be desirable anyway (eg. debugging functionalities li
 
 
 ## Quality of life 
-- or even just print tokenization and AST human-readably
-- we can make a simple recursive function to display it with indents?
-
-
-## Cleaning up before the storm
-(see todo comments in code)
-(also just generally do a new pass over the whole code, I wrote it with worse Rust knowledge)
-- (maybe) rename some stuff
-    - various enum variants
-    - and BinaryOperationType
-        - maybe Expression::BinaryOperation and BinaryOperator
+- print tokenization and AST human-readably
+	- we can make a simple recursive function to display it with indents?
 
 
 ## Functions
