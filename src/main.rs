@@ -172,7 +172,7 @@ fn lex(program: &str) -> Vec<Token> {
                 '}' => Token::RightBrace,
                 '<' => Token::Less,
                 '%' => Token::Modulo,
-                _ => {panic!("Unexpected character {} at position ",c)},
+                _ => {panic!("Unexpected character: {}",c)},
             };
             chars.next();
             tokens.push(token);
@@ -519,7 +519,7 @@ impl Compiler {
                 
                 match self.loop_end_label_stack.last() {
                     None => {
-                        panic!("Detected break statement outside of loop body"); 
+                        panic!("Detected break statement outside of loop body");        // TODO: shouldn't this be caught at parsing?
                     }
                     Some(end_label) => {
                         self.emit(&format!("    b {}", end_label));

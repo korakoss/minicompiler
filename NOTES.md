@@ -36,10 +36,8 @@ Or maybe some of them will be desirable anyway (eg. debugging functionalities li
 
 
 ## Quality of life 
-- debuggin
-	- add line nums to panics
-	- or even just print tokenization and AST human-readably
-		- we can make a simple recursive function to display it with indents?
+- or even just print tokenization and AST human-readably
+- we can make a simple recursive function to display it with indents?
 
 
 ## Cleaning up before the storm
