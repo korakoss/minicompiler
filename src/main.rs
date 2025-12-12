@@ -289,13 +289,9 @@ impl Parser {
 
     fn parse_statement(&mut self) -> Statement {
         
-        match self.peek() {
+        match self.consume() {
                         
-            Token::Identifier(_) => {
-                let varname = match self.consume() {
-                    Token::Identifier(name) => name,
-                    _ => unreachable!() // WHAT? Refactor this sometime !!!!!!!!!!!!!!!!!!!!!!
-                };
+            Token::Identifier(varname) => {
                 self.expect_token(Token::Assign); 
                 let expr = self.parse_expression(); 
                 self.expect_token(Token::Semicolon);
@@ -305,14 +301,12 @@ impl Parser {
                 }
             }
             Token::If => {
-                self.consume();
                 let cond = self.parse_expression();
                 self.expect_token(Token::LeftBrace);
                 let body = self.parse_block();
                 self.expect_token(Token::RightBrace);
                 
                 if matches!(self.peek(), Token::Else) {
-                    self.consume();
                     self.expect_token(Token::LeftBrace);
                     let else_body = self.parse_block();
                     self.expect_token(Token::RightBrace);
@@ -332,7 +326,6 @@ impl Parser {
             }
 
             Token::While => {
-                self.consume();
                 let cond = self.parse_expression();
                 self.expect_token(Token::LeftBrace);
                 let body = self.parse_block();
@@ -344,13 +337,11 @@ impl Parser {
             }
 
             Token::Break => {         
-                self.consume();
                 self.expect_token(Token::Semicolon);
                 Statement::Break
             }
             
             Token::Continue => {         
-                self.consume();
                 self.expect_token(Token::Semicolon);
                 Statement::Continue
             }
@@ -569,8 +560,6 @@ impl Compiler {
                     }
                 } 
             }
-
-            _ => unreachable!()
         }
     }
 
