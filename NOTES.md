@@ -20,7 +20,7 @@ Or maybe some of them will be desirable anyway (eg. debugging functionalities li
 ## Easy wins
 - Negation
     - introduce Expression::UnaryOp
-- Remaining comparison operators (>, !) 
+- Remaining comparison operators (>, !=) 
     - maybe >= and =< but not necessary
 - add commenting -- eg //
 - add support for signed integers 
@@ -45,17 +45,12 @@ Or maybe some of them will be desirable anyway (eg. debugging functionalities li
 ## Cleaning up before the storm
 (see todo comments in code)
 (also just generally do a new pass over the whole code, I wrote it with worse Rust knowledge)
-
-- turn ugly elif chains into hashmaps   
-    - some things might not need to be boxed
-        - exprs in stmts maybe?
+- some things might not need to be boxed
+	- exprs in stmts maybe?
 - (maybe) rename some stuff
     - various enum variants
     - and BinaryOperationType
         - maybe Expression::BinaryOperation and BinaryOperator
-- helper function in Compiler for label count accounting
-- that patternmatch abomination early in parse_expression()
-- potentially: an expect() in Parser
 
 
 ## Functions

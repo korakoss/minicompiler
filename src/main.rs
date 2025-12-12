@@ -365,7 +365,7 @@ impl Parser {
 struct Compiler {
     output: String,
     stack_offsets: HashMap<String, i32>,
-    label_counter: i32,  // make some kind of function call that does increment + return previous, so it's safer
+    label_counter: u32,  // make some kind of function call that does increment + return previous, so it's safer
     loop_start_label_stack: Vec<String>,
     loop_end_label_stack: Vec<String>,
 }
@@ -379,6 +379,11 @@ impl Compiler {
     fn emit(&mut self, line: &str) {
         self.output.push_str(line);
         self.output.push('\n');
+    }
+
+    fn assign_labelcount(&mut self) -> u32 {
+        self.label_counter = self.label_counter + 1;
+        self.label_counter
     }
 
     fn compile_expression(&mut self, expression: &Expression) {
@@ -451,15 +456,9 @@ impl Compiler {
                 }
             }
             Statement::If {condition, if_body, else_body} => {
-                
-                // Get our label ordinal, increment
-                let counter_str = format!("{}", self.label_counter);
-                self.label_counter = self.label_counter + 1;
-                
-                // Create a label pointing to the address after if body or if _and_ else body, depending on case
+                let counter_str = format!("{}", self.assign_labelcount());
                 let branching_end_label = format!("branching_end_{}", counter_str);
 
-                // Execute the expression that if conditions on, store result in r0
                 self.compile_expression(condition);
                 self.emit("    cmp r0, #0");
                 
@@ -469,66 +468,49 @@ impl Compiler {
                     Some(else_statements) => {
                         
                         let else_start_label = format!("else_start_{}", counter_str);
-                        
-                        // If the condition was false, we jump to the body of else
                         self.emit(&format!("    beq {}", else_start_label));
-                        
-                        // If body code
                         for stmt in if_body {
                             self.compile_statement(stmt);
                         }
-
-                        // After if body, unconditional jump to after the branch code
                         self.emit(&format!("    b {}", branching_end_label));
-
                         self.emit(&format!("{}:", else_start_label));
                         for stmt in else_statements {
                             self.compile_statement(stmt);
                         }
-
                     }
                     
                     None => {
-                        // If r0 was false, we jump to after the body
                         self.emit(&format!("    beq {}", branching_end_label));
-
-                        // Body code
                         for stmt in if_body {
                             self.compile_statement(stmt);
                         } 
                     } 
 
                 }
-                // Set up label after all branching codes       
                 self.emit(&format!("{}:",branching_end_label));
             }
             
             Statement::While {condition, body} => {
-                let start_label = format!("while_start_{}", self.label_counter);
-                let end_label = format!("while_end_{}", self.label_counter);
-
-                self.label_counter = self.label_counter + 1;
+                let counter_str = format!("{}", self.assign_labelcount());
+                let start_label = format!("while_start_{}", counter_str);
+                let end_label = format!("while_end_{}", counter_str);
 
                 self.loop_start_label_stack.push(start_label.clone());
                 self.loop_end_label_stack.push(end_label.clone());
 
                 self.emit(&format!("{}:", start_label));
                 
-                // Loop head: compute condition, if false then jump to end label
                 self.compile_expression(condition);
                 self.emit("    cmp r0, #0");
                 self.emit(&format!("    beq {}", end_label));
 
-                // Loop body
                 for stmt in body {
                     self.compile_statement(stmt);
                 }
                 
-                // At the end of loop body, unconditionally jump to start label
                 self.emit(&format!("    b {}", start_label));
 
                 self.emit(&format!("{}:", end_label));
-                
                 self.loop_start_label_stack.pop();
                 self.loop_end_label_stack.pop();
             }
@@ -536,11 +518,9 @@ impl Compiler {
             Statement::Break => {
                 
                 match self.loop_end_label_stack.last() {
-                    
                     None => {
                         panic!("Detected break statement outside of loop body"); 
                     }
-
                     Some(end_label) => {
                         self.emit(&format!("    b {}", end_label));
                     }
@@ -550,11 +530,9 @@ impl Compiler {
             Statement::Continue => {
                 
                 match self.loop_start_label_stack.last() {
-                    
                     None => {
                         panic!("Detected continue statement outside of loop body"); 
                     }
-
                     Some(start_label) => {
                         self.emit(&format!("    b {}", start_label));
                     }
