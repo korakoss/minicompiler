@@ -27,6 +27,11 @@ enum Expression {
        left: Box<Expression>,
        right: Box<Expression>,
     },
+
+    FuncCall {
+        funcname: String,
+        args: Vec<Box<Expression>>,
+    }
     
     // UnaryOp (eg. negation)
 }
@@ -55,12 +60,22 @@ enum Statement {
 
     Break,
     Continue,
+
+    Return(Expression),
     //Print(Box<Expression>),
 }
 
 #[derive(Debug)]
+struct Function {
+    name: String,
+    args: Vec<String>,
+    body: Vec<Statement>,
+}
+
+#[derive(Debug)]
 struct Program {
-    statements: Vec<Statement>
+    functions: Vec<Function>,
+    main_statements: Vec<Statement>
 }
 
 
@@ -81,6 +96,7 @@ enum Token {
     RightParen,
     LeftBrace,
     RightBrace,
+    Comma,
     
     // Values 
     IntLiteral(i32),
@@ -93,6 +109,8 @@ enum Token {
     While,
     Break,
     Continue,
+    Function,
+    Return,
     
     // Special
     EOF,
@@ -129,6 +147,8 @@ fn lex(program: &str) -> Vec<Token> {
                 "while" => Token::While,
                 "break" => Token::Break,
                 "continue" => Token::Continue,
+                "fun" => Token::Function,
+                "return" => Token::Return,
                 _ => Token::Identifier(word),
             };  
             tokens.push(token); 
@@ -172,6 +192,7 @@ fn lex(program: &str) -> Vec<Token> {
                 '}' => Token::RightBrace,
                 '<' => Token::Less,
                 '%' => Token::Modulo,
+                ',' => Token::Comma,
                 _ => {panic!("Unexpected character: {}",c)},
             };
             chars.next();
@@ -350,14 +371,51 @@ impl Parser {
         }
     }    
 
+    fn parse_function_declaration(&mut self) -> Function {
+        let funcname = match self.consume(){
+            Token::Identifier(name) => {name},
+            other => {panic!("Expected a function name, got token {:?} at {}", other, self.position);}
+        };
+
+        let mut args = Vec::new();
+        self.expect_token(Token::LeftParen);
+        
+        if self.peek() == &Token::RightParen {
+            self.consume();
+        } else {
+            match self.consume() {
+                Token::Identifier(name) => args.push(name),
+                other => panic!("Expected parameter name, got {:?}", other),
+            }
+                
+            while self.peek() == &Token::Comma {
+                self.consume();  
+                match self.consume() {
+                    Token::Identifier(name) => args.push(name),
+                    other => panic!("Expected parameter name after comma, got {:?}", other),
+                }
+            }
+        }
+        self.expect_token(Token::RightParen);
+        self.expect_token(Token::LeftBrace);
+        let body = self.parse_block();
+        self.expect_token(Token::RightBrace);
+        Function {name: funcname, args, body: body}
+    }
+
     fn parse_program(&mut self) -> Program {
+        let mut functions = Vec::new();
         let mut statements = Vec::new();
         
         while !self.is_at_end() {
-            statements.push(self.parse_statement());
+            if self.peek() == &Token::Function {
+                functions.push(self.parse_function_declaration());
+            } else {
+                statements.push(self.parse_statement());
+            }
         }
         
-        Program { statements }
+        Program { functions: functions,main_statements: statements }
     }
 }
 
@@ -553,7 +611,7 @@ impl Compiler {
         self.emit("    sub sp, sp, #256");             //reserving space (TBD: actually count the variables
         
         // Compiling statements
-        for statement in &program.statements {
+        for statement in &program.main_statements {
             self.compile_statement(statement);
         }
 
