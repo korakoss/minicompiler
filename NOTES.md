@@ -14,6 +14,26 @@ The rest can be sprinkled in whenever I don't want to deal with the harder parts
 Or maybe some of them will be desirable anyway (eg. debugging functionalities like printing and improved panics; potentially even comments).
 
 
+# Action plan (XII.13.)
+
+We are working on *functions*. We have to finish parsing, then move on to compiling. 
+
+## Parsing
+
+- parsing func calls in expressions
+    - how do we check func call correctness?
+        - should we just leave that for later (when typechecking)?
+    - DECISION: for now, the plan is: user must implement function calls before the main stuff 
+        - later version: I think we should have a main() entry point
+- we need to keep track of variables or something in the frame
+- **NOTE:** for now, all of the above was solved by instead distinguishing funccalls by the ( after them
+
+- make scripts that show tokens, then AST, then assembly, then run
+
+## Compiling 
+(...)
+
+
 
 # v1 plans 
 

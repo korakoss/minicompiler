@@ -208,11 +208,27 @@ fn lex(program: &str) -> Vec<Token> {
 struct Parser {
     tokens: Vec<Token>,
     position: usize,
+    loop_nest_counter: usize,
+    within_function_body:bool,
+    defined_funcs: Vec<Function>,
+    glob_vars: Vec<String>,
+    loc_vars: Vec<String>,
 }
 
 
 impl Parser {
-
+    
+    fn new() -> Self {
+        Parser {
+            tokens: Vec::new(),
+            position: 0,
+            loop_nest_counter:0,
+            within_function_body: false,
+            defined_funcs: Vec::new(),
+            glob_vars: Vec::new(),
+            loc_vars: Vec::new(),
+        }
+    }
     
     fn is_at_end(&self) -> bool {
         self.position >= self.tokens.len() 
@@ -237,12 +253,29 @@ impl Parser {
         self.consume();
     }
     
+    fn parse_funccall_args(&mut self) -> Vec<Box<Expression>> {
+        let mut args = Vec::new();
+        while self.peek() != &Token::RightParen {
+            let expr = self.parse_expression();              // TODO: this should ideally handle which variables are in scope maybe?
+            args.push(Box::new(expr));
+            self.expect_token(Token::Comma);
+        }
+        args
+    }
 
     fn parse_primitive(&mut self) -> Expression {
         
          match self.consume() {
             Token::IntLiteral(int) => {Expression::IntLiteral(int)},
-            Token::Identifier(name) => {Expression::Variable(name)},
+            Token::Identifier(name) => {
+                if self.peek() == &Token::LeftParen {        // Function call 
+                    self.consume();
+                    let args = self.parse_funccall_args(); 
+                    Expression::FuncCall { funcname: name, args: args}
+                } else {
+                    Expression::Variable(name)
+                }
+            },
             Token::LeftParen => {
                 let paren_expr = self.parse_expression();
                 self.expect_token(Token::RightParen);
@@ -316,6 +349,12 @@ impl Parser {
                 self.expect_token(Token::Assign); 
                 let expr = self.parse_expression(); 
                 self.expect_token(Token::Semicolon);
+                if self.within_function_body {
+                    self.loc_vars.push(varname.clone());                
+                } else {
+                    self.glob_vars.push(varname.clone());
+                }
+
                 Statement::Assign {
                     varname,
                     value: expr
@@ -349,8 +388,10 @@ impl Parser {
             Token::While => {
                 let cond = self.parse_expression();
                 self.expect_token(Token::LeftBrace);
+                self.loop_nest_counter = self.loop_nest_counter + 1;
                 let body = self.parse_block();
                 self.expect_token(Token::RightBrace);
+                self.loop_nest_counter = self.loop_nest_counter - 1;
                 Statement::While { 
                     condition: cond, 
                     body: body,
@@ -358,13 +399,30 @@ impl Parser {
             }
 
             Token::Break => {         
-                self.expect_token(Token::Semicolon);
-                Statement::Break
+                if self.loop_nest_counter > 1 {
+                    self.expect_token(Token::Semicolon);
+                    Statement::Break
+                } else {
+                    panic!("Break statement detected outside of any loop body at position {}", self.position);
+                }
             }
             
             Token::Continue => {         
+                if self.loop_nest_counter > 1 {
+                    self.expect_token(Token::Semicolon);
+                    Statement::Continue
+                } else {
+                    panic!("Continue statement detected outside of any loop body at position {}", self.position);
+                }
+            }
+
+            Token::Return => {
+                if !self.within_function_body {
+                    panic!("Return statement detected outside of a function body at position {}", self.position);
+                }
+                let return_expr = self.parse_expression();
                 self.expect_token(Token::Semicolon);
-                Statement::Continue
+                Statement::Return(return_expr)
             }
 
             other => {panic!("Expected statement, got: {:?} at position {}", other, self.position);}
@@ -398,24 +456,26 @@ impl Parser {
         }
         self.expect_token(Token::RightParen);
         self.expect_token(Token::LeftBrace);
+        self.within_function_body = true;
         let body = self.parse_block();
         self.expect_token(Token::RightBrace);
-        Function {name: funcname, args, body: body}
+        self.within_function_body = false;
+        Function {name: funcname, args: args, body: body}
     }
 
-    fn parse_program(&mut self) -> Program {
-        let mut functions = Vec::new();
+    fn parse_program(mut self) -> Program {
         let mut statements = Vec::new();
         
         while !self.is_at_end() {
             if self.peek() == &Token::Function {
-                functions.push(self.parse_function_declaration());
+                let func_decl = self.parse_function_declaration();
+                self.defined_funcs.push(func_decl);
             } else {
                 statements.push(self.parse_statement());
             }
         }
         
-        Program { functions: functions,main_statements: statements }
+        Program { functions: self.defined_funcs, main_statements: statements}
     }
 }
 
@@ -576,9 +636,7 @@ impl Compiler {
             Statement::Break => {
                 
                 match self.loop_end_label_stack.last() {
-                    None => {
-                        panic!("Detected break statement outside of loop body");        // TODO: shouldn't this be caught at parsing?
-                    }
+                    None => {unreachable!("Break outside loop at compilation")},
                     Some(end_label) => {
                         self.emit(&format!("    b {}", end_label));
                     }
@@ -588,9 +646,7 @@ impl Compiler {
             Statement::Continue => {
                 
                 match self.loop_start_label_stack.last() {
-                    None => {
-                        panic!("Detected continue statement outside of loop body"); 
-                    }
+                    None => {unreachable!("Continue outside loop at compilation")},
                     Some(start_label) => {
                         self.emit(&format!("    b {}", start_label));
                     }
@@ -639,7 +695,7 @@ fn main() {
         println!("{:?}", tok);
     }
 
-    let mut parser = Parser {tokens, position: 0};
+    let mut parser = Parser::new();
     let program = parser.parse_program();
     println!("{:?}", program);
     let mut compiler = Compiler::new();
