@@ -18,5 +18,4 @@ if [ "$keep_asm" = false ]; then
 fi
 if [ "$run_program" = true ]; then
     ./"$2"
-    echo $?
 fi
