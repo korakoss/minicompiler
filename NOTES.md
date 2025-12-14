@@ -19,6 +19,9 @@ Or maybe some of them will be desirable anyway (eg. debugging functionalities li
 
 - variable overwriting within blocks
 - allocating 8 bits per var depspite it's 4 on arm32
+- validating called function even exists
+- emit should do the format! itself (and probably not take _borrows_, also mega annoying
+
 # Action plan (XII.13.)
 
 We are working on *functions*. We have to finish parsing, then move on to compiling. 

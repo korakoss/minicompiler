@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use std::fs;
 use std::env;
-use std::hash::Hash;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum BinaryOperator {
     Add, 
     Sub, 
@@ -17,7 +16,7 @@ enum BinaryOperator {
     //NotEqual
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Expression {
     IntLiteral(i32),
 
@@ -259,6 +258,9 @@ impl Parser {
     }
     
     fn parse_funccall_args(&mut self) -> Vec<Box<Expression>> {
+        if self.peek() == &Token::RightParen {
+            println!("Boo");
+        }
         let mut args = Vec::new();
         if self.is_expression_start() {
             args.push(Box::new(self.parse_expression()));
@@ -267,7 +269,6 @@ impl Parser {
                 args.push(Box::new(self.parse_expression()));
             }
         } 
-        self.expect_token(Token::RightParen);
         args
     }
 
@@ -279,6 +280,7 @@ impl Parser {
                 if self.peek() == &Token::LeftParen {        // Function call 
                     self.consume();
                     let args = self.parse_funccall_args(); 
+                    self.expect_token(Token::RightParen);
                     Expression::FuncCall { funcname: name, args: args}
                 } else {
                     Expression::Variable(name)
@@ -445,7 +447,6 @@ impl Parser {
 
         let mut args = Vec::new();
         self.expect_token(Token::LeftParen);
-        
         if self.peek() == &Token::RightParen {
             self.consume();
         } else {
@@ -461,8 +462,8 @@ impl Parser {
                     other => panic!("Expected parameter name after comma, got {:?}", other),
                 }
             }
+            self.expect_token(Token::RightParen);
         }
-        self.expect_token(Token::RightParen);
         self.expect_token(Token::LeftBrace);
         self.within_function_body = true;
         let body = self.parse_block();
@@ -492,15 +493,17 @@ struct Context {
     stack_offsets: HashMap<String, i32>,
     loop_start_label_stack: Vec<String>,
     loop_end_label_stack: Vec<String>,
+    return_label: Option<String>,           // TODO: later not Option, because mainfunc
 }
 
 
 impl Context {
-    fn new() -> Context {
+    fn new(return_label: Option<String>) -> Context {
         Context {
             stack_offsets: HashMap::new(),
             loop_start_label_stack: Vec::new(),
             loop_end_label_stack: Vec::new(),
+            return_label: return_label
         }
     }
 }
@@ -517,7 +520,7 @@ impl Compiler {
         Compiler { output: String::new(), label_counter: 0}
     }
 
-    fn emit(&mut self, line: &str) {
+    fn emit(&mut self, line: &str) {        // TODO: let this do the formatting
         self.output.push_str(line);
         self.output.push('\n');
     }
@@ -531,7 +534,17 @@ impl Compiler {
        
         match expression {
             
-            Expression::FuncCall { funcname, args } => {unimplemented!("FuncCall unimplemented")}
+            Expression::FuncCall { funcname, args } => {
+                // TODO: validating function exists in the first place
+                // NOTE: only for 1 arg, TODO: general solution
+               
+                // What if empty? TODO
+                if !args.is_empty() {
+                    let firstarg = *args[0].clone();
+                    self.compile_expression(context, firstarg);  // Result in r0
+                }
+                self.emit(&format!("    bl {}", funcname));
+            }
             
             Expression::IntLiteral(n) => {
                 self.emit(&format!("    ldr r0, ={}", n));   // Load the value into the main register 
@@ -674,7 +687,15 @@ impl Compiler {
                 } 
             }
 
-            Statement::Return(value) => {unimplemented!("Return unimplemented")}
+            Statement::Return(return_expr) => {
+                self.compile_expression(context, return_expr);
+                match &context.return_label {
+                    None => panic!("Return without active return label set"),
+                    Some(label) => {
+                        self.emit(&format!("    b {}", label));
+                    }
+                }
+            }
         }
     }
 
@@ -685,7 +706,9 @@ impl Compiler {
         self.emit("    push {fp, lr}");     
         self.emit("    mov fp, sp");     
         self.emit("    sub sp, sp, #256"); // TBD: do properly        
-        let mut func_context = Context::new();
+        
+        let ret_label = format!("{}_epilogue", name);
+        let mut func_context = Context::new(Some(ret_label.clone()));
 
         if args.len() > 0 {
             self.emit("    str r0, [fp, #-8]"); // save the argument (NOTE: 1 argument assumed for now)
@@ -696,12 +719,24 @@ impl Compiler {
         for stmt in body {
             self.compile_statement(&mut func_context, stmt);
         }
+        
+        self.emit(&format!("{}:", ret_label));
+        self.emit("    add sp, sp, #256");         // TBD: actual variable offsets!
+        self.emit("    pop {fp, lr}");
+        self.emit("    bx lr");
     }
     
     fn compile_program(&mut self, program: Program) -> String {
         // Header
         self.emit(".global main");
         self.emit(".align 4");
+        
+        let Program{functions, main_statements} = program;
+        for func in functions {
+            self.compile_function(func);
+        }
+
+
         self.emit("main:");
 
         // Prologue
@@ -709,12 +744,8 @@ impl Compiler {
         self.emit("    mov fp, sp");                  //fp = sp
         self.emit("    sub sp, sp, #256");             //reserving space (TBD: actually count the variables
         
-        let Program{functions, main_statements} = program;
-        for func in functions {
-            self.compile_function(func);
-        }
-        
-        let mut global_context = Context::new();
+                
+        let mut global_context = Context::new(None);
         for stmt in main_statements {
             self.compile_statement(&mut global_context, stmt);
         }
