@@ -218,9 +218,9 @@ struct Parser {
 
 impl Parser {
     
-    fn new() -> Self {
+    fn new(tokens: Vec<Token>) -> Self {
         Parser {
-            tokens: Vec::new(),
+            tokens: tokens,
             position: 0,
             loop_nest_counter:0,
             within_function_body: false,
@@ -252,14 +252,21 @@ impl Parser {
         }
         self.consume();
     }
+
+    fn is_expression_start(&self) -> bool {
+        matches!(self.peek(), Token::IntLiteral(_) | Token::Identifier(_) | Token::LeftParen)
+    }
     
     fn parse_funccall_args(&mut self) -> Vec<Box<Expression>> {
         let mut args = Vec::new();
-        while self.peek() != &Token::RightParen {
-            let expr = self.parse_expression();              // TODO: this should ideally handle which variables are in scope maybe?
-            args.push(Box::new(expr));
-            self.expect_token(Token::Comma);
-        }
+        if self.is_expression_start() {
+            args.push(Box::new(self.parse_expression()));
+            while self.peek() == &Token::Comma {
+                self.consume();
+                args.push(Box::new(self.parse_expression()));
+            }
+        } 
+        self.expect_token(Token::RightParen);
         args
     }
 
@@ -465,16 +472,15 @@ impl Parser {
 
     fn parse_program(mut self) -> Program {
         let mut statements = Vec::new();
-        
         while !self.is_at_end() {
             if self.peek() == &Token::Function {
+                self.consume();
                 let func_decl = self.parse_function_declaration();
                 self.defined_funcs.push(func_decl);
             } else {
                 statements.push(self.parse_statement());
             }
         }
-        
         Program { functions: self.defined_funcs, main_statements: statements}
     }
 }
@@ -507,7 +513,9 @@ impl Compiler {
     fn compile_expression(&mut self, expression: &Expression) {
        
         match expression {
-     
+            
+            Expression::FuncCall { funcname, args } => {unimplemented!("FuncCall unimplemented")}
+            
             Expression::IntLiteral(n) => {
                 self.emit(&format!("    ldr r0, ={}", n));   // Load the value into the main register 
 
@@ -652,6 +660,8 @@ impl Compiler {
                     }
                 } 
             }
+
+            Statement::Return(value) => {unimplemented!("Return unimplemented")}
         }
     }
 
@@ -695,7 +705,7 @@ fn main() {
         println!("{:?}", tok);
     }
 
-    let mut parser = Parser::new();
+    let parser = Parser::new(tokens);
     let program = parser.parse_program();
     println!("{:?}", program);
     let mut compiler = Compiler::new();

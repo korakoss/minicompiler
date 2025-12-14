@@ -17,6 +17,9 @@ Or maybe some of them will be desirable anyway (eg. debugging functionalities li
 # Action plan (XII.13.)
 
 We are working on *functions*. We have to finish parsing, then move on to compiling. 
+After finishing it, without further ado I plan to create the typing for primitive types (maybe only booleans before we have printing, for strings).
+Then, clean up code, and then, do the type system.
+Afterwards, we should probably collect our forces, get the whole v1 version together
 
 ## Parsing
 
