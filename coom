@@ -9,6 +9,7 @@ while getopts "ar" opt; do
     esac
 done
 shift $((OPTIND - 1))
+cargo build
 target/debug/minicompiler "$1" TEMP.s
 as -o TEMP.o TEMP.s
 gcc -o "$2" TEMP.o
