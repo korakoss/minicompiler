@@ -17,9 +17,12 @@ pub enum Token {
     LeftBrace,
     RightBrace,
     Comma,
+    Colon,
     
     // Values 
     IntLiteral(i32),
+    True, 
+    False, 
     Identifier(String),
     
     // Keywords
@@ -32,6 +35,11 @@ pub enum Token {
     Function,
     Return,
     
+    // Type shit --all tbd
+    IntType, 
+    BoolType, 
+    RightArrow, // TBD
+
     // Special
     EOF,
 }

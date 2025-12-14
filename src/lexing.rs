@@ -1,6 +1,8 @@
 use crate::ast::*;
 
 
+// NOTE: should we put instead more info in the Token type to help parsing?
+
 pub fn lex(program: &str) -> Vec<Token> {
     let mut tokens: Vec<Token> = Vec::new();
     let mut chars = program.chars().peekable();
@@ -34,6 +36,10 @@ pub fn lex(program: &str) -> Vec<Token> {
                 "fun" => Token::Function,
                 "return" => Token::Return,
                 "print" => Token::Print,
+                "true" => Token::True,
+                "false" => Token::False,
+                "bool" => Token::BoolType,
+                "int" => Token::IntType,
                 _ => Token::Identifier(word),
             };  
             tokens.push(token); 
@@ -63,12 +69,21 @@ pub fn lex(program: &str) -> Vec<Token> {
                 tokens.push(Token::Assign);
             }
         }
-
+        
+        else if c == '-' {
+            // TODO: recognize negative int literals (tho maybe not here?)
+            chars.next();
+            if chars.peek() == Some(&'>') {
+                chars.next();
+                tokens.push(Token::RightArrow);
+            } else {
+                tokens.push(Token::Minus);
+            }
+        }
         else {
             // Processing single character stuff
             let token = match c {
                 '+' => Token::Plus,
-                '-' => Token::Minus,
                 '*' => Token::Multiply,
                 ';' => Token::Semicolon,
                 '(' => Token::LeftParen,
@@ -78,6 +93,7 @@ pub fn lex(program: &str) -> Vec<Token> {
                 '<' => Token::Less,
                 '%' => Token::Modulo,
                 ',' => Token::Comma,
+                ':' => Token::Colon,
                 _ => {panic!("Unexpected character: {}",c)},
             };
             chars.next();
