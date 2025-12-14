@@ -527,7 +527,7 @@ impl Compiler {
         self.label_counter
     }
 
-    fn compile_expression(&mut self, context: &Context, expression: &Expression) {  
+    fn compile_expression(&mut self, context: &Context, expression: Expression) {  
        
         match expression {
             
@@ -539,14 +539,14 @@ impl Compiler {
             }
 
             Expression::Variable(varname) => {
-                let offset = context.stack_offsets.get(varname).expect(&format!("Undefined variable: {}", &varname));
+                let offset = context.stack_offsets.get(&varname).expect(&format!("Undefined variable: {}", &varname));
                 self.emit(&format!("    ldr r0, [fp, #-{}]", offset));    // 
             }
 
             Expression::BinOp{op, left, right} => {
-                self.compile_expression(context, left);
+                self.compile_expression(context, *left);
                 self.emit("    push {r0}");// Store left's value on stack
-                self.compile_expression(context, right);
+                self.compile_expression(context, *right);
                 self.emit("    pop {r1}");
 
                 match op {
@@ -580,7 +580,7 @@ impl Compiler {
 
     }
 
-    fn compile_statement_block(&mut self, external_context: &mut Context, block: &Vec<Statement>){
+    fn compile_statement_block(&mut self, external_context: &mut Context, block: Vec<Statement>){
         let mut block_context = external_context.clone();
         for stmt in block {
             self.compile_statement(&mut block_context, stmt);
@@ -588,14 +588,14 @@ impl Compiler {
     }
 
 
-    fn compile_statement(&mut self, context: &mut Context, statement: &Statement) {
+    fn compile_statement(&mut self, context: &mut Context, statement: Statement) {
 
         match statement {
             
             Statement::Assign { varname, value } => {
 
                 self.compile_expression(context, value);
-                if let Some(&var_offset) = context.stack_offsets.get(varname) {
+                if let Some(&var_offset) = context.stack_offsets.get(&varname) {
                     // The variable already exists -> we use its address
                     self.emit(&format!("    str r0, [fp, #-{}]", var_offset));
                 } else {
@@ -680,13 +680,22 @@ impl Compiler {
 
     
     fn compile_function(&mut self, function: Function) {
-        self.emit(&format!("{}:", function.name));
+        let Function{name, args, body} = function;
+        self.emit(&format!("{}:", name));
         self.emit("    push {fp, lr}");     
         self.emit("    mov fp, sp");     
         self.emit("    sub sp, sp, #256"); // TBD: do properly        
-        
-        self.emit("    str r0, [fp, #-4]"); // save the argument (NOTE: 1 argument assumed for now)
-         
+        let mut func_context = Context::new();
+
+        if args.len() > 0 {
+            self.emit("    str r0, [fp, #-8]"); // save the argument (NOTE: 1 argument assumed for now)
+            let argname = args[0].clone();
+            func_context.stack_offsets.insert(argname, 8);
+        }
+
+        for stmt in body {
+            self.compile_statement(&mut func_context, stmt);
+        }
     }
     
     fn compile_program(&mut self, program: Program) -> String {
@@ -700,9 +709,13 @@ impl Compiler {
         self.emit("    mov fp, sp");                  //fp = sp
         self.emit("    sub sp, sp, #256");             //reserving space (TBD: actually count the variables
         
-        // Compiling statements
+        let Program{functions, main_statements} = program;
+        for func in functions {
+            self.compile_function(func);
+        }
+        
         let mut global_context = Context::new();
-        for stmt in &program.main_statements {
+        for stmt in main_statements {
             self.compile_statement(&mut global_context, stmt);
         }
 
