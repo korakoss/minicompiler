@@ -15,6 +15,8 @@ use compiling::*;
 mod analyzing;
 use analyzing::*;
 
+mod typing;
+
 fn main() {
     
     let args: Vec<String> = env::args().collect();

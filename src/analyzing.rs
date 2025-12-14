@@ -1,18 +1,9 @@
 use crate::ast::*;
-
-// Type should really go into AST later
-#[derive(Clone)]
-enum Type {
-    Int,
-    Bool,
-    // Pointer,
-    // Struct,
-    // Array
-}
+use crate::typing::*;
 
 
 #[derive(Clone)]
-struct Variable {
+pub struct Variable {
     name: String,
     vartype: Type,
 }
