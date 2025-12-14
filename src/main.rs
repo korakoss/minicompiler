@@ -16,6 +16,7 @@ enum BinaryOperator {
     //NotEqual
 }
 
+
 #[derive(Debug, Clone)]
 enum Expression {
     IntLiteral(i32),
@@ -36,34 +37,28 @@ enum Expression {
     // UnaryOp (eg. negation)
 }
 
+
 #[derive(Debug)]
 enum Statement {
-    
-    // NOTE: do we need to box exprs here???
-
-
     Assign {
         varname: String,
         value: Expression
     },
-
     If {
         condition: Expression,
         if_body: Vec<Statement>,
         else_body: Option<Vec<Statement>>,
     },
-    
     While {
         condition: Expression,
         body: Vec<Statement>,
     },
-
     Break,
     Continue,
-
     Return(Expression),
     Print(Expression),
 }
+
 
 #[derive(Debug)]
 struct Function {
@@ -71,6 +66,7 @@ struct Function {
     args: Vec<String>,
     body: Vec<Statement>,
 }
+
 
 #[derive(Debug)]
 struct Program {
@@ -440,7 +436,7 @@ impl Parser {
                 self.expect_token(Token::LeftParen);
                 let expr = self.parse_expression();
                 self.expect_token(Token::RightParen);
-                self.expect_token(Token::Semicolon);        // Couldn't this be deredunded?
+                self.expect_token(Token::Semicolon);        
                 Statement::Print(expr)
             }
 
