@@ -10,12 +10,13 @@ Start adding the types when it feels ready.
 
 ## Static analysis
 Work in the "analyzing.rs" file.
-1. Start with validating variable names (scope-sensitively). 
+1. Start with validating variable names (scope-sensitively). **DONE**
 	- we might add type info already to the machinery, just not use it (eg. type everything as int, which is kinda fair)
 2. This should enable allocating the right amount of memory to variables by counting them, instead of the constant 256 bytes, so fix that
-3. Also validate function names 
-4. And also function argument count (in a separate pass probably)
-
+3. Also validate function names **DONE** 
+	- And also function argument count (in a separate pass probably)
+	- And later types
+4. Regularize names
 
 # v1 plans 
 

@@ -24,14 +24,21 @@ struct Scope {
     inside_loop: bool,
 }
 
+struct FuncDef {
+    name: String,
+    args: Vec<Variable>,
+    ret_type: Type,
+}
+
 
 pub struct Analyzer {
-    functions: Vec<String>,      // TODO: later also mark type signature (turn into HashMap)
+    functions: Vec<FuncDef>,     
     errors: Vec<String>,        // Could turn into struct
 }
 
 
-// let errors propagate up
+// analyzed content and errors propagate up
+// print linenums, we should be able to do that
 // TODO: could make some struct for it
 
 impl Analyzer {
@@ -46,17 +53,11 @@ impl Analyzer {
     pub fn analyze_program(&mut self, program: Program) {
         
         let Program{functions, main_statements} = program;
-
-        // Collect defined methods (later: signatures too)
-        for func in &functions {
-            self.functions.push(func.name.clone()); 
-        }
+        // TODO: watch out for name clashes
+        // though we may allow type polymorhpy later?
         
-        // Analyze functions
-        for func in functions {
-            self.analyze_function(func);
-        }
-        
+        self.functions = functions.iter().map(|func| self.analyze_function(func.clone())).collect();
+                
         let global_scope = Scope{
             scope_variables: Vec::new(), 
             inside_func: false,
@@ -66,15 +67,21 @@ impl Analyzer {
     }
 
     
-    fn analyze_function(&mut self, function: Function) {
+    fn analyze_function(&mut self, function: Function) -> FuncDef{
         
         let Function{name, args, body} = function;
         let func_scope = Scope {
-            scope_variables: args,
+            scope_variables: args.clone(),
             inside_func: true,
             inside_loop: false,
         };
         self.analyze_statement_block(func_scope, body);
+        let arg_variables = args.iter().map(|argname| Variable{name: argname.clone(), vartype: Type::Int}).collect();          // NOTE: int is stopgap, change later
+        FuncDef{
+            name: name,
+            args: arg_variables,
+            ret_type: Type::Int              // TODO: update this later too
+        }
     }
     
 
@@ -103,6 +110,9 @@ impl Analyzer {
                 }
                 Statement::Return(expr) => {
                     self.analyze_expression(scope.clone(), expr);
+                    if !scope.inside_func {
+                        panic!("Return statement detected outside function body");
+                    }
                 }
                 Statement::Assign{varname, value} => {
                     // TODO: some kind of clash checks somehow
@@ -137,7 +147,7 @@ impl Analyzer {
             },
             Expression::FuncCall{funcname, args} => {
                 // TODO later: type checks
-                if !self.functions.contains(&funcname) {
+                if !self.functions.iter().any(|funcdef| funcdef.name == funcname) {
                     panic!("Unrecognized funcname"); // TBD
                 }
                 for expr in args {
