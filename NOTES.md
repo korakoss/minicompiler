@@ -21,6 +21,8 @@ Or maybe some of them will be desirable anyway (eg. debugging functionalities li
 - allocating 8 bits per var depspite it's 4 on arm32
 - validating called function even exists
 - emit should do the format! itself (and probably not take _borrows_, also mega annoying
+- keep track of valid variable names in scope, valid funcnames, etc
+- check function call correctness (argcount now, typing later)
 
 # Action plan (XII.13.)
 
@@ -28,24 +30,6 @@ We are working on *functions*. We have to finish parsing, then move on to compil
 After finishing it, without further ado I plan to create the typing for primitive types (maybe only booleans before we have printing, for strings).
 Then, clean up code, and then, do the type system.
 Afterwards, we should probably collect our forces, get the whole v1 version together
-
-## Parsing
-
-- parsing func calls in expressions
-    - how do we check func call correctness?
-        - should we just leave that for later (when typechecking)?
-    - DECISION: for now, the plan is: user must implement function calls before the main stuff 
-        - later version: I think we should have a main() entry point
-- we need to keep track of variables or something in the frame
-- **NOTE:** for now, all of the above was solved by instead distinguishing funccalls by the ( after them
-
-- make scripts that show tokens, then AST, then assembly, then run
-
-## Compiling 
-(...)
-
-First, just 1-var calls
-
 
 
 # v1 plans 
@@ -71,16 +55,7 @@ First, just 1-var calls
 ## Quality of life 
 - print tokenization and AST human-readably
 	- we can make a simple recursive function to display it with indents?
-
-
-## Functions
-- planned v1 syntax: 
-    > fun fname(arg_1, ..., arg_n) {}
-- of course everything is implicitly typed integer now
-- _return_, probably
-    - eventually a trailing expr return would be nice but that can wait
-- milestone: we want "sandbox/dream_program.txt" code or something like that running
-
+- make scripts that show tokens, then AST, then assembly, then run
 
 
 
