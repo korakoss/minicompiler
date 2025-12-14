@@ -14,6 +14,11 @@ The rest can be sprinkled in whenever I don't want to deal with the harder parts
 Or maybe some of them will be desirable anyway (eg. debugging functionalities like printing and improved panics; potentially even comments).
 
 
+
+# ROUGH EDGES
+
+- variable overwriting within blocks
+
 # Action plan (XII.13.)
 
 We are working on *functions*. We have to finish parsing, then move on to compiling. 
@@ -35,6 +40,8 @@ Afterwards, we should probably collect our forces, get the whole v1 version toge
 
 ## Compiling 
 (...)
+
+First, just 1-var calls
 
 
 

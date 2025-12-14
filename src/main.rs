@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::env;
+use std::hash::Hash;
 
 
 #[derive(Debug)]
@@ -406,7 +407,7 @@ impl Parser {
             }
 
             Token::Break => {         
-                if self.loop_nest_counter > 1 {
+                if self.loop_nest_counter > 0 {
                     self.expect_token(Token::Semicolon);
                     Statement::Break
                 } else {
@@ -415,7 +416,7 @@ impl Parser {
             }
             
             Token::Continue => {         
-                if self.loop_nest_counter > 1 {
+                if self.loop_nest_counter > 0 {
                     self.expect_token(Token::Semicolon);
                     Statement::Continue
                 } else {
@@ -486,18 +487,34 @@ impl Parser {
 }
 
 
-struct Compiler {
-    output: String,
+#[derive(Clone)]
+struct Context {
     stack_offsets: HashMap<String, i32>,
-    label_counter: u32,  // make some kind of function call that does increment + return previous, so it's safer
     loop_start_label_stack: Vec<String>,
     loop_end_label_stack: Vec<String>,
+}
+
+
+impl Context {
+    fn new() -> Context {
+        Context {
+            stack_offsets: HashMap::new(),
+            loop_start_label_stack: Vec::new(),
+            loop_end_label_stack: Vec::new(),
+        }
+    }
+}
+
+
+struct Compiler {
+    output: String,
+    label_counter: u32,  
 }
 
 impl Compiler {
 
     fn new() -> Self {
-        Compiler { output: String::new(), stack_offsets: HashMap::new(), label_counter: 0, loop_start_label_stack: Vec::new(), loop_end_label_stack: Vec::new()}
+        Compiler { output: String::new(), label_counter: 0}
     }
 
     fn emit(&mut self, line: &str) {
@@ -510,7 +527,7 @@ impl Compiler {
         self.label_counter
     }
 
-    fn compile_expression(&mut self, expression: &Expression) {
+    fn compile_expression(&mut self, context: &Context, expression: &Expression) {  
        
         match expression {
             
@@ -522,14 +539,14 @@ impl Compiler {
             }
 
             Expression::Variable(varname) => {
-                let offset = self.stack_offsets.get(varname).expect(&format!("Undefined variable: {}", &varname));
+                let offset = context.stack_offsets.get(varname).expect(&format!("Undefined variable: {}", &varname));
                 self.emit(&format!("    ldr r0, [fp, #-{}]", offset));    // 
             }
 
             Expression::BinOp{op, left, right} => {
-                self.compile_expression(left);
+                self.compile_expression(context, left);
                 self.emit("    push {r0}");// Store left's value on stack
-                self.compile_expression(right);
+                self.compile_expression(context, right);
                 self.emit("    pop {r1}");
 
                 match op {
@@ -563,21 +580,28 @@ impl Compiler {
 
     }
 
-    fn compile_statement(&mut self, statement: &Statement) {
-            
+    fn compile_statement_block(&mut self, external_context: &mut Context, block: &Vec<Statement>){
+        let mut block_context = external_context.clone();
+        for stmt in block {
+            self.compile_statement(&mut block_context, stmt);
+        }
+    }
+
+
+    fn compile_statement(&mut self, context: &mut Context, statement: &Statement) {
+
         match statement {
             
             Statement::Assign { varname, value } => {
 
-                self.compile_expression(value);
-
-                if let Some(&var_offset) = self.stack_offsets.get(varname) {
+                self.compile_expression(context, value);
+                if let Some(&var_offset) = context.stack_offsets.get(varname) {
                     // The variable already exists -> we use its address
                     self.emit(&format!("    str r0, [fp, #-{}]", var_offset));
                 } else {
                     // New variable: allocate it space on the stack
-                    let new_offset = self.stack_offsets.values().max().unwrap_or(&0) + 8;
-                    self.stack_offsets.insert(varname.clone(), new_offset);
+                    let new_offset = context.stack_offsets.values().max().unwrap_or(&0) + 8;
+                    context.stack_offsets.insert(varname.clone(), new_offset);
                     self.emit(&format!("    str r0, [fp, #-{}]", new_offset));
                 }
             }
@@ -585,31 +609,22 @@ impl Compiler {
                 let counter_str = format!("{}", self.assign_labelcount());
                 let branching_end_label = format!("branching_end_{}", counter_str);
 
-                self.compile_expression(condition);
+                self.compile_expression(context, condition);
                 self.emit("    cmp r0, #0");
-                
                 
                 match else_body {
                     
                     Some(else_statements) => {
-                        
                         let else_start_label = format!("else_start_{}", counter_str);
                         self.emit(&format!("    beq {}", else_start_label));
-                        for stmt in if_body {
-                            self.compile_statement(stmt);
-                        }
+                        self.compile_statement_block(context, if_body); 
                         self.emit(&format!("    b {}", branching_end_label));
                         self.emit(&format!("{}:", else_start_label));
-                        for stmt in else_statements {
-                            self.compile_statement(stmt);
-                        }
+                        self.compile_statement_block(context, else_statements); 
                     }
-                    
                     None => {
                         self.emit(&format!("    beq {}", branching_end_label));
-                        for stmt in if_body {
-                            self.compile_statement(stmt);
-                        } 
+                        self.compile_statement_block(context, if_body);
                     } 
 
                 }
@@ -621,29 +636,27 @@ impl Compiler {
                 let start_label = format!("while_start_{}", counter_str);
                 let end_label = format!("while_end_{}", counter_str);
 
-                self.loop_start_label_stack.push(start_label.clone());
-                self.loop_end_label_stack.push(end_label.clone());
+                context.loop_start_label_stack.push(start_label.clone());
+                context.loop_end_label_stack.push(end_label.clone());
 
                 self.emit(&format!("{}:", start_label));
                 
-                self.compile_expression(condition);
+                self.compile_expression(context, condition);
                 self.emit("    cmp r0, #0");
                 self.emit(&format!("    beq {}", end_label));
-
-                for stmt in body {
-                    self.compile_statement(stmt);
-                }
+                
+                self.compile_statement_block(context, body);
                 
                 self.emit(&format!("    b {}", start_label));
 
                 self.emit(&format!("{}:", end_label));
-                self.loop_start_label_stack.pop();
-                self.loop_end_label_stack.pop();
+                context.loop_start_label_stack.pop();
+                context.loop_end_label_stack.pop();
             }
             
             Statement::Break => {
                 
-                match self.loop_end_label_stack.last() {
+                match context.loop_end_label_stack.last() {
                     None => {unreachable!("Break outside loop at compilation")},
                     Some(end_label) => {
                         self.emit(&format!("    b {}", end_label));
@@ -653,7 +666,7 @@ impl Compiler {
             
             Statement::Continue => {
                 
-                match self.loop_start_label_stack.last() {
+                match context.loop_start_label_stack.last() {
                     None => {unreachable!("Continue outside loop at compilation")},
                     Some(start_label) => {
                         self.emit(&format!("    b {}", start_label));
@@ -665,6 +678,17 @@ impl Compiler {
         }
     }
 
+    
+    fn compile_function(&mut self, function: Function) {
+        self.emit(&format!("{}:", function.name));
+        self.emit("    push {fp, lr}");     
+        self.emit("    mov fp, sp");     
+        self.emit("    sub sp, sp, #256"); // TBD: do properly        
+        
+        self.emit("    str r0, [fp, #-4]"); // save the argument (NOTE: 1 argument assumed for now)
+         
+    }
+    
     fn compile_program(&mut self, program: Program) -> String {
         // Header
         self.emit(".global main");
@@ -677,8 +701,9 @@ impl Compiler {
         self.emit("    sub sp, sp, #256");             //reserving space (TBD: actually count the variables
         
         // Compiling statements
-        for statement in &program.main_statements {
-            self.compile_statement(statement);
+        let mut global_context = Context::new();
+        for stmt in &program.main_statements {
+            self.compile_statement(&mut global_context, stmt);
         }
 
         // Epilogue
