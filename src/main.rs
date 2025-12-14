@@ -12,6 +12,8 @@ use parsing::*;
 mod compiling;
 use compiling::*;
 
+mod analyzing;
+use analyzing::*;
 
 fn main() {
     
@@ -27,6 +29,8 @@ fn main() {
 
     let parser = Parser::new(tokens);
     let program = parser.parse_program();
+    let mut analyzer = Analyzer::new();
+    analyzer.analyze_program(program.clone());
     println!("{:?}", program);
     let mut compiler = Compiler::new();
     let assembly = compiler.compile_program(program);

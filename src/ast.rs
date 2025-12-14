@@ -73,11 +73,11 @@ pub enum Expression {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Assign {
         varname: String,
-        value: Expression
+        value: Expression,      // TODO: rename
     },
     If {
         condition: Expression,
@@ -95,7 +95,7 @@ pub enum Statement {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
     pub name: String,
     pub args: Vec<String>,
@@ -103,7 +103,7 @@ pub struct Function {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Program {
     pub functions: Vec<Function>,
     pub main_statements: Vec<Statement>
