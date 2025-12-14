@@ -539,9 +539,14 @@ impl Compiler {
                 // NOTE: only for 1 arg, TODO: general solution
                
                 // What if empty? TODO
-                if !args.is_empty() {
-                    let firstarg = *args[0].clone();
-                    self.compile_expression(context, firstarg);  // Result in r0
+                let num_args = args.len();
+                for arg_expr in  args{
+                    self.compile_expression(context, *arg_expr);
+                    self.emit("    push {r0}");
+                }
+                for i in 0..num_args {
+                    let register = format!("r{}", num_args-i-1);
+                    self.emit(&format!("    pop {{{}}}", register));    
                 }
                 self.emit(&format!("    bl {}", funcname));
             }
@@ -711,9 +716,17 @@ impl Compiler {
         let mut func_context = Context::new(Some(ret_label.clone()));
 
         if args.len() > 0 {
-            self.emit("    str r0, [fp, #-8]"); // save the argument (NOTE: 1 argument assumed for now)
-            let argname = args[0].clone();
-            func_context.stack_offsets.insert(argname, 8);
+
+            // TODO: implement stack-based
+            if args.len() > 4 {
+                panic!("Only up to 4 args supported at the moment");
+            }
+            
+            for (i,argname) in args.iter().enumerate() {
+                let current_offset = (i+1)*8; 
+                self.emit(&format!("    str r{}, [fp, #-{}]", i,current_offset)); 
+                func_context.stack_offsets.insert(argname.clone(), current_offset as i32);
+            }
         }
 
         for stmt in body {
