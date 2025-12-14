@@ -62,7 +62,7 @@ enum Statement {
     Continue,
 
     Return(Expression),
-    //Print(Box<Expression>),
+    Print(Expression),
 }
 
 #[derive(Debug)]
@@ -103,7 +103,7 @@ enum Token {
     Identifier(String),
     
     // Keywords
-    //Print,
+    Print,
     If,
     Else,
     While,
@@ -149,6 +149,7 @@ fn lex(program: &str) -> Vec<Token> {
                 "continue" => Token::Continue,
                 "fun" => Token::Function,
                 "return" => Token::Return,
+                "print" => Token::Print,
                 _ => Token::Identifier(word),
             };  
             tokens.push(token); 
@@ -435,6 +436,14 @@ impl Parser {
                 Statement::Return(return_expr)
             }
 
+            Token::Print => {
+                self.expect_token(Token::LeftParen);
+                let expr = self.parse_expression();
+                self.expect_token(Token::RightParen);
+                self.expect_token(Token::Semicolon);        // Couldn't this be deredunded?
+                Statement::Print(expr)
+            }
+
             other => {panic!("Expected statement, got: {:?} at position {}", other, self.position);}
         }
     }    
@@ -701,6 +710,12 @@ impl Compiler {
                     }
                 }
             }
+            Statement::Print(print_expr) => {
+                self.compile_expression(context, print_expr);
+                self.emit("    mov r1, r0");
+                self.emit("    ldr r0, =fmt");
+                self.emit("    bl printf");
+            }
         }
     }
 
@@ -742,7 +757,11 @@ impl Compiler {
     fn compile_program(&mut self, program: Program) -> String {
         // Header
         self.emit(".global main");
+        self.emit(".extern printf");
         self.emit(".align 4");
+        self.emit(".data");
+        self.emit(r#"fmt: .asciz "%d\n""#);
+        self.emit(".text");
         
         let Program{functions, main_statements} = program;
         for func in functions {
