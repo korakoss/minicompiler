@@ -2,77 +2,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::env;
 
-
-#[derive(Debug, Clone)]
-enum BinaryOperator {
-    Add, 
-    Sub, 
-    Mul, 
-    Equals,
-    Less,       // left < right 
-    Modulo
-    //Greater, 
-    //Div (later, when floats ig?),
-    //NotEqual
-}
-
-
-#[derive(Debug, Clone)]
-enum Expression {
-    IntLiteral(i32),
-
-    Variable(String),
-
-    BinOp {
-       op: BinaryOperator,
-       left: Box<Expression>,
-       right: Box<Expression>,
-    },
-
-    FuncCall {
-        funcname: String,
-        args: Vec<Box<Expression>>,
-    }
-    
-    // UnaryOp (eg. negation)
-}
-
-
-#[derive(Debug)]
-enum Statement {
-    Assign {
-        varname: String,
-        value: Expression
-    },
-    If {
-        condition: Expression,
-        if_body: Vec<Statement>,
-        else_body: Option<Vec<Statement>>,
-    },
-    While {
-        condition: Expression,
-        body: Vec<Statement>,
-    },
-    Break,
-    Continue,
-    Return(Expression),
-    Print(Expression),
-}
-
-
-#[derive(Debug)]
-struct Function {
-    name: String,
-    args: Vec<String>,
-    body: Vec<Statement>,
-}
-
-
-#[derive(Debug)]
-struct Program {
-    functions: Vec<Function>,
-    main_statements: Vec<Statement>
-}
+mod ast;
+use crate::ast::*;
 
 
 #[derive(Debug, Clone, PartialEq)]
