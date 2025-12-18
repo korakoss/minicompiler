@@ -259,7 +259,7 @@ impl Compiler {
         self.emit("    bx lr");
     }
     
-    pub fn compile_program(&mut self, program: Program) -> String {
+    pub fn compile_program(&mut self, program: RawAST) -> String {
         // Header
         self.emit(".global main");
         self.emit(".extern printf");
@@ -268,7 +268,7 @@ impl Compiler {
         self.emit(r#"fmt: .asciz "%d\n""#);
         self.emit(".text");
         
-        let Program{functions, main_statements} = program;
+        let RawAST{functions, main_statements} = program;
         for func in functions {
             self.compile_function(func);
         }

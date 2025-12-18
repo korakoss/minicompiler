@@ -65,7 +65,7 @@ pub struct Function {
 
 
 #[derive(Debug)]
-pub struct Program {
+pub struct RawAST {
     pub functions: Vec<Function>,
     pub main_statements: Vec<Statement>
 }

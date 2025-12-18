@@ -402,7 +402,7 @@ impl Parser {
         Function {name: funcname, args: args, body: body}
     }
 
-    pub fn parse_program(mut self) -> Program {
+    pub fn parse_program(mut self) -> RawAST {
         let mut statements = Vec::new();
         while !self.is_at_end() {
             if self.peek() == &Token::Function {
@@ -413,7 +413,7 @@ impl Parser {
                 statements.push(self.parse_statement());
             }
         }
-        Program { functions: self.defined_funcs, main_statements: statements}
+        RawAST { functions: self.defined_funcs, main_statements: statements}
     }
 }
 
