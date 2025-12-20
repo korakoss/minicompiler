@@ -123,20 +123,23 @@ impl Compiler {
     fn compile_statement(&mut self, context: &mut Context, statement: Statement) {
 
         match statement {
-            
-            Statement::Assign { varname, value } => {
 
-                self.compile_expression(context, value);
-                if let Some(&var_offset) = context.stack_offsets.get(&varname) {
-                    // The variable already exists -> we use its address
-                    self.emit(&format!("    str r0, [fp, #-{}]", var_offset));
-                } else {
-                    // New variable: allocate it space on the stack
-                    let new_offset = context.stack_offsets.values().max().unwrap_or(&0) + 8;
-                    context.stack_offsets.insert(varname.clone(), new_offset);
-                    self.emit(&format!("    str r0, [fp, #-{}]", new_offset));
-                }
+            Statement::Let {name, value} => {
+                self.compile_expression(context, value);     
+                let new_offset = context.stack_offsets.values().max().unwrap_or(&0) + 8;
+                context.stack_offsets.insert(name.clone(), new_offset);
+                self.emit(&format!("    str r0, [fp, #-{}]", new_offset));
             }
+ 
+            Statement::Assign { target, value } => {
+                let Expression::Variable(varname) = target else {
+                    panic!("Invalid target for assignment");
+                };
+                self.compile_expression(context, value);
+                let &var_offset = context.stack_offsets.get(&varname).unwrap();
+                self.emit(&format!("    str r0, [fp, #-{}]", var_offset));
+            }
+
             Statement::If {condition, if_body, else_body} => {
                 let counter_str = format!("{}", self.assign_labelcount());
                 let branching_end_label = format!("branching_end_{}", counter_str);

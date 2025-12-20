@@ -36,8 +36,14 @@ pub enum Expression {
 
 #[derive(Debug)]
 pub enum Statement {
+
+    Let {
+        name: String,
+        value: Expression,
+        // TODO: type field
+    },
     Assign {
-        varname: String,
+        target: Expression,         // validate lvalue
         value: Expression
     },
     If {

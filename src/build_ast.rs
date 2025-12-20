@@ -32,7 +32,8 @@ pub enum Token {
     Continue,
     Function,
     Return,
-    
+    Let,
+
     // Special
     EOF,
 }
@@ -71,6 +72,7 @@ pub fn lex(program: &str) -> Vec<Token> {
                 "fun" => Token::Function,
                 "return" => Token::Return,
                 "print" => Token::Print,
+                "let" => Token::Let,
                 _ => Token::Identifier(word),
             };  
             tokens.push(token); 
@@ -167,12 +169,23 @@ impl Parser {
         token
     }
     
-    // Inteded use is for unparametric Tokens (normally delimiters). TODO: might check if we can make this work for parametrics, dunno if needed
-    fn expect_token(&mut self, expected_token: Token) {
+    fn expect_unparametric_token(&mut self, expected_token: Token) {
         if self.peek() != &expected_token {
             panic!("Expected token {:?} at position {}, got token {:?}.", expected_token, self.position, self.peek()); 
         }
         self.consume();
+    }
+    
+    // TODO: add result
+    fn expect_identifier_token(&mut self) -> String {
+        match self.consume() {
+            Token::Identifier(name) => {
+                return name;
+            }
+            other => {
+                panic!("Expected identifier token, got token: {:?}", other);
+            }
+        }
     }
 
     fn is_expression_start(&self) -> bool {
@@ -202,7 +215,7 @@ impl Parser {
                 if self.peek() == &Token::LeftParen {        // Function call 
                     self.consume();
                     let args = self.parse_funccall_args(); 
-                    self.expect_token(Token::RightParen);
+                    self.expect_unparametric_token(Token::RightParen);
                     Expression::FuncCall { funcname: name, args: args}
                 } else {
                     Expression::Variable(name)
@@ -210,7 +223,7 @@ impl Parser {
             },
             Token::LeftParen => {
                 let paren_expr = self.parse_expression();
-                self.expect_token(Token::RightParen);
+                self.expect_unparametric_token(Token::RightParen);
                 paren_expr
             },
             _ => {
@@ -230,7 +243,7 @@ impl Parser {
         }
     }
 
-    fn convert_binop(&mut self, op_token: Token) -> BinaryOperator {
+    fn map_binop_token(&mut self, op_token: Token) -> BinaryOperator {
         match op_token {
             Token::Plus => BinaryOperator::Add,
             Token::Minus => BinaryOperator::Sub,
@@ -252,7 +265,7 @@ impl Parser {
                 break;
             }
             let optoken = self.consume();
-            let op = self.convert_binop(optoken);
+            let op = self.map_binop_token(optoken);
             let next_expr = self.parse_expression_with_precedence(prec+1);
             current_expr = Expression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr)};
 
@@ -275,33 +288,26 @@ impl Parser {
 
     fn parse_statement(&mut self) -> Statement {
         
+        if self.is_expression_start() {
+            // TODO: later we can do trailing-expr return here
+            let expr = self.parse_expression();
+            self.expect_unparametric_token(Token::Assign);
+            let assign_value = self.parse_expression();
+            self.expect_unparametric_token(Token::Semicolon);
+            return Statement::Assign { target: expr, value: assign_value};
+        }
         match self.consume() {
                         
-            Token::Identifier(varname) => {
-                self.expect_token(Token::Assign); 
-                let expr = self.parse_expression(); 
-                self.expect_token(Token::Semicolon);
-                if self.within_function_body {
-                    self.loc_vars.push(varname.clone());                
-                } else {
-                    self.glob_vars.push(varname.clone());
-                }
-
-                Statement::Assign {
-                    varname,
-                    value: expr
-                }
-            }
             Token::If => {
                 let cond = self.parse_expression();
-                self.expect_token(Token::LeftBrace);
+                self.expect_unparametric_token(Token::LeftBrace);
                 let body = self.parse_block();
-                self.expect_token(Token::RightBrace);
+                self.expect_unparametric_token(Token::RightBrace);
                 
                 if matches!(self.peek(), Token::Else) {
-                    self.expect_token(Token::LeftBrace);
+                    self.expect_unparametric_token(Token::LeftBrace);
                     let else_body = self.parse_block();
-                    self.expect_token(Token::RightBrace);
+                    self.expect_unparametric_token(Token::RightBrace);
                     return Statement::If{
                         condition: cond,
                         if_body: body,
@@ -319,10 +325,10 @@ impl Parser {
 
             Token::While => {
                 let cond = self.parse_expression();
-                self.expect_token(Token::LeftBrace);
+                self.expect_unparametric_token(Token::LeftBrace);
                 self.loop_nest_counter = self.loop_nest_counter + 1;
                 let body = self.parse_block();
-                self.expect_token(Token::RightBrace);
+                self.expect_unparametric_token(Token::RightBrace);
                 self.loop_nest_counter = self.loop_nest_counter - 1;
                 Statement::While { 
                     condition: cond, 
@@ -332,7 +338,7 @@ impl Parser {
 
             Token::Break => {         
                 if self.loop_nest_counter > 0 {
-                    self.expect_token(Token::Semicolon);
+                    self.expect_unparametric_token(Token::Semicolon);
                     Statement::Break
                 } else {
                     panic!("Break statement detected outside of any loop body at position {}", self.position);
@@ -341,7 +347,7 @@ impl Parser {
             
             Token::Continue => {         
                 if self.loop_nest_counter > 0 {
-                    self.expect_token(Token::Semicolon);
+                    self.expect_unparametric_token(Token::Semicolon);
                     Statement::Continue
                 } else {
                     panic!("Continue statement detected outside of any loop body at position {}", self.position);
@@ -353,19 +359,46 @@ impl Parser {
                     panic!("Return statement detected outside of a function body at position {}", self.position);
                 }
                 let return_expr = self.parse_expression();
-                self.expect_token(Token::Semicolon);
+                self.expect_unparametric_token(Token::Semicolon);
                 Statement::Return(return_expr)
             }
 
             Token::Print => {
-                self.expect_token(Token::LeftParen);
+                self.expect_unparametric_token(Token::LeftParen);
                 let expr = self.parse_expression();
-                self.expect_token(Token::RightParen);
-                self.expect_token(Token::Semicolon);        
+                self.expect_unparametric_token(Token::RightParen);
+                self.expect_unparametric_token(Token::Semicolon);        
                 Statement::Print(expr)
-            }
+            },
 
-            other => {panic!("Expected statement, got: {:?} at position {}", other, self.position);}
+            Token::Let => {
+                let varname = self.expect_identifier_token();         
+                self.expect_unparametric_token(Token::Assign);
+                let value = self.parse_expression();
+                self.expect_unparametric_token(Token::Semicolon);
+                Statement::Let { name: varname, value}
+            },
+            
+            other => {                                      
+                // we assume it'll be an Assign statement otherwise
+                // could do it better
+                // eg. somehow dry-run expression recog?
+                if self.is_expression_start() {
+                    // Trying to parse it as an Assign statement 
+                    let target = self.parse_expression();
+                    self.expect_unparametric_token(Token::Assign);
+                    let value = self.parse_expression();
+                    self.expect_unparametric_token(Token::Semicolon);
+                    Statement::Assign {
+                        target: target, 
+                        value: value 
+
+                    }
+                }
+                else {
+                    panic!("Cannot recognize valid statement at position {:?} with token {:?}", self.position, other);
+                }
+            }
         }
     }    
 
@@ -376,7 +409,7 @@ impl Parser {
         };
 
         let mut args = Vec::new();
-        self.expect_token(Token::LeftParen);
+        self.expect_unparametric_token(Token::LeftParen);
         if self.peek() == &Token::RightParen {
             self.consume();
         } else {
@@ -392,12 +425,12 @@ impl Parser {
                     other => panic!("Expected parameter name after comma, got {:?}", other),
                 }
             }
-            self.expect_token(Token::RightParen);
+            self.expect_unparametric_token(Token::RightParen);
         }
-        self.expect_token(Token::LeftBrace);
+        self.expect_unparametric_token(Token::LeftBrace);
         self.within_function_body = true;
         let body = self.parse_block();
-        self.expect_token(Token::RightBrace);
+        self.expect_unparametric_token(Token::RightBrace);
         self.within_function_body = false;
         Function {name: funcname, args: args, body: body}
     }
