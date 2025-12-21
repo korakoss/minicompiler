@@ -9,7 +9,11 @@ use crate::build_ast::*;
 mod codegen;
 use crate::codegen::*;
 
+//mod hir;
+//use crate::hir::*;
 
+mod common;
+use crate::common::*;
 
 fn main() {
     

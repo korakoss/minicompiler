@@ -1,3 +1,4 @@
+use crate::common::*;
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
@@ -38,7 +39,7 @@ pub enum Expression {
 pub enum Statement {
 
     Let {
-        name: String,
+        var: VariableInfo,
         value: Expression,
         // TODO: type field
     },
@@ -65,7 +66,7 @@ pub enum Statement {
 #[derive(Debug)]
 pub struct Function {
     pub name: String,
-    pub args: Vec<String>,
+    pub args: Vec<VariableInfo>,
     pub body: Vec<Statement>,
 }
 

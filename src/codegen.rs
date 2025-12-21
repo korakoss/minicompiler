@@ -124,10 +124,10 @@ impl Compiler {
 
         match statement {
 
-            Statement::Let {name, value} => {
+            Statement::Let {var, value} => {
                 self.compile_expression(context, value);     
                 let new_offset = context.stack_offsets.values().max().unwrap_or(&0) + 8;
-                context.stack_offsets.insert(name.clone(), new_offset);
+                context.stack_offsets.insert(var.name, new_offset);
                 self.emit(&format!("    str r0, [fp, #-{}]", new_offset));
             }
  
@@ -245,10 +245,10 @@ impl Compiler {
                 panic!("Only up to 4 args supported at the moment");
             }
             
-            for (i,argname) in args.iter().enumerate() {
+            for (i,arg) in args.iter().enumerate() {
                 let current_offset = (i+1)*8; 
                 self.emit(&format!("    str r{}, [fp, #-{}]", i,current_offset)); 
-                func_context.stack_offsets.insert(argname.clone(), current_offset as i32);
+                func_context.stack_offsets.insert(arg.name.clone(), current_offset as i32);
             }
         }
 

@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::common::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -18,7 +19,8 @@ pub enum Token {
     LeftBrace,
     RightBrace,
     Comma,
-    
+    Colon,
+
     // Values 
     IntLiteral(i32),
     Identifier(String),
@@ -33,6 +35,10 @@ pub enum Token {
     Function,
     Return,
     Let,
+    
+    // Type stuff
+    Int, 
+    Bool,
 
     // Special
     EOF,
@@ -73,6 +79,8 @@ pub fn lex(program: &str) -> Vec<Token> {
                 "return" => Token::Return,
                 "print" => Token::Print,
                 "let" => Token::Let,
+                "int" => Token::Int,
+                "bool" => Token::Bool,
                 _ => Token::Identifier(word),
             };  
             tokens.push(token); 
@@ -117,6 +125,7 @@ pub fn lex(program: &str) -> Vec<Token> {
                 '<' => Token::Less,
                 '%' => Token::Modulo,
                 ',' => Token::Comma,
+                ':' => Token::Colon,
                 _ => {panic!("Unexpected character: {}",c)},
             };
             chars.next();
@@ -194,7 +203,7 @@ impl Parser {
     
     fn parse_funccall_args(&mut self) -> Vec<Box<Expression>> {
         if self.peek() == &Token::RightParen {
-            println!("Boo");
+            println!("Boo");                                        // TODO: ?????
         }
         let mut args = Vec::new();
         if self.is_expression_start() {
@@ -286,6 +295,14 @@ impl Parser {
         statements
     }
 
+    fn parse_type(&mut self) -> Type {
+        match self.consume() {
+            Token::Int => {Type::Integer},
+            Token::Bool => {Type::Bool},
+            _ => {panic!("Unexpected token in typing");}
+        }
+    }
+
     fn parse_statement(&mut self) -> Statement {
         
         if self.is_expression_start() {
@@ -373,10 +390,13 @@ impl Parser {
 
             Token::Let => {
                 let varname = self.expect_identifier_token();         
+                self.expect_unparametric_token(Token::Colon);
+                let typ = self.parse_type();
+                let var = VariableInfo{name: varname, typ: typ};
                 self.expect_unparametric_token(Token::Assign);
                 let value = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
-                Statement::Let { name: varname, value}
+                Statement::Let { var: var, value}
             },
             
             other => {                                      
@@ -413,17 +433,18 @@ impl Parser {
         if self.peek() == &Token::RightParen {
             self.consume();
         } else {
-            match self.consume() {
-                Token::Identifier(name) => args.push(name),
-                other => panic!("Expected parameter name, got {:?}", other),
-            }
-                
+            let argname = self.expect_identifier_token();
+            self.expect_unparametric_token(Token::Colon);
+            let argtype = self.parse_type();
+            args.push(VariableInfo{name: argname, typ: argtype});
+                            
             while self.peek() == &Token::Comma {
                 self.consume();  
-                match self.consume() {
-                    Token::Identifier(name) => args.push(name),
-                    other => panic!("Expected parameter name after comma, got {:?}", other),
-                }
+                let argname = self.expect_identifier_token();
+                self.expect_unparametric_token(Token::Colon);
+                let argtype = self.parse_type();
+                args.push(VariableInfo{name: argname, typ: argtype});
+
             }
             self.expect_unparametric_token(Token::RightParen);
         }
