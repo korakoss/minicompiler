@@ -39,6 +39,7 @@ pub enum Token {
     // Type stuff
     Int, 
     Bool,
+    RightArrow,
 
     // Special
     EOF,
@@ -111,11 +112,20 @@ pub fn lex(program: &str) -> Vec<Token> {
             }
         }
 
+        else if c == '-' {
+            chars.next();
+            if chars.peek() == Some(&'>') {
+                chars.next();
+                tokens.push(Token::RightArrow);
+            } else {
+                tokens.push(Token::Minus);
+            }
+        }
+
         else {
             // Processing single character stuff
             let token = match c {
                 '+' => Token::Plus,
-                '-' => Token::Minus,
                 '*' => Token::Multiply,
                 ';' => Token::Semicolon,
                 '(' => Token::LeftParen,
@@ -448,12 +458,14 @@ impl Parser {
             }
             self.expect_unparametric_token(Token::RightParen);
         }
+        self.expect_unparametric_token(Token::RightArrow);
+        let ret_type = self.parse_type();
         self.expect_unparametric_token(Token::LeftBrace);
         self.within_function_body = true;
         let body = self.parse_block();
         self.expect_unparametric_token(Token::RightBrace);
         self.within_function_body = false;
-        Function {name: funcname, args: args, body: body}
+        Function {name: funcname, args: args, body: body, ret_type}
     }
 
     pub fn parse_program(mut self) -> RawAST {

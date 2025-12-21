@@ -229,7 +229,7 @@ impl Compiler {
 
     
     fn compile_function(&mut self, function: Function) {
-        let Function{name, args, body} = function;
+        let Function{name, args, body, ret_type} = function;
         self.emit(&format!("{}:", name));
         self.emit("    push {fp, lr}");     
         self.emit("    mov fp, sp");     

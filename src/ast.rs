@@ -68,6 +68,7 @@ pub struct Function {
     pub name: String,
     pub args: Vec<VariableInfo>,
     pub body: Vec<Statement>,
+    pub ret_type: Type,
 }
 
 
