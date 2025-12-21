@@ -1,11 +1,11 @@
 
-#[derive(PartialEq,Eq, Debug)]
+#[derive(PartialEq,Eq, Debug, Hash, Clone)]
 pub enum Type {
     Integer,
     Bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VariableInfo {
     pub name: String,
     pub typ: Type,
