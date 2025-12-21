@@ -105,7 +105,7 @@ impl HIRBuilder {
         for stmt in body {
             self.transform_statement(stmt, &scope_id);
         }
-        let func_id = self.add_func(HIRFunction{args:args.clone(), body: body_block, ret_type: ret_type.clone()});
+        let func_id = self.add_func(HIRFunction{args:args.clone(), body: scope_id, ret_type: ret_type.clone()});
         self.function_map.insert((name, args.into_iter().map(|x| x.typ).collect()), func_id);
     }
 

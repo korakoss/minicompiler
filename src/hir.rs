@@ -79,7 +79,7 @@ pub enum HIRStatement {
 #[derive(Clone, Debug)]
 pub struct HIRFunction {
     pub args: Vec<VariableInfo>,
-    pub body: ScopeBlock,
+    pub body: ScopeId,
     pub ret_type: Type,
 }
 
