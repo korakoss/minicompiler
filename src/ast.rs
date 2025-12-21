@@ -35,7 +35,7 @@ pub enum Expression {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
 
     Let {
@@ -63,7 +63,7 @@ pub enum Statement {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
     pub name: String,
     pub args: Vec<VariableInfo>,
@@ -72,7 +72,7 @@ pub struct Function {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RawAST {
     pub functions: Vec<Function>,
     pub main_statements: Vec<Statement>

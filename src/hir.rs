@@ -15,7 +15,7 @@ pub struct ScopeId(pub usize);
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct FuncId(pub usize);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TypedExpressionKind {
     IntLiteral(i32),
     Variable(VarId),
@@ -30,19 +30,19 @@ pub enum TypedExpressionKind {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HIRExpression {
     pub typ: Type,
     pub expr: TypedExpressionKind,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Place {
     Variable(VarId),
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ScopeBlock {      
     pub parent_id: Option<ScopeId>,
     pub scope_vars: HashMap<String, VarId>,
@@ -51,24 +51,24 @@ pub struct ScopeBlock {
     pub statements: Vec<HIRStatement>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum HIRStatement {
     Let {
         var: Place,     // Expected to be Variable
         value: HIRExpression,
     },
     Assign {
-        target: HIRExpression,   // Expected to be l-value
+        target: Place,   // Expected to be l-value
         value: HIRExpression,
     },
     If {
         condition: HIRExpression,    // Expected to be Boolean
-        if_body: ScopeBlock,    
-        else_body: Option<ScopeBlock>,
+        if_body: ScopeId,    
+        else_body: Option<ScopeId>,
     },
     While {
         condition: HIRExpression,
-        body: ScopeBlock,
+        body: ScopeId,
 },
     Break,
     Continue,
@@ -76,12 +76,19 @@ pub enum HIRStatement {
     Print(HIRExpression),
 }
 
-
+#[derive(Clone, Debug)]
 pub struct HIRFunction {
     pub args: Vec<VariableInfo>,
     pub body: ScopeBlock,
     pub ret_type: Type,
 }
 
+#[derive(Clone, Debug)]
+pub struct HIRProgram {
+    pub scopes: HashMap<ScopeId, ScopeBlock>,
+    pub variables: HashMap<VarId, VariableInfo>,
+    pub functions: HashMap<FuncId, HIRFunction>,
+    pub global_scope: ScopeId,
+}
 
 

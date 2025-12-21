@@ -31,10 +31,14 @@ fn main() {
     }
 
     let parser = Parser::new(tokens);
-    let program = parser.parse_program();
-    println!("{:?}", program);
+    let ast = parser.parse_program();
+    println!("{:?}", ast);
+   
+    let mut lowerer = HIRBuilder::new();
+    let hir = lowerer.lower_AST(ast.clone());
+    println!("{:?}", hir);
     let mut compiler = Compiler::new();
-    let assembly = compiler.compile_program(program);
+    let assembly = compiler.compile_program(ast);
     fs::write(assembly_filename, assembly).unwrap();
 }
 

@@ -4,10 +4,10 @@ use crate::common::*;
 use std::{collections::HashMap};
 
 
-struct HIRBuilder {
-    scopes: HashMap<ScopeId, ScopeBlock>,
-    variables: HashMap<VarId, VariableInfo>,
-    functions: HashMap<FuncId, HIRFunction>,
+pub struct HIRBuilder {
+    pub scopes: HashMap<ScopeId, ScopeBlock>,
+    pub variables: HashMap<VarId, VariableInfo>,
+    pub functions: HashMap<FuncId, HIRFunction>,
     function_map: HashMap<(String, Vec<Type>), FuncId>,
     scope_counter: usize,
     var_counter: usize,
@@ -17,14 +17,50 @@ struct HIRBuilder {
 
 impl HIRBuilder {
     
-    pub fn add_scope(&mut self, scope: ScopeBlock) -> ScopeId {
+    pub fn new() -> HIRBuilder {
+        HIRBuilder {
+            scopes: HashMap::new(),
+            variables: HashMap::new(),
+            functions: HashMap::new(),
+            function_map: HashMap::new(),
+            scope_counter: 0,
+            var_counter: 0,
+            func_counter: 0,
+        }
+    }
+
+    pub fn lower_AST(&mut self, ast: RawAST) -> HIRProgram {
+        let RawAST{functions, main_statements} = ast;
+        for func in functions {
+            self.transform_function(func);
+        }
+        let globscope = ScopeBlock{
+            parent_id: None,
+            scope_vars: HashMap::new(),
+            within_loop: false,
+            within_func: false,
+            statements: Vec::new(),
+        };
+        let globscope_id = self.add_scope(globscope);
+        for stmt in main_statements {
+            self.transform_statement(stmt, &globscope_id);
+        }
+        HIRProgram {
+            scopes: self.scopes.clone(),
+            variables: self.variables.clone(),
+            functions: self.functions.clone(),
+            global_scope: globscope_id,
+        }
+    }
+
+    fn add_scope(&mut self, scope: ScopeBlock) -> ScopeId {
         let scope_id = ScopeId(self.scope_counter);
         self.scope_counter = self.scope_counter + 1;
         self.scopes.insert(scope_id, scope);
         scope_id
     }
 
-    pub fn add_var(&mut self, var: VariableInfo, active_scope: &ScopeId) -> VarId {
+    fn add_var(&mut self, var: VariableInfo, active_scope: &ScopeId) -> VarId {
         if self.get_varid(&var.name, active_scope) != None {
             panic!("Variable name exists in scope");
         }    
@@ -35,14 +71,14 @@ impl HIRBuilder {
         var_id 
     }
 
-    pub fn add_func(&mut self, func: HIRFunction) -> FuncId {
+    fn add_func(&mut self, func: HIRFunction) -> FuncId {
         let func_id = FuncId(self.func_counter);
         self.func_counter = self.func_counter + 1;
         self.functions.insert(func_id, func);
         func_id
     }
 
-    pub fn get_varid(&self, varname: &String, scope_id: &ScopeId) -> Option<VarId>{
+    fn get_varid(&self, varname: &String, scope_id: &ScopeId) -> Option<VarId>{
         let scope = self.scopes.get(&scope_id).unwrap();
         if let Some(&varid) = scope.scope_vars.get(varname) {
             Some(varid)
@@ -63,6 +99,9 @@ impl HIRBuilder {
             statements: Vec::new(),
         };
         let scope_id = self.add_scope(body_block.clone());
+        for arg in args.clone() {
+            self.add_var(arg, &scope_id);
+        }
         for stmt in body {
             self.transform_statement(stmt, &scope_id);
         }
@@ -72,6 +111,7 @@ impl HIRBuilder {
 
 
     fn transform_statement(&mut self, statement: Statement, active_scope: &ScopeId) { 
+        let scope = self.scopes.get(active_scope).unwrap();
         let hir_statement = match statement {
             Statement::Let{var, value} => {
                 let hir_val = self.transform_expr(value, active_scope);
@@ -81,14 +121,73 @@ impl HIRBuilder {
                     value: hir_val, 
                 }
             },
-            _ => {unimplemented!();}             
+            Statement::Assign { target, value } => {
+                match target {
+                    Expression::Variable(varname) => {
+                        let varid = self.get_varid(&varname, active_scope).expect("Unrecognized variable name in scope");
+                        let hir_expr = self.transform_expr(value, active_scope);
+                        // TODO: typecheck!!! IMPORTANT!!!
+                        HIRStatement::Assign { 
+                            target: Place::Variable(varid), 
+                            value: hir_expr
+                        }
+                    },
+                    _ => {panic!("Invalid assignment target");}
+                }
+            },
+            Statement::If { condition, if_body, else_body } => {
+                let hir_condition = self.transform_expr(condition, active_scope);
+                if hir_condition.typ != Type::Bool {
+                    panic!("If condition expression not boolean");
+                }
+                let hir_if_body = self.transform_block(if_body, active_scope, false); 
+                let hir_else_body = match else_body {
+                    None => None,
+                    Some(stmts) => {
+                        Some(self.transform_block(stmts, active_scope, false))
+                    }
+                };
+                HIRStatement::If { condition: hir_condition, if_body: hir_if_body, else_body: hir_else_body}
+            },
+            Statement::While { condition, body } => {
+                let hir_condition = self.transform_expr(condition, active_scope);
+                if hir_condition.typ != Type::Bool {
+                    panic!("If condition expression not boolean");
+                }
+                let hir_body = self.transform_block(body, active_scope, true); 
+                HIRStatement::While { condition: hir_condition, body: hir_body}
+            },
+            Statement::Break => {
+                if !scope.within_loop {
+                    panic!("Break statement detected out of loop");
+                }
+                HIRStatement::Break
+            },
+            Statement::Continue => {
+                if !scope.within_loop {
+                    panic!("Break statement detected out of loop");
+                }
+                HIRStatement::Continue
+            },
+            Statement::Return(expr) => {
+                // TODO: this needs type checks!!! IMPORTANT!!!
+                let hir_expr = self.transform_expr(expr, active_scope);
+                HIRStatement::Return(hir_expr)
+            },
+            Statement::Print(expr) => {
+                // TODO: this needs subtler type shit later
+                let hir_expr = self.transform_expr(expr, active_scope);
+                HIRStatement::Print(hir_expr)
+            }       
         };
         self.scopes.get_mut(active_scope).unwrap().statements.push(hir_statement);
     }
-
-    fn transform_block(&mut self, statements: Vec<Statement>, parent_scope: &ScopeId) -> ScopeId{
+    
+    // Split into two funcs?
+    fn transform_block(&mut self, statements: Vec<Statement>, parent_scope: &ScopeId, is_loop_body: bool) -> ScopeId{
         let mut block_scope = self.scopes.get(parent_scope).unwrap().clone();
         block_scope.statements = Vec::new();
+        block_scope.within_loop = block_scope.within_loop || is_loop_body;
         let block_scope_id = self.add_scope(block_scope);
         for stmt in statements {
             self.transform_statement(stmt, &block_scope_id);
