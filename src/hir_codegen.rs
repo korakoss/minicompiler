@@ -67,7 +67,6 @@ impl HIRCompiler {
         }
         let reserved_stack = 8 * vars.len();       // TODO: incorporate size stuff later 
 
-        self.emit(&format!("{}:", flabel));
         self.emit_prologue(flabel, reserved_stack);
 
         for i in 0..args.len(){
