@@ -6,8 +6,8 @@ mod ast;
 mod build_ast;
 use crate::build_ast::*;
 
-//mod codegen;
-//use crate::codegen::*;
+mod codegen;
+use crate::codegen::*;
 
 mod hir;
 

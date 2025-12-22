@@ -61,7 +61,7 @@ impl HIRCompiler {
         let HIRFunction{args, body, ret_type} = function;
 
         let vars = self.hir_program.collect_scope_vars(&body);
-        let stack_offsets: HashMap<VarId, usize> = vars.values().enumerate().map(|(i,x)| (x.clone(), 8*i)).collect();  // TODO: incorporate size stuff later 
+        let stack_offsets: HashMap<VarId, usize> = vars.values().enumerate().map(|(i,x)| (x.clone(), 8*(i+1))).collect();  // TODO: incorporate size stuff later 
         if args.len() > 4 {
                 panic!("Only up to 4 args supported at the moment");
         }
