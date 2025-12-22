@@ -48,6 +48,7 @@ impl HIRBuilder {
         let scope_id = ScopeId(self.scope_counter);
         self.scope_counter = self.scope_counter + 1;
         self.hir.scopes.insert(scope_id, scope);
+        self.hir.scopetree.insert(scope_id, Vec::new());
         scope_id
     }
 
@@ -169,6 +170,7 @@ impl HIRBuilder {
         block_scope.statements = Vec::new();
         block_scope.within_loop = block_scope.within_loop || is_loop_body;
         let block_scope_id = self.add_scope(block_scope);
+        self.hir.scopetree.get_mut(&block_scope_id).unwrap().push(parent_scope.clone());
         for stmt in statements {
             self.transform_statement(stmt, &block_scope_id);
         }           

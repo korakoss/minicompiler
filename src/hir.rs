@@ -86,6 +86,7 @@ pub struct HIRFunction {
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
     pub scopes: HashMap<ScopeId, ScopeBlock>,
+    pub scopetree: HashMap<ScopeId, Vec<ScopeId>>,
     pub variables: HashMap<VarId, VariableInfo>,
     pub functions: HashMap<FuncId, HIRFunction>,
     pub global_scope: Option<ScopeId>,
@@ -96,6 +97,7 @@ impl HIRProgram {
     pub fn new() -> Self {
         HIRProgram {
             scopes: HashMap::new(),
+            scopetree: HashMap::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
             global_scope: None
@@ -112,4 +114,23 @@ impl HIRProgram {
             None
         }
     } 
+
+    // TODO: probably generally invoke on top level to alloc?
+    pub fn collect_downstream_vars(&self, scope_id: &ScopeId) -> Vec<VarId> {
+        let mut result: Vec<VarId> = Vec::new();
+
+        // TODO: errorhandling
+        let scope = self.scopes.get(scope_id).unwrap();
+        let scopevars = scope.scope_vars.values(); 
+        result.extend(scopevars);
+        
+        // TODO: better comprehension?
+        for child_scope_id in self.scopetree.get(scope_id).unwrap() {
+            result.extend(self.collect_downstream_vars(child_scope_id)); 
+        }
+
+        result
+    }
+
+    
 }
