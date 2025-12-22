@@ -185,27 +185,16 @@ impl Parser {
             self.expect_unparametric_token(Token::Semicolon);
             return ASTStatement::Assign { target: expr, value: assign_value};
         }
+
         match self.consume() {
                         
             Token::If => {
-                let cond = self.parse_expression();
-                let body = self.expect_block();
-                
-                if matches!(self.peek(), Token::Else) {
-                    let else_body = self.expect_block();
-                    return ASTStatement::If{
-                        condition: cond,
-                        if_body: body,
-                        else_body: Some(else_body),
-                    }
-   
-                } else {
-                    return ASTStatement::If { 
-                        condition: cond, 
-                        if_body: body,
-                        else_body: None,
-                    }
-                }
+                let condition = self.parse_expression();
+                let if_body = self.expect_block();
+                let else_body =  if matches!(self.peek(), Token::Else) {
+                    Some(self.expect_block())
+                } else {None};
+                ASTStatement::If {condition, if_body, else_body}
             }
 
             Token::While => {
