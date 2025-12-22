@@ -78,7 +78,7 @@ pub enum HIRStatement {
 
 #[derive(Clone, Debug)]
 pub struct HIRFunction {
-    pub args: Vec<VariableInfo>,
+    pub args: Vec<Variable>,
     pub body: ScopeId,
     pub ret_type: Type,
 }
@@ -87,7 +87,7 @@ pub struct HIRFunction {
 pub struct HIRProgram {
     pub scopes: HashMap<ScopeId, ScopeBlock>,
     pub scopetree: HashMap<ScopeId, Vec<ScopeId>>,
-    pub variables: HashMap<VarId, VariableInfo>,
+    pub variables: HashMap<VarId, Variable>,
     pub functions: HashMap<FuncId, HIRFunction>,
     pub global_scope: Option<ScopeId>,
 }

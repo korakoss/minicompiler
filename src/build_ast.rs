@@ -402,7 +402,7 @@ impl Parser {
                 let varname = self.expect_identifier_token();         
                 self.expect_unparametric_token(Token::Colon);
                 let typ = self.parse_type();
-                let var = VariableInfo{name: varname, typ: typ};
+                let var = Variable{name: varname, typ: typ};
                 self.expect_unparametric_token(Token::Assign);
                 let value = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
@@ -446,14 +446,14 @@ impl Parser {
             let argname = self.expect_identifier_token();
             self.expect_unparametric_token(Token::Colon);
             let argtype = self.parse_type();
-            args.push(VariableInfo{name: argname, typ: argtype});
+            args.push(Variable{name: argname, typ: argtype});
                             
             while self.peek() == &Token::Comma {
                 self.consume();  
                 let argname = self.expect_identifier_token();
                 self.expect_unparametric_token(Token::Colon);
                 let argtype = self.parse_type();
-                args.push(VariableInfo{name: argname, typ: argtype});
+                args.push(Variable{name: argname, typ: argtype});
 
             }
             self.expect_unparametric_token(Token::RightParen);

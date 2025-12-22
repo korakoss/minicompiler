@@ -53,7 +53,7 @@ impl HIRBuilder {
         scope_id
     }
 
-    fn add_var(&mut self, var: VariableInfo, active_scope: &ScopeId) -> VarId {
+    fn add_var(&mut self, var: Variable, active_scope: &ScopeId) -> VarId {
         if self.hir.get_varid(&var.name, active_scope) != None {
             panic!("Variable name exists in scope");
         }    

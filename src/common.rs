@@ -6,7 +6,7 @@ pub enum Type {
 }
 
 #[derive(Debug, Clone)]
-pub struct VariableInfo {
+pub struct Variable {
     pub name: String,
     pub typ: Type,
     // TODO: mutable, etc

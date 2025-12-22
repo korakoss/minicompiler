@@ -39,7 +39,7 @@ pub enum Expression {
 pub enum Statement {
 
     Let {
-        var: VariableInfo,
+        var: Variable,
         value: Expression,
         // TODO: type field
     },
@@ -66,7 +66,7 @@ pub enum Statement {
 #[derive(Debug, Clone)]
 pub struct Function {
     pub name: String,
-    pub args: Vec<VariableInfo>,
+    pub args: Vec<Variable>,
     pub body: Vec<Statement>,
     pub ret_type: Type,
 }
