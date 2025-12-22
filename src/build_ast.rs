@@ -3,7 +3,6 @@ use crate::ast::*;
 use crate::common::*;
 
 
-
 pub struct Parser {
     tokens: Vec<Token>,
     position: usize,
@@ -254,22 +253,7 @@ impl Parser {
             },
             
             other => {                                      
-                // TODO: can we do this better? eg. before the match?
-                if self.is_expression_start() {
-                    // Trying to parse it as an Assign statement 
-                    let target = self.parse_expression();
-                    self.expect_unparametric_token(Token::Assign);
-                    let value = self.parse_expression();
-                    self.expect_unparametric_token(Token::Semicolon);
-                    ASTStatement::Assign {
-                        target: target, 
-                        value: value 
-
-                    }
-                }
-                else {
-                    panic!("Cannot recognize valid statement at position {:?} with token {:?}", self.position, other);
-                }
+                panic!("Cannot recognize valid statement at position {:?} with token {:?}", self.position, other);
             }
         }
     }    

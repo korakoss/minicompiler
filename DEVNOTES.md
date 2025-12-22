@@ -11,6 +11,8 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
 
 - QUESTION: who's checking being in a loop nest/fun currently. Is it the HIR lowerer?
     - write a test case for this
+    - other testcase: write a nonparametric function
+        - unconfident about AST parsing there
 
 # Current things
 
