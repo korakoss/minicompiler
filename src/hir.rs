@@ -88,7 +88,28 @@ pub struct HIRProgram {
     pub scopes: HashMap<ScopeId, ScopeBlock>,
     pub variables: HashMap<VarId, VariableInfo>,
     pub functions: HashMap<FuncId, HIRFunction>,
-    pub global_scope: ScopeId,
+    pub global_scope: Option<ScopeId>,
 }
 
+impl HIRProgram {
 
+    pub fn new() -> Self {
+        HIRProgram {
+            scopes: HashMap::new(),
+            variables: HashMap::new(),
+            functions: HashMap::new(),
+            global_scope: None
+        }
+    }
+
+    pub fn get_varid(&self, varname: &String, scope_id: &ScopeId) -> Option<VarId>{
+        let scope = self.scopes.get(&scope_id).unwrap();
+        if let Some(&varid) = scope.scope_vars.get(varname) {
+            Some(varid)
+        } else if let Some(parent_id) = scope.parent_id {
+            self.get_varid(varname, &parent_id)
+        } else {
+            None
+        }
+    } 
+}

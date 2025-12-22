@@ -5,9 +5,7 @@ use std::{collections::HashMap};
 
 
 pub struct HIRBuilder {
-    pub scopes: HashMap<ScopeId, ScopeBlock>,
-    pub variables: HashMap<VarId, VariableInfo>,
-    pub functions: HashMap<FuncId, HIRFunction>,
+    pub hir: HIRProgram,
     function_map: HashMap<(String, Vec<Type>), FuncId>,
     scope_counter: usize,
     var_counter: usize,
@@ -19,9 +17,7 @@ impl HIRBuilder {
     
     pub fn new() -> HIRBuilder {
         HIRBuilder {
-            scopes: HashMap::new(),
-            variables: HashMap::new(),
-            functions: HashMap::new(),
+            hir: HIRProgram::new(),
             function_map: HashMap::new(),
             scope_counter: 0,
             var_counter: 0,
@@ -29,7 +25,7 @@ impl HIRBuilder {
         }
     }
 
-    pub fn lower_AST(&mut self, ast: RawAST) -> HIRProgram {
+    pub fn lower_ast(&mut self, ast: RawAST) -> HIRProgram {
         let RawAST{functions, main_statements} = ast;
         for func in functions {
             self.transform_function(func);
@@ -45,49 +41,33 @@ impl HIRBuilder {
         for stmt in main_statements {
             self.transform_statement(stmt, &globscope_id);
         }
-        HIRProgram {
-            scopes: self.scopes.clone(),
-            variables: self.variables.clone(),
-            functions: self.functions.clone(),
-            global_scope: globscope_id,
-        }
+        self.hir.clone() 
     }
 
     fn add_scope(&mut self, scope: ScopeBlock) -> ScopeId {
         let scope_id = ScopeId(self.scope_counter);
         self.scope_counter = self.scope_counter + 1;
-        self.scopes.insert(scope_id, scope);
+        self.hir.scopes.insert(scope_id, scope);
         scope_id
     }
 
     fn add_var(&mut self, var: VariableInfo, active_scope: &ScopeId) -> VarId {
-        if self.get_varid(&var.name, active_scope) != None {
+        if self.hir.get_varid(&var.name, active_scope) != None {
             panic!("Variable name exists in scope");
         }    
         let var_id = VarId(self.var_counter);
-        self.scopes.get_mut(active_scope).unwrap().scope_vars.insert(var.name.clone(), var_id.clone());
+        self.hir.scopes.get_mut(active_scope).unwrap().scope_vars.insert(var.name.clone(), var_id.clone());
         self.var_counter = self.var_counter + 1;
-        self.variables.insert(var_id, var);
+        self.hir.variables.insert(var_id, var);
         var_id 
     }
 
     fn add_func(&mut self, func: HIRFunction) -> FuncId {
         let func_id = FuncId(self.func_counter);
         self.func_counter = self.func_counter + 1;
-        self.functions.insert(func_id, func);
+        self.hir.functions.insert(func_id, func);
         func_id
     }
-
-    fn get_varid(&self, varname: &String, scope_id: &ScopeId) -> Option<VarId>{
-        let scope = self.scopes.get(&scope_id).unwrap();
-        if let Some(&varid) = scope.scope_vars.get(varname) {
-            Some(varid)
-        } else if let Some(parent_id) = scope.parent_id {
-            self.get_varid(varname, &parent_id)
-        } else {
-            None
-        }
-    } 
 
     fn transform_function(&mut self, function: Function) {
         let Function{name, args, body, ret_type} = function;
@@ -111,7 +91,7 @@ impl HIRBuilder {
 
 
     fn transform_statement(&mut self, statement: Statement, active_scope: &ScopeId) { 
-        let scope = self.scopes.get(active_scope).unwrap();
+        let scope = self.hir.scopes.get(active_scope).unwrap();
         let hir_statement = match statement {
             Statement::Let{var, value} => {
                 let hir_val = self.transform_expr(value, active_scope);
@@ -124,7 +104,7 @@ impl HIRBuilder {
             Statement::Assign { target, value } => {
                 match target {
                     Expression::Variable(varname) => {
-                        let varid = self.get_varid(&varname, active_scope).expect("Unrecognized variable name in scope");
+                        let varid = self.hir.get_varid(&varname, active_scope).expect("Unrecognized variable name in scope");
                         let hir_expr = self.transform_expr(value, active_scope);
                         // TODO: typecheck!!! IMPORTANT!!!
                         HIRStatement::Assign { 
@@ -180,12 +160,12 @@ impl HIRBuilder {
                 HIRStatement::Print(hir_expr)
             }       
         };
-        self.scopes.get_mut(active_scope).unwrap().statements.push(hir_statement);
+        self.hir.scopes.get_mut(active_scope).unwrap().statements.push(hir_statement);
     }
     
     // Split into two funcs?
     fn transform_block(&mut self, statements: Vec<Statement>, parent_scope: &ScopeId, is_loop_body: bool) -> ScopeId{
-        let mut block_scope = self.scopes.get(parent_scope).unwrap().clone();
+        let mut block_scope = self.hir.scopes.get(parent_scope).unwrap().clone();
         block_scope.statements = Vec::new();
         block_scope.within_loop = block_scope.within_loop || is_loop_body;
         let block_scope_id = self.add_scope(block_scope);
@@ -204,8 +184,8 @@ impl HIRBuilder {
                 }
             },
             Expression::Variable(name) => {
-                if let Some(varid) = self.get_varid(&name, active_scope) {
-                    let var = self.variables.get(&varid).unwrap();
+                if let Some(varid) = self.hir.get_varid(&name, active_scope) {
+                    let var = self.hir.variables.get(&varid).unwrap();
                     HIRExpression {
                         typ: var.typ.clone(),
                         expr: TypedExpressionKind::Variable(varid), 
@@ -238,7 +218,7 @@ impl HIRBuilder {
                 let Some(funcid) = self.function_map.get(&(funcname, type_signature)) else {
                     panic!("Function with name and signature not found");
                 };
-                let func_info = self.functions.get(funcid).unwrap();
+                let func_info = self.hir.functions.get(funcid).unwrap();
                 HIRExpression {
                     typ: func_info.ret_type.clone(),
                     expr: TypedExpressionKind::FuncCall { funcid: funcid.clone(), args: hir_args},

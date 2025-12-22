@@ -35,7 +35,7 @@ fn main() {
     println!("{:?}", ast);
    
     let mut lowerer = HIRBuilder::new();
-    let hir = lowerer.lower_AST(ast.clone());
+    let hir = lowerer.lower_ast(ast.clone());
     println!("{:?}", hir);
     let mut compiler = Compiler::new();
     let assembly = compiler.compile_program(ast);
