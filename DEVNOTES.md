@@ -1,14 +1,14 @@
 
 # Current thing
 
-HIR->Assembly codegen
-- compiling scope blocks 
-    - somehow we need to know what the stack offsets are on all upstream variables
-    - and the max space requirement on dowstream branches. or something
-- when compiling expressions, we need to get the right offsets
-- we also need to make the assembly line up
-    - it'd be nice to just batch-compile all the blocks and then emit them in some order
-
+- HIR->Assembly codegen
+    - compiling scope blocks 
+        - somehow we need to know what the stack offsets are on all upstream variables
+        - and the max space requirement on dowstream branches. or something
+    - when compiling expressions, we need to get the right offsets
+    - we also need to make the assembly line up
+        - it'd be nice to just batch-compile all the blocks and then emit them in some order
+- nicer scripts (see Rough Edges section)
 
 # Next steps
 
