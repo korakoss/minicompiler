@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+src_path = "/yum/src/$1.yum"
+ass_path = "/yum/ass/$1.s"
+ex_path = "/yum/bin/$1" 
+
+target/debug/minicompiler "$src_path" "$ass_path"
+as -o TEMP.o "$ass_path" 
+gcc -o "$ex_path" TEMP.o
+rm TEMP.o
+
+./"$2"
