@@ -12,3 +12,19 @@ pub struct Variable {
     // TODO: mutable, etc
 }
 
+#[derive(Debug, Clone)]
+pub enum BinaryOperator {
+    Add, 
+    Sub, 
+    Mul, 
+    Equals,
+    Less,       // NOTE: represents left < right 
+    Modulo
+
+    // TODO
+        //Greater, 
+        //Div (later, when floats ig?),
+        //NotEqual
+}
+
+// TODO: eventually also UnaryOperation (eg. negation)

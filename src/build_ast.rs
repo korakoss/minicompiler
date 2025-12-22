@@ -153,7 +153,7 @@ pub struct Parser {
     position: usize,
     loop_nest_counter: usize,
     within_function_body:bool,
-    defined_funcs: Vec<Function>,
+    defined_funcs: Vec<ASTFunction>,
     glob_vars: Vec<String>,
     loc_vars: Vec<String>,
 }
@@ -211,7 +211,7 @@ impl Parser {
         matches!(self.peek(), Token::IntLiteral(_) | Token::Identifier(_) | Token::LeftParen)
     }
     
-    fn parse_funccall_args(&mut self) -> Vec<Box<Expression>> {
+    fn parse_funccall_args(&mut self) -> Vec<Box<ASTExpression>> {
         if self.peek() == &Token::RightParen {
             println!("Boo");                                        // TODO: ?????
         }
@@ -226,18 +226,18 @@ impl Parser {
         args
     }
 
-    fn parse_primitive(&mut self) -> Expression {
+    fn parse_primitive(&mut self) -> ASTExpression {
         
          match self.consume() {
-            Token::IntLiteral(int) => {Expression::IntLiteral(int)},
+            Token::IntLiteral(int) => {ASTExpression::IntLiteral(int)},
             Token::Identifier(name) => {
                 if self.peek() == &Token::LeftParen {        // Function call 
                     self.consume();
                     let args = self.parse_funccall_args(); 
                     self.expect_unparametric_token(Token::RightParen);
-                    Expression::FuncCall { funcname: name, args: args}
+                    ASTExpression::FuncCall { funcname: name, args: args}
                 } else {
-                    Expression::Variable(name)
+                    ASTExpression::Variable(name)
                 }
             },
             Token::LeftParen => {
@@ -274,7 +274,7 @@ impl Parser {
         }
     }
    
-    fn parse_expression_with_precedence(&mut self, current_level: i8) -> Expression {
+    fn parse_expression_with_precedence(&mut self, current_level: i8) -> ASTExpression {
         
         let mut current_expr = self.parse_primitive(); 
 
@@ -286,17 +286,17 @@ impl Parser {
             let optoken = self.consume();
             let op = self.map_binop_token(optoken);
             let next_expr = self.parse_expression_with_precedence(prec+1);
-            current_expr = Expression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr)};
+            current_expr = ASTExpression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr)};
 
         }
         current_expr 
     }
 
-    fn parse_expression(&mut self) -> Expression {
+    fn parse_expression(&mut self) -> ASTExpression {
         self.parse_expression_with_precedence(0)
     }
 
-    fn parse_block(&mut self) -> Vec<Statement> {
+    fn parse_block(&mut self) -> Vec<ASTStatement> {
        let mut statements = Vec::new();
         
         while !matches!(self.peek(), Token::RightBrace){
@@ -313,7 +313,7 @@ impl Parser {
         }
     }
 
-    fn parse_statement(&mut self) -> Statement {
+    fn parse_statement(&mut self) -> ASTStatement {
         
         if self.is_expression_start() {
             // TODO: later we can do trailing-expr return here
@@ -321,7 +321,7 @@ impl Parser {
             self.expect_unparametric_token(Token::Assign);
             let assign_value = self.parse_expression();
             self.expect_unparametric_token(Token::Semicolon);
-            return Statement::Assign { target: expr, value: assign_value};
+            return ASTStatement::Assign { target: expr, value: assign_value};
         }
         match self.consume() {
                         
@@ -335,14 +335,14 @@ impl Parser {
                     self.expect_unparametric_token(Token::LeftBrace);
                     let else_body = self.parse_block();
                     self.expect_unparametric_token(Token::RightBrace);
-                    return Statement::If{
+                    return ASTStatement::If{
                         condition: cond,
                         if_body: body,
                         else_body: Some(else_body),
                     }
    
                 } else {
-                    return Statement::If { 
+                    return ASTStatement::If { 
                         condition: cond, 
                         if_body: body,
                         else_body: None,
@@ -357,7 +357,7 @@ impl Parser {
                 let body = self.parse_block();
                 self.expect_unparametric_token(Token::RightBrace);
                 self.loop_nest_counter = self.loop_nest_counter - 1;
-                Statement::While { 
+                ASTStatement::While { 
                     condition: cond, 
                     body: body,
                 }
@@ -366,7 +366,7 @@ impl Parser {
             Token::Break => {         
                 if self.loop_nest_counter > 0 {
                     self.expect_unparametric_token(Token::Semicolon);
-                    Statement::Break
+                    ASTStatement::Break
                 } else {
                     panic!("Break statement detected outside of any loop body at position {}", self.position);
                 }
@@ -375,7 +375,7 @@ impl Parser {
             Token::Continue => {         
                 if self.loop_nest_counter > 0 {
                     self.expect_unparametric_token(Token::Semicolon);
-                    Statement::Continue
+                    ASTStatement::Continue
                 } else {
                     panic!("Continue statement detected outside of any loop body at position {}", self.position);
                 }
@@ -387,7 +387,7 @@ impl Parser {
                 }
                 let return_expr = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
-                Statement::Return(return_expr)
+                ASTStatement::Return(return_expr)
             }
 
             Token::Print => {
@@ -395,7 +395,7 @@ impl Parser {
                 let expr = self.parse_expression();
                 self.expect_unparametric_token(Token::RightParen);
                 self.expect_unparametric_token(Token::Semicolon);        
-                Statement::Print(expr)
+                ASTStatement::Print(expr)
             },
 
             Token::Let => {
@@ -406,7 +406,7 @@ impl Parser {
                 self.expect_unparametric_token(Token::Assign);
                 let value = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
-                Statement::Let { var: var, value}
+                ASTStatement::Let { var: var, value}
             },
             
             other => {                                      
@@ -419,7 +419,7 @@ impl Parser {
                     self.expect_unparametric_token(Token::Assign);
                     let value = self.parse_expression();
                     self.expect_unparametric_token(Token::Semicolon);
-                    Statement::Assign {
+                    ASTStatement::Assign {
                         target: target, 
                         value: value 
 
@@ -432,7 +432,7 @@ impl Parser {
         }
     }    
 
-    fn parse_function_declaration(&mut self) -> Function {
+    fn parse_function_declaration(&mut self) -> ASTFunction {
         let funcname = match self.consume(){
             Token::Identifier(name) => {name},
             other => {panic!("Expected a function name, got token {:?} at {}", other, self.position);}
@@ -465,10 +465,10 @@ impl Parser {
         let body = self.parse_block();
         self.expect_unparametric_token(Token::RightBrace);
         self.within_function_body = false;
-        Function {name: funcname, args: args, body: body, ret_type}
+        ASTFunction {name: funcname, args: args, body: body, ret_type}
     }
 
-    pub fn parse_program(mut self) -> RawAST {
+    pub fn parse_program(mut self) -> ASTProgram {
         let mut statements = Vec::new();
         while !self.is_at_end() {
             if self.peek() == &Token::Function {
@@ -479,7 +479,7 @@ impl Parser {
                 statements.push(self.parse_statement());
             }
         }
-        RawAST { functions: self.defined_funcs, main_statements: statements}
+        ASTProgram { functions: self.defined_funcs, main_statements: statements}
     }
 }
 

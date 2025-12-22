@@ -1,81 +1,61 @@
 use crate::common::*;
 
-#[derive(Debug, Clone)]
-pub enum BinaryOperator {
-    Add, 
-    Sub, 
-    Mul, 
-    Equals,
-    Less,       // left < right 
-    Modulo
-    //Greater, 
-    //Div (later, when floats ig?),
-    //NotEqual
-}
-
 
 #[derive(Debug, Clone)]
-pub enum Expression {
+pub enum ASTExpression {
     IntLiteral(i32),
-
     Variable(String),
-
     BinOp {
        op: BinaryOperator,
-       left: Box<Expression>,
-       right: Box<Expression>,
+       left: Box<ASTExpression>,
+       right: Box<ASTExpression>,
     },
-
     FuncCall {
         funcname: String,
-        args: Vec<Box<Expression>>,
+        args: Vec<Box<ASTExpression>>,
     }
-    
-    // UnaryOp (eg. negation)
+    // TODO: negation 
 }
 
 
 #[derive(Debug, Clone)]
-pub enum Statement {
-
+pub enum ASTStatement {
     Let {
         var: Variable,
-        value: Expression,
+        value: ASTExpression,
         // TODO: type field
     },
     Assign {
-        target: Expression,         // validate lvalue
-        value: Expression
+        target: ASTExpression,         
+        value: ASTExpression
     },
     If {
-        condition: Expression,
-        if_body: Vec<Statement>,
-        else_body: Option<Vec<Statement>>,
+        condition: ASTExpression,
+        if_body: Vec<ASTStatement>,
+        else_body: Option<Vec<ASTStatement>>,
     },
     While {
-        condition: Expression,
-        body: Vec<Statement>,
+        condition: ASTExpression,
+        body: Vec<ASTStatement>,
     },
     Break,
     Continue,
-    Return(Expression),
-    Print(Expression),
+    Return(ASTExpression),
+    Print(ASTExpression),
 }
 
-
 #[derive(Debug, Clone)]
-pub struct Function {
+pub struct ASTFunction {
     pub name: String,
     pub args: Vec<Variable>,
-    pub body: Vec<Statement>,
+    pub body: Vec<ASTStatement>,
     pub ret_type: Type,
 }
 
-
 #[derive(Debug, Clone)]
-pub struct RawAST {
-    pub functions: Vec<Function>,
-    pub main_statements: Vec<Statement>
+pub struct ASTProgram {
+    pub functions: Vec<ASTFunction>,
+    pub main_statements: Vec<ASTStatement>
 }
 
 

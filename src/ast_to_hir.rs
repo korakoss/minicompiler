@@ -25,8 +25,8 @@ impl HIRBuilder {
         }
     }
 
-    pub fn lower_ast(&mut self, ast: RawAST) -> HIRProgram {
-        let RawAST{functions, main_statements} = ast;
+    pub fn lower_ast(&mut self, ast: ASTProgram) -> HIRProgram {
+        let ASTProgram{functions, main_statements} = ast;
         for func in functions {
             self.transform_function(func);
         }
@@ -71,8 +71,8 @@ impl HIRBuilder {
         func_id
     }
 
-    fn transform_function(&mut self, function: Function) {
-        let Function{name, args, body, ret_type} = function;
+    fn transform_function(&mut self, function: ASTFunction) {
+        let ASTFunction{name, args, body, ret_type} = function;
         let body_block = ScopeBlock{
             parent_id: None,
             scope_vars: HashMap::new(),
@@ -92,10 +92,10 @@ impl HIRBuilder {
     }
 
 
-    fn transform_statement(&mut self, statement: Statement, active_scope: &ScopeId) { 
+    fn transform_statement(&mut self, statement: ASTStatement, active_scope: &ScopeId) { 
         let scope = self.hir.scopes.get(active_scope).unwrap();
         let hir_statement = match statement {
-            Statement::Let{var, value} => {
+            ASTStatement::Let{var, value} => {
                 let hir_val = self.transform_expr(value, active_scope);
                 let varid = self.add_var(var, active_scope); // TODO: error handling
                 HIRStatement::Let { 
@@ -103,9 +103,9 @@ impl HIRBuilder {
                     value: hir_val, 
                 }
             },
-            Statement::Assign { target, value } => {
+            ASTStatement::Assign { target, value } => {
                 match target {
-                    Expression::Variable(varname) => {
+                    ASTExpression::Variable(varname) => {
                         let varid = self.hir.get_varid(&varname, active_scope).expect("Unrecognized variable name in scope");
                         let hir_expr = self.transform_expr(value, active_scope);
                         // TODO: typecheck!!! IMPORTANT!!!
@@ -117,7 +117,7 @@ impl HIRBuilder {
                     _ => {panic!("Invalid assignment target");}
                 }
             },
-            Statement::If { condition, if_body, else_body } => {
+            ASTStatement::If { condition, if_body, else_body } => {
                 let hir_condition = self.transform_expr(condition, active_scope);
                 if hir_condition.typ != Type::Bool {
                     panic!("If condition expression not boolean");
@@ -131,7 +131,7 @@ impl HIRBuilder {
                 };
                 HIRStatement::If { condition: hir_condition, if_body: hir_if_body, else_body: hir_else_body}
             },
-            Statement::While { condition, body } => {
+            ASTStatement::While { condition, body } => {
                 let hir_condition = self.transform_expr(condition, active_scope);
                 if hir_condition.typ != Type::Bool {
                     panic!("If condition expression not boolean");
@@ -139,24 +139,24 @@ impl HIRBuilder {
                 let hir_body = self.transform_block(body, active_scope, true); 
                 HIRStatement::While { condition: hir_condition, body: hir_body}
             },
-            Statement::Break => {
+            ASTStatement::Break => {
                 if !scope.within_loop {
                     panic!("Break statement detected out of loop");
                 }
                 HIRStatement::Break
             },
-            Statement::Continue => {
+            ASTStatement::Continue => {
                 if !scope.within_loop {
                     panic!("Break statement detected out of loop");
                 }
                 HIRStatement::Continue
             },
-            Statement::Return(expr) => {
+            ASTStatement::Return(expr) => {
                 // TODO: this needs type checks!!! IMPORTANT!!!
                 let hir_expr = self.transform_expr(expr, active_scope);
                 HIRStatement::Return(hir_expr)
             },
-            Statement::Print(expr) => {
+            ASTStatement::Print(expr) => {
                 // TODO: this needs subtler type shit later
                 let hir_expr = self.transform_expr(expr, active_scope);
                 HIRStatement::Print(hir_expr)
@@ -166,7 +166,7 @@ impl HIRBuilder {
     }
     
     // Split into two funcs?
-    fn transform_block(&mut self, statements: Vec<Statement>, parent_scope: &ScopeId, is_loop_body: bool) -> ScopeId{
+    fn transform_block(&mut self, statements: Vec<ASTStatement>, parent_scope: &ScopeId, is_loop_body: bool) -> ScopeId{
         let mut block_scope = self.hir.scopes.get(parent_scope).unwrap().clone();
         block_scope.parent_id = Some(parent_scope.clone());
         block_scope.statements = Vec::new();
@@ -179,15 +179,15 @@ impl HIRBuilder {
         block_scope_id 
     }
 
-    fn transform_expr(&self, expr: Expression, active_scope: &ScopeId) -> HIRExpression {
+    fn transform_expr(&self, expr: ASTExpression, active_scope: &ScopeId) -> HIRExpression {
         match expr {
-            Expression::IntLiteral(num) => {
+            ASTExpression::IntLiteral(num) => {
                 HIRExpression{
                     typ: Type::Integer,
                     expr: TypedExpressionKind::IntLiteral(num),
                 }
             },
-            Expression::Variable(name) => {
+            ASTExpression::Variable(name) => {
                 if let Some(varid) = self.hir.get_varid(&name, active_scope) {
                     let var = self.hir.variables.get(&varid).unwrap();
                     HIRExpression {
@@ -198,7 +198,7 @@ impl HIRBuilder {
                     panic!("Cannot find variable {} in scope", name);
                 }
             },
-            Expression::BinOp {op, left, right} => {
+            ASTExpression::BinOp {op, left, right} => {
                 let left_hir = self.transform_expr(*left, active_scope);
                 let right_hir = self.transform_expr(*right, active_scope);
                 let inferred_type = binop_typecheck(&op, &left_hir.typ, &right_hir.typ);  
@@ -216,7 +216,7 @@ impl HIRBuilder {
                     panic!("Binop typecheck failed");
                 }
             },
-            Expression::FuncCall {funcname, args} => {
+            ASTExpression::FuncCall {funcname, args} => {
                 let hir_args: Vec<HIRExpression> = args.into_iter().map(|x| self.transform_expr(*x, active_scope)).collect();
                 let type_signature: Vec<Type> = hir_args.iter().map(|x| x.typ.clone()).collect();
                 let Some(funcid) = self.function_map.get(&(funcname, type_signature)) else {

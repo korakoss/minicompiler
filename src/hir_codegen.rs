@@ -1,5 +1,7 @@
 use std::collections::HashMap;
-use crate::{ast::BinaryOperator, common::Variable, hir::*};
+
+use crate::common::*;
+use crate::hir::*;
 
 
 pub struct HIRCompiler {
