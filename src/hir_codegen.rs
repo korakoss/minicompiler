@@ -31,18 +31,28 @@ impl HIRCompiler {
         for (f_id, func) in self.hir_program.functions.clone(){
             self.compile_function(f_id, func);
         }
-        
-        self.emit_prologue("main".to_string(), 256); // TODO: change hardcode
+
+        let globscope_id = self.hir_program.global_scope.expect("Expected global statements");
+        let globvars = self.hir_program.collect_scope_vars(&globscope_id);
+        let stack_offsets: HashMap<VarId, usize> = globvars.values().enumerate().map(|(i,x)| (x.clone(), 8*i)).collect();  // TODO: incorporate size stuff later 
+        let globscope_info = ScopeInfo{
+            var_offsets: stack_offsets, 
+            curr_loop_start: None,
+            curr_loop_end: None, 
+            curr_func_epi: None, 
+        };
+        let reserved_stack = 8 * globvars.len();       // TODO: incorporate size stuff later 
+        self.emit_prologue("main".to_string(), reserved_stack); 
         
         // TODO: compile global block or sth                
-
+        self.compile_block(&globscope_id, &globscope_info);
         // Epilogue
-        self.emit_epilogue(256);                    // TODO: change
+        self.emit_epilogue(reserved_stack);                    // TODO: change
         
         self.output.clone() 
     }
     
-
+    // WHAT THE FUCK IS THIS SIGNATURE?
     fn compile_function(&mut self, id: FuncId, function: HIRFunction) {
 
         let flabel = format!("func_{}", id.0);
@@ -55,23 +65,22 @@ impl HIRCompiler {
         if args.len() > 4 {
                 panic!("Only up to 4 args supported at the moment");
         }
+        let reserved_stack = 8 * vars.len();       // TODO: incorporate size stuff later 
+
+        self.emit(&format!("{}:", flabel));
+        self.emit_prologue(flabel, reserved_stack);
+
         for i in 0..args.len(){
                 self.emit(&format!("    str r{}, [fp, #-{}]", i, (i+1)*8)); 
         }
-        let reserved_stack = 8 * vars.len();       // TODO: incorporate size stuff later 
 
-        let scope_info = ScopeInfo{
+        let func_scope = ScopeInfo{
             var_offsets: stack_offsets, 
             curr_loop_start: None,
             curr_loop_end: None, 
             curr_func_epi: Some(retlabel.clone())
         };
-        self.emit(&format!("{}:", flabel));
-        self.emit_prologue(flabel, reserved_stack);
-        
-        // TODO: stuff
-            // pop args off the stack  
-            // compile the stmts
+        self.compile_block(&body, &func_scope); 
         
         self.emit(&format!("{}:", retlabel));
         self.emit_epilogue(reserved_stack);
@@ -146,6 +155,7 @@ impl HIRCompiler {
                         self.compile_block(&else_block, scope); 
                     }
                 }
+                self.emit(&format!("{}:",end_label));
             }
             // TODO: if
             HIRStatement::Break => {

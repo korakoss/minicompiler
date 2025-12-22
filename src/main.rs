@@ -6,8 +6,8 @@ mod ast;
 mod build_ast;
 use crate::build_ast::*;
 
-mod codegen;
-use crate::codegen::*;
+//mod codegen;
+//use crate::codegen::*;
 
 mod hir;
 
@@ -17,6 +17,8 @@ use ast_to_hir::*;
 mod common;
 
 mod hir_codegen;
+use hir_codegen::*;
+
 
 fn main() {
     
@@ -37,8 +39,12 @@ fn main() {
     let mut lowerer = HIRBuilder::new();
     let hir = lowerer.lower_ast(ast.clone());
     println!("{:?}", hir);
-    let mut compiler = Compiler::new();
-    let assembly = compiler.compile_program(ast);
+
+    //let mut compiler = Compiler::new();
+    //let assembly = compiler.compile_program(ast);
+
+    let mut hircomp = HIRCompiler::new(hir);
+    let assembly = hircomp.compile();
     fs::write(assembly_filename, assembly).unwrap();
 }
 

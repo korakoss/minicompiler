@@ -41,6 +41,7 @@ impl HIRBuilder {
         for stmt in main_statements {
             self.transform_statement(stmt, &globscope_id);
         }
+        self.hir.global_scope = Some(globscope_id);
         self.hir.clone() 
     }
 
@@ -167,6 +168,7 @@ impl HIRBuilder {
     // Split into two funcs?
     fn transform_block(&mut self, statements: Vec<Statement>, parent_scope: &ScopeId, is_loop_body: bool) -> ScopeId{
         let mut block_scope = self.hir.scopes.get(parent_scope).unwrap().clone();
+        block_scope.parent_id = Some(parent_scope.clone());
         block_scope.statements = Vec::new();
         block_scope.within_loop = block_scope.within_loop || is_loop_body;
         let block_scope_id = self.add_scope(block_scope);
