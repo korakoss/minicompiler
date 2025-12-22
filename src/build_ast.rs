@@ -260,23 +260,23 @@ impl Parser {
 
 
 // TODO: maybe we should make a big binop info table with rows like: Token, Binoptype,precedence
-    fn get_binop_precedence(op_token: Token) -> i8 {
-        match op_token {
-            Token::Plus| Token::Minus => 1,
-            Token::Multiply | Token::Modulo => 2,
-            Token::Equals | Token::Less => 0,
-            _ => -1, 
-        }
+fn get_binop_precedence(op_token: Token) -> i8 {
+    match op_token {
+        Token::Plus| Token::Minus => 1,
+        Token::Multiply | Token::Modulo => 2,
+        Token::Equals | Token::Less => 0,
+        _ => -1, 
     }
-    fn map_binop_token(op_token: Token) -> BinaryOperator {
-        match op_token {
-            Token::Plus => BinaryOperator::Add,
-            Token::Minus => BinaryOperator::Sub,
-            Token::Multiply => BinaryOperator::Mul,
-            Token::Equals => BinaryOperator::Equals,
-            Token::Less => BinaryOperator::Less,
-            Token::Modulo => BinaryOperator::Modulo,
-            _ => panic!("Expected binary operator token"),
-        }
+}
+fn map_binop_token(op_token: Token) -> BinaryOperator {
+    match op_token {
+        Token::Plus => BinaryOperator::Add,
+        Token::Minus => BinaryOperator::Sub,
+        Token::Multiply => BinaryOperator::Mul,
+        Token::Equals => BinaryOperator::Equals,
+        Token::Less => BinaryOperator::Less,
+        Token::Modulo => BinaryOperator::Modulo,
+        _ => panic!("Expected binary operator token"),
     }
+}
 
