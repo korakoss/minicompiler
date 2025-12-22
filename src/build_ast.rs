@@ -73,9 +73,6 @@ impl Parser {
     }
     
     fn parse_funccall_args(&mut self) -> Vec<Box<ASTExpression>> {
-        if self.peek() == &Token::RightParen {
-            println!("Boo");                                        // TODO: ?????
-        }
         let mut args = Vec::new();
         if self.is_expression_start() {
             args.push(Box::new(self.parse_expression()));
