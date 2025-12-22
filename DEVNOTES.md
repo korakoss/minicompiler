@@ -1,57 +1,25 @@
 
-# Current thing
+# Capn log XII.22
 
-- HIR->Assembly codegen
-    - compiling scope blocks 
-        - somehow we need to know what the stack offsets are on all upstream variables
-        - and the max space requirement on dowstream branches. or something
-    - when compiling expressions, we need to get the right offsets
-    - we also need to make the assembly line up
-        - it'd be nice to just batch-compile all the blocks and then emit them in some order
-- nicer scripts (see Rough Edges section)
+HIR->assembly codegen possibly works now. Test it, clean up, merge maybe.
+Write nicer scripts (this can even enable having a small "test suite" of Yum programs nicely).
 
-# Next steps
 
+# Current things
+
+## Next steps
+- finalize stuff
+    - possibly merge even
+    - _significant_ cleanups on the codebase
+- nicer scripts 
+    - Yum codefiles and other pipeline stage results should go in a Yum folder's subfolders
+    - we might want to also do a bit nicer compiler internal stage displays ("serialize" AST and HIR, save to file)
 - rename everything to make more sense
 
 ## Typechecking gaps
 - returns in func bodies having the correct type
 - assign values having the type of the target
-- LATER: prints
-    - not all types might be naively printable
-    - we want bool prints to print True/False not 1/0, etc
 
-## Variable counting
-- we now have enough info to allocate the correct amount of space actually needed by variables
-- oh also eventually we'll need size info into vars ig right?
-
-## Rough edges & QoL improvement areas
-- allocating 8 bits per var depspite it's 4 on arm32
-- print tokenization and AST human-readably
-	- we can make a simple recursive function to display it with indents?
-- nicer scripts
-    - flags for displaying/saving each pipeline stage
-    - uniformize the result names: $.yum turns into $.everythingelse
-    - ideal flow:
-        - (context: dedicated result folders for pipeline stages)
-        - script takes one arg (not counting possible flags ig): [filename]
-            - flags: run or not
-        - rsyncs to pi
-        - cargo builds over there
-        - compiles ./yumsrc/[filename].yum
-        - saves intermediates into ./[intermediate]/[filename]
-        - runs the executable
-- add syntax highlighting
-    - vim script / treesitter
-
-## Easy but unnecessary wins
-- Negation
-    - introduce Expression::UnaryOp
-- Remaining comparison operators (>, !=) 
-    - maybe >= and =< but not necessary
-- add commenting -- eg //
-- add support for signed integers 
-    - mostly a lexing issue i think -- need to parse the pattern -[intliteral]
 
 
 # Next progess steps
@@ -60,6 +28,7 @@
 
 ### Structs
 - just make normal struct stuff (I guess with int and bool -- and struct -- fields)
+    - this makes variables have different sizes and thus forces us to start counting and using it in stackspace alloc
 
 ### The Option<T> push
 - add _None_ type 
@@ -78,3 +47,23 @@
 - subtyping, | operator on types to go in function signatures
 
 
+
+# "Meh, do it someday"
+
+## Rough edges & QoL improvement areas
+- allocating 8 bits per var depspite it's 4 on arm32
+- add syntax highlighting
+    - vim script / treesitter
+- improving print()
+    - not all types might be naively printable
+    - we want bool prints to print True/False not 1/0, etc
+
+
+## Easy but unnecessary wins
+- Negation
+    - introduce Expression::UnaryOp
+- Remaining comparison operators (>, !=) 
+    - maybe >= and =< but not necessary
+- add commenting -- eg //
+- add support for signed integers 
+    - mostly a lexing issue i think -- need to parse the pattern -[intliteral]
