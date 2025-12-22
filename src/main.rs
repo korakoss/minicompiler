@@ -10,13 +10,13 @@ mod codegen;
 use crate::codegen::*;
 
 mod hir;
-use crate::hir::*;
 
 mod ast_to_hir;
 use ast_to_hir::*;
 
 mod common;
-use crate::common::*;
+
+mod hir_codegen;
 
 fn main() {
     
