@@ -23,6 +23,7 @@
 
 ## Variable counting
 - we now have enough info to allocate the correct amount of space actually needed by variables
+- oh also eventually we'll need size info into vars ig right?
 
 ## Rough edges & QoL improvement areas
 - allocating 8 bits per var depspite it's 4 on arm32

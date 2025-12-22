@@ -115,22 +115,30 @@ impl HIRProgram {
         }
     } 
 
-    // TODO: probably generally invoke on top level to alloc?
-    pub fn collect_downstream_vars(&self, scope_id: &ScopeId) -> Vec<VarId> {
-        let mut result: Vec<VarId> = Vec::new();
-
-        // TODO: errorhandling
-        let scope = self.scopes.get(scope_id).unwrap();
-        let scopevars = scope.scope_vars.values(); 
-        result.extend(scopevars);
+    pub fn collect_scope_vars(&self, scope_id: &ScopeId) -> HashMap<String, VarId> {
+        // Collects directly-in-scope vars upstream and everything downstream
         
+
+        // TODO: all sorts of errorhandling
+        
+        let mut result: HashMap<String, VarId> = HashMap::new();
+
         // TODO: better comprehension?
         for child_scope_id in self.scopetree.get(scope_id).unwrap() {
-            result.extend(self.collect_downstream_vars(child_scope_id)); 
+            result.extend(self.collect_scope_vars(child_scope_id)); 
         }
+        
+        let mut curr_tent_scope = self.scopes.get(scope_id);
 
+        while let Some(curr_scope) = curr_tent_scope {
+            result.extend(curr_scope.scope_vars.clone());
+            curr_tent_scope = match curr_scope.parent_id {
+                None => None,
+                Some(id) => {
+                    self.scopes.get(&id)
+                }
+            }
+        }
         result
     }
-
-    
 }
