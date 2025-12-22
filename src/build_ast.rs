@@ -113,39 +113,19 @@ impl Parser {
         }
     }
 
-    // TODO: maybe we should make a big binop info table with rows like: Token, Binoptype,precedence
-    fn get_binop_precedence(&mut self, op_token: Token) -> i8 {
-        match op_token {
-            Token::Plus| Token::Minus => 1,
-            Token::Multiply | Token::Modulo => 2,
-            Token::Equals | Token::Less => 0,
-            _ => -1, 
-        }
-    }
-    fn map_binop_token(&mut self, op_token: Token) -> BinaryOperator {
-        match op_token {
-            Token::Plus => BinaryOperator::Add,
-            Token::Minus => BinaryOperator::Sub,
-            Token::Multiply => BinaryOperator::Mul,
-            Token::Equals => BinaryOperator::Equals,
-            Token::Less => BinaryOperator::Less,
-            Token::Modulo => BinaryOperator::Modulo,
-            _ => panic!("Expected binary operator token"),
-        }
-    }
-    
+        
     // TODO: clarify logic
     fn parse_expression_with_precedence(&mut self, current_level: i8) -> ASTExpression {
         
         let mut current_expr = self.parse_primitive(); 
 
         while matches!(self.peek(), Token::Plus | Token::Minus | Token::Multiply | Token::Equals | Token::Less | Token::Modulo) {
-            let prec = self.get_binop_precedence(self.peek().clone());
+            let prec = get_binop_precedence(self.peek().clone());
             if prec < current_level {
                 break;
             }
             let optoken = self.consume();
-            let op = self.map_binop_token(optoken);
+            let op = map_binop_token(optoken);
             let next_expr = self.parse_expression_with_precedence(prec+1);
             current_expr = ASTExpression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr)};
 
@@ -281,4 +261,25 @@ impl Parser {
 
 }
 
+
+// TODO: maybe we should make a big binop info table with rows like: Token, Binoptype,precedence
+    fn get_binop_precedence(op_token: Token) -> i8 {
+        match op_token {
+            Token::Plus| Token::Minus => 1,
+            Token::Multiply | Token::Modulo => 2,
+            Token::Equals | Token::Less => 0,
+            _ => -1, 
+        }
+    }
+    fn map_binop_token(op_token: Token) -> BinaryOperator {
+        match op_token {
+            Token::Plus => BinaryOperator::Add,
+            Token::Minus => BinaryOperator::Sub,
+            Token::Multiply => BinaryOperator::Mul,
+            Token::Equals => BinaryOperator::Equals,
+            Token::Less => BinaryOperator::Less,
+            Token::Modulo => BinaryOperator::Modulo,
+            _ => panic!("Expected binary operator token"),
+        }
+    }
 
