@@ -5,6 +5,9 @@ mod ast;
 mod common;
 mod hir;
 
+mod lex;
+use crate::lex::*;
+
 mod build_ast;
 use crate::build_ast::*;
 

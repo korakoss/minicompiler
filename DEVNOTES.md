@@ -4,6 +4,13 @@
 HIR->assembly codegen possibly works now. Test it, clean up, merge maybe.
 Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_ compiles and runs on pi, _yumpi_ jumps to project folder on pi. 
 
+## OVERHAUL STUFF
+- main.rs finalized
+- common.rs done
+- ast.rs done
+
+- QUESTION: who's checking being in a loop nest/fun currently. Is it the HIR lowerer?
+    - write a test case for this
 
 # Current things
 
@@ -12,7 +19,6 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
     - possibly merge even
     - grep for TODOs
     - _significant_ cleanups on the codebase
-- we might want to also do a bit nicer compiler internal stage displays ("serialize" AST and HIR, save to file)
 - write a small "test suite" of yum programs to check compiler updates against
     - create an automatic test script too
 - rename everything to make more sense
@@ -25,6 +31,9 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
 
 # Next progess steps
 
+## Better error handling
+- Result types, propagating up, etcetc?
+
 ## More types
 
 ### Structs
@@ -36,6 +45,9 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
 - _enums_-s
 - add generics
 - NOTE: we might start needing _match_ here
+
+### Floats
+- which also enable the Division binop etc
 
 ## Stack args 
 - support arbitrary number of arguments via pushing to stack
@@ -51,8 +63,10 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
 
 # "Meh, do it someday"
 
-## Rough edges & QoL improvement areas
-- allocating 8 bits per var depspite it's 4 on arm32
+## Cringe things 
+- currently allocating 8 bits per var depspite it's 4 on arm32
+
+## Niceties
 - add syntax highlighting
     - vim script / treesitter
 - improving print()

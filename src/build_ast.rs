@@ -1,161 +1,13 @@
+use crate::lex::*;
 use crate::ast::*;
 use crate::common::*;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Token {
-    // Operators
-    Assign,
-    Plus,
-    Minus,
-    Multiply,
-    Equals,
-    Less,
-    Modulo,
-
-    // Delimiters
-    Semicolon,
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    Comma,
-    Colon,
-
-    // Values 
-    IntLiteral(i32),
-    Identifier(String),
-    
-    // Keywords
-    Print,
-    If,
-    Else,
-    While,
-    Break,
-    Continue,
-    Function,
-    Return,
-    Let,
-    
-    // Type stuff
-    Int, 
-    Bool,
-    RightArrow,
-
-    // Special
-    EOF,
-}
-
-
-pub fn lex(program: &str) -> Vec<Token> {
-    let mut tokens: Vec<Token> = Vec::new();
-    let mut chars = program.chars().peekable();
-    
-    while let Some(&c) = chars.peek() {
-
-        if c.is_whitespace() {
-            chars.next();
-            continue;
-        }
-
-
-        // Alphanumeric strings: keywords or identifiers
-        if c.is_ascii_alphabetic() {
-            let mut word = String::new();
-            while let Some(&ch) = chars.peek() {
-                if ch.is_ascii_alphanumeric() || ch == '_' {
-                    word.push(ch);
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-
-            let token = match word.as_str() {
-                "if" => Token::If,
-                "else" => Token::Else,
-                "while" => Token::While,
-                "break" => Token::Break,
-                "continue" => Token::Continue,
-                "fun" => Token::Function,
-                "return" => Token::Return,
-                "print" => Token::Print,
-                "let" => Token::Let,
-                "int" => Token::Int,
-                "bool" => Token::Bool,
-                _ => Token::Identifier(word),
-            };  
-            tokens.push(token); 
-        } 
-        
-        // Numbers
-        else if c.is_ascii_digit() {
-            let mut num_str = String::new();
-            while let Some(&ch) = chars.peek() {
-                if ch.is_ascii_digit() {
-                    num_str.push(ch);
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-            let value = num_str.parse::<i32>().unwrap();
-            tokens.push(Token::IntLiteral(value));
-        }
-
-        else if c == '=' {
-            chars.next();
-            if chars.peek() == Some(&'=') {
-                chars.next();
-                tokens.push(Token::Equals);
-            } else {
-                tokens.push(Token::Assign);
-            }
-        }
-
-        else if c == '-' {
-            chars.next();
-            if chars.peek() == Some(&'>') {
-                chars.next();
-                tokens.push(Token::RightArrow);
-            } else {
-                tokens.push(Token::Minus);
-            }
-        }
-
-        else {
-            // Processing single character stuff
-            let token = match c {
-                '+' => Token::Plus,
-                '*' => Token::Multiply,
-                ';' => Token::Semicolon,
-                '(' => Token::LeftParen,
-                ')' => Token::RightParen,
-                '{' => Token::LeftBrace,
-                '}' => Token::RightBrace,
-                '<' => Token::Less,
-                '%' => Token::Modulo,
-                ',' => Token::Comma,
-                ':' => Token::Colon,
-                _ => {panic!("Unexpected character: {}",c)},
-            };
-            chars.next();
-            tokens.push(token);
-        }
-        
-    } 
-    tokens.push(Token::EOF);
-    tokens
-}
 
 
 pub struct Parser {
     tokens: Vec<Token>,
     position: usize,
-    loop_nest_counter: usize,
-    within_function_body:bool,
     defined_funcs: Vec<ASTFunction>,
-    glob_vars: Vec<String>,
-    loc_vars: Vec<String>,
 }
 
 
@@ -165,14 +17,25 @@ impl Parser {
         Parser {
             tokens: tokens,
             position: 0,
-            loop_nest_counter:0,
-            within_function_body: false,
             defined_funcs: Vec::new(),
-            glob_vars: Vec::new(),
-            loc_vars: Vec::new(),
         }
     }
-    
+
+    pub fn parse_program(mut self) -> ASTProgram {
+        let mut statements = Vec::new();
+        while !self.is_at_end() {
+            if self.peek() == &Token::Function {
+                self.consume();
+                let func_decl = self.parse_function_declaration();
+                self.defined_funcs.push(func_decl);
+            } else {
+                statements.push(self.parse_statement());
+            }
+        }
+        ASTProgram { functions: self.defined_funcs, main_statements: statements}
+    }
+
+    // TODO: can't these 3 functions be substituted by .peekable of whatever? 
     fn is_at_end(&self) -> bool {
         self.position >= self.tokens.len() 
         || matches!(self.peek(), Token::EOF)
@@ -195,7 +58,6 @@ impl Parser {
         self.consume();
     }
     
-    // TODO: add result
     fn expect_identifier_token(&mut self) -> String {
         match self.consume() {
             Token::Identifier(name) => {
@@ -261,7 +123,6 @@ impl Parser {
             _ => -1, 
         }
     }
-
     fn map_binop_token(&mut self, op_token: Token) -> BinaryOperator {
         match op_token {
             Token::Plus => BinaryOperator::Add,
@@ -270,10 +131,11 @@ impl Parser {
             Token::Equals => BinaryOperator::Equals,
             Token::Less => BinaryOperator::Less,
             Token::Modulo => BinaryOperator::Modulo,
-            _ => panic!("Expected binary operator toke"),
+            _ => panic!("Expected binary operator token"),
         }
     }
-   
+    
+    // TODO: clarify logic
     fn parse_expression_with_precedence(&mut self, current_level: i8) -> ASTExpression {
         
         let mut current_expr = self.parse_primitive(); 
@@ -295,13 +157,14 @@ impl Parser {
     fn parse_expression(&mut self) -> ASTExpression {
         self.parse_expression_with_precedence(0)
     }
-
-    fn parse_block(&mut self) -> Vec<ASTStatement> {
-       let mut statements = Vec::new();
-        
+    
+    fn expect_block(&mut self) -> Vec<ASTStatement> {
+        let mut statements = Vec::new();
+        self.expect_unparametric_token(Token::LeftBrace);
         while !matches!(self.peek(), Token::RightBrace){
             statements.push(self.parse_statement());
         }
+        self.expect_unparametric_token(Token::RightBrace);
         statements
     }
 
@@ -327,14 +190,10 @@ impl Parser {
                         
             Token::If => {
                 let cond = self.parse_expression();
-                self.expect_unparametric_token(Token::LeftBrace);
-                let body = self.parse_block();
-                self.expect_unparametric_token(Token::RightBrace);
+                let body = self.expect_block();
                 
                 if matches!(self.peek(), Token::Else) {
-                    self.expect_unparametric_token(Token::LeftBrace);
-                    let else_body = self.parse_block();
-                    self.expect_unparametric_token(Token::RightBrace);
+                    let else_body = self.expect_block();
                     return ASTStatement::If{
                         condition: cond,
                         if_body: body,
@@ -352,11 +211,7 @@ impl Parser {
 
             Token::While => {
                 let cond = self.parse_expression();
-                self.expect_unparametric_token(Token::LeftBrace);
-                self.loop_nest_counter = self.loop_nest_counter + 1;
-                let body = self.parse_block();
-                self.expect_unparametric_token(Token::RightBrace);
-                self.loop_nest_counter = self.loop_nest_counter - 1;
+                let body = self.expect_block();
                 ASTStatement::While { 
                     condition: cond, 
                     body: body,
@@ -364,27 +219,16 @@ impl Parser {
             }
 
             Token::Break => {         
-                if self.loop_nest_counter > 0 {
-                    self.expect_unparametric_token(Token::Semicolon);
-                    ASTStatement::Break
-                } else {
-                    panic!("Break statement detected outside of any loop body at position {}", self.position);
-                }
+                self.expect_unparametric_token(Token::Semicolon);
+                ASTStatement::Break
             }
             
             Token::Continue => {         
-                if self.loop_nest_counter > 0 {
-                    self.expect_unparametric_token(Token::Semicolon);
-                    ASTStatement::Continue
-                } else {
-                    panic!("Continue statement detected outside of any loop body at position {}", self.position);
-                }
+                self.expect_unparametric_token(Token::Semicolon);
+                ASTStatement::Continue
             }
 
             Token::Return => {
-                if !self.within_function_body {
-                    panic!("Return statement detected outside of a function body at position {}", self.position);
-                }
                 let return_expr = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
                 ASTStatement::Return(return_expr)
@@ -410,9 +254,7 @@ impl Parser {
             },
             
             other => {                                      
-                // we assume it'll be an Assign statement otherwise
-                // could do it better
-                // eg. somehow dry-run expression recog?
+                // TODO: can we do this better? eg. before the match?
                 if self.is_expression_start() {
                     // Trying to parse it as an Assign statement 
                     let target = self.parse_expression();
@@ -460,27 +302,10 @@ impl Parser {
         }
         self.expect_unparametric_token(Token::RightArrow);
         let ret_type = self.parse_type();
-        self.expect_unparametric_token(Token::LeftBrace);
-        self.within_function_body = true;
-        let body = self.parse_block();
-        self.expect_unparametric_token(Token::RightBrace);
-        self.within_function_body = false;
+        let body = self.expect_block();
         ASTFunction {name: funcname, args: args, body: body, ret_type}
     }
 
-    pub fn parse_program(mut self) -> ASTProgram {
-        let mut statements = Vec::new();
-        while !self.is_at_end() {
-            if self.peek() == &Token::Function {
-                self.consume();
-                let func_decl = self.parse_function_declaration();
-                self.defined_funcs.push(func_decl);
-            } else {
-                statements.push(self.parse_statement());
-            }
-        }
-        ASTProgram { functions: self.defined_funcs, main_statements: statements}
-    }
 }
 
 
