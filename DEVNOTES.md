@@ -2,7 +2,7 @@
 # Capn log XII.22
 
 HIR->assembly codegen possibly works now. Test it, clean up, merge maybe.
-Write nicer scripts (this can even enable having a small "test suite" of Yum programs nicely).
+Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_ compiles and runs on pi, _yumpi_ jumps to project folder on pi. 
 
 
 # Current things
@@ -10,10 +10,11 @@ Write nicer scripts (this can even enable having a small "test suite" of Yum pro
 ## Next steps
 - finalize stuff
     - possibly merge even
+    - grep for TODOs
     - _significant_ cleanups on the codebase
-- nicer scripts 
-    - Yum codefiles and other pipeline stage results should go in a Yum folder's subfolders
-    - we might want to also do a bit nicer compiler internal stage displays ("serialize" AST and HIR, save to file)
+- we might want to also do a bit nicer compiler internal stage displays ("serialize" AST and HIR, save to file)
+- write a small "test suite" of yum programs to check compiler updates against
+    - create an automatic test script too
 - rename everything to make more sense
 
 ## Typechecking gaps
