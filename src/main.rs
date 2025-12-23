@@ -8,8 +8,8 @@ mod hir;
 mod lex;
 use crate::lex::*;
 
-mod build_ast;
-use crate::build_ast::*;
+mod parse;
+use crate::parse::*;
 
 mod ast_to_hir;
 use ast_to_hir::*;
