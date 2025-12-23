@@ -7,6 +7,8 @@ Currently doing a finializing overhaul of the present codebase (renames, code cl
 
 ## OVERHAUL STUFF
 
+- **WE DIDN'T GET BOOLS ACTUALLY WORKING. SO DO THAT**
+
 ### DONE, FINALIZED
 - main.rs 
 - common.rs 

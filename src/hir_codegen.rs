@@ -219,6 +219,12 @@ impl HIRCompiler {
                 let flabel = format!("func_{}", funcid);
                 self.emit(&format!("    bl {}", flabel));
             }
+            HIRExpressionKind::BoolTrue => {
+                self.emit(&"    ldr r0, =1");   
+            }
+            HIRExpressionKind::BoolFalse => {
+                self.emit(&"    ldr r0, =0");   
+            }
         }
     }
 

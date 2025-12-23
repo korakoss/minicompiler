@@ -13,7 +13,9 @@ pub enum ASTExpression {
     FuncCall {
         funcname: String,
         args: Vec<Box<ASTExpression>>,
-    }
+    },
+    BoolTrue,
+    BoolFalse,
     // TODO: negation 
 }
 

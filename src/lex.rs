@@ -22,6 +22,11 @@ pub enum Token {
     // Values 
     IntLiteral(i32),
     Identifier(String),
+
+    // Literals
+    // TODO: None
+    True,
+    False,
     
     // Keywords
     Print,
@@ -77,6 +82,8 @@ pub fn lex(program: &str) -> Vec<Token> {
                 "let" => Token::Let,
                 "int" => Token::Int,
                 "bool" => Token::Bool,
+                "true" => Token::True,
+                "false" => Token::False,
                 _ => Token::Identifier(word),
             };  
             tokens.push(token); 

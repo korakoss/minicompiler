@@ -199,6 +199,19 @@ impl HIRBuilder {
                     expr: HIRExpressionKind::FuncCall { funcid: funcid.clone(), args: hir_args},
                 }
             }
+            ASTExpression::BoolTrue => {
+                HIRExpression{
+                    typ: Type::Bool,
+                    expr: HIRExpressionKind::BoolTrue,
+                }
+            }
+            ASTExpression::BoolFalse => {
+                HIRExpression{
+                    typ: Type::Bool,
+                    expr: HIRExpressionKind::BoolFalse,
+                }
+            }
+
         }
     }
 }

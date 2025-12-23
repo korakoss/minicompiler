@@ -210,6 +210,8 @@ impl Parser {
                 self.expect_unparametric_token(Token::RightParen);
                 paren_expr
             },
+            Some(Token::True) => {ASTExpression::BoolTrue},
+            Some(Token::False) => {ASTExpression::BoolFalse},
             other => {
                 panic!("Unexpected token {:?} during expression parsing", other);
             },

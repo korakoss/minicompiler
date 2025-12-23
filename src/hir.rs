@@ -34,7 +34,9 @@ pub enum HIRExpressionKind {
     FuncCall {
         funcid: FuncId,
         args: Vec<HIRExpression>,
-    }
+    },
+    BoolTrue,
+    BoolFalse,
 }
 
 #[derive(Clone, Debug)]
@@ -184,3 +186,4 @@ impl HIRProgram {
         }
     }
 }
+
