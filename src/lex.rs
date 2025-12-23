@@ -38,9 +38,6 @@ pub enum Token {
     Int, 
     Bool,
     RightArrow,
-
-    // Special
-    EOF,
 }
 
 
@@ -141,7 +138,6 @@ pub fn lex(program: &str) -> Vec<Token> {
         }
         
     } 
-    tokens.push(Token::EOF);
     tokens
 }
 
