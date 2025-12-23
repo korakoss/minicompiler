@@ -12,7 +12,18 @@ pub struct ScopeId(pub usize);
 pub struct FuncId(pub usize);
 
 #[derive(Clone, Debug)]
-pub enum TypedExpressionKind {
+pub enum Place {
+    Variable(VarId),
+}
+
+#[derive(Clone, Debug)]
+pub struct HIRExpression {
+    pub typ: Type,
+    pub expr: HIRExpressionKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum HIRExpressionKind {
     IntLiteral(i32),
     Variable(VarId),
     BinOp {
@@ -24,27 +35,6 @@ pub enum TypedExpressionKind {
         funcid: FuncId,
         args: Vec<HIRExpression>,
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct HIRExpression {
-    pub typ: Type,
-    pub expr: TypedExpressionKind,
-}
-
-#[derive(Clone, Debug)]
-pub enum Place {
-    Variable(VarId),
-}
-
-
-#[derive(Clone, Debug)]
-pub struct Scope {      
-    pub parent_id: Option<ScopeId>,
-    pub scope_vars: HashMap<String, VarId>,
-    pub within_func: bool,
-    pub within_loop: bool,
-    pub statements: Vec<HIRStatement>,
 }
 
 #[derive(Clone, Debug)]
@@ -79,6 +69,14 @@ pub struct HIRFunction {
     pub ret_type: Type,
 }
 
+#[derive(Clone, Debug)]
+pub struct Scope {      
+    pub parent_id: Option<ScopeId>,
+    pub scope_vars: HashMap<String, VarId>,
+    pub within_func: bool,
+    pub within_loop: bool,
+    pub statements: Vec<HIRStatement>,
+}
 
 // TODO: could make this have a nice partially exposed interface
 #[derive(Clone, Debug)]

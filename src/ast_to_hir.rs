@@ -184,7 +184,7 @@ impl HIRBuilder {
             ASTExpression::IntLiteral(num) => {
                 HIRExpression{
                     typ: Type::Integer,
-                    expr: TypedExpressionKind::IntLiteral(num),
+                    expr: HIRExpressionKind::IntLiteral(num),
                 }
             },
             ASTExpression::Variable(name) => {
@@ -192,7 +192,7 @@ impl HIRBuilder {
                     let var = self.hir.variables.get(&varid).unwrap();
                     HIRExpression {
                         typ: var.typ.clone(),
-                        expr: TypedExpressionKind::Variable(varid), 
+                        expr: HIRExpressionKind::Variable(varid), 
                     }
                 } else {
                     panic!("Cannot find variable {} in scope", name);
@@ -203,7 +203,7 @@ impl HIRBuilder {
                 let right_hir = self.transform_expr(*right, active_scope);
                 let inferred_type = binop_typecheck(&op, &left_hir.typ, &right_hir.typ);  
                 if let Some(typ) = inferred_type {
-                    let binop_expr = TypedExpressionKind::BinOp { 
+                    let binop_expr = HIRExpressionKind::BinOp { 
                         op, 
                         left: Box::new(left_hir), 
                         right: Box::new(right_hir), 
@@ -225,7 +225,7 @@ impl HIRBuilder {
                 let func_info = self.hir.functions.get(funcid).unwrap();
                 HIRExpression {
                     typ: func_info.ret_type.clone(),
-                    expr: TypedExpressionKind::FuncCall { funcid: funcid.clone(), args: hir_args},
+                    expr: HIRExpressionKind::FuncCall { funcid: funcid.clone(), args: hir_args},
                 }
             }
         }

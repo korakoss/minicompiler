@@ -193,19 +193,19 @@ impl HIRCompiler {
         }
     }
 
-    fn compile_expression(&mut self, expression: TypedExpressionKind, scope: &ScopeInfo) {
+    fn compile_expression(&mut self, expression: HIRExpressionKind, scope: &ScopeInfo) {
         match expression {
-            TypedExpressionKind::BinOp {op, left, right} => {
+            HIRExpressionKind::BinOp {op, left, right} => {
                 self.compile_binop(op, left.expr, right.expr, scope); 
             }
-            TypedExpressionKind::Variable(varid) => {
+            HIRExpressionKind::Variable(varid) => {
                 let var_offset = scope.var_offsets.get(&varid).unwrap();
                 self.emit(&format!("    ldr r0, [fp, #-{}]", var_offset));     
             }
-            TypedExpressionKind::IntLiteral(n) => {
+            HIRExpressionKind::IntLiteral(n) => {
                 self.emit(&format!("    ldr r0, ={}", n));   
             }
-            TypedExpressionKind::FuncCall{funcid:FuncId(funcid), args:args} => {
+            HIRExpressionKind::FuncCall{funcid:FuncId(funcid), args:args} => {
                 for arg in args.clone() {
                     self.compile_expression(arg.expr, scope); 
                     self.emit("    push {r0}");
@@ -222,7 +222,7 @@ impl HIRCompiler {
         }
     }
 
-    fn compile_binop(&mut self, op: BinaryOperator, left: TypedExpressionKind, right:TypedExpressionKind, scope: &ScopeInfo) {
+    fn compile_binop(&mut self, op: BinaryOperator, left: HIRExpressionKind, right:HIRExpressionKind, scope: &ScopeInfo) {
         self.compile_expression(left, scope);
         self.emit("    push {r0}");
         self.compile_expression(right, scope);
