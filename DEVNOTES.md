@@ -5,14 +5,26 @@ HIR->assembly codegen possibly works now. Test it, clean up, merge maybe.
 Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_ compiles and runs on pi, _yumpi_ jumps to project folder on pi. 
 
 ## OVERHAUL STUFF
-- main.rs finalized
-- common.rs done
-- ast.rs done
 
-- QUESTION: who's checking being in a loop nest/fun currently. Is it the HIR lowerer?
+### DONE, FINALIZED
+- main.rs 
+- common.rs 
+- ast.rs 
+- (lex.rs)
+- parse.rs 
+
+### PLAN
+- hir
+- ast-to-hir
+- hir codegen
+- (delete codegen)
+
+### QUESTION: 
+- who's checking being in a loop nest/fun currently. Is it the HIR lowerer?
     - write a test case for this
     - other testcase: write a nonparametric function
         - unconfident about AST parsing there
+    - other testcase: long ass expression made of binops
 
 # Current things
 
@@ -67,6 +79,7 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
 
 ## Cringe things 
 - currently allocating 8 bits per var depspite it's 4 on arm32
+- refactor thing to do less clone()-s and other stopgap practices 
 
 ## Niceties
 - add syntax highlighting
@@ -74,7 +87,8 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
 - improving print()
     - not all types might be naively printable
     - we want bool prints to print True/False not 1/0, etc
-
+- _if else_ syntax sugar
+- trailing expression returns
 
 ## Easy but unnecessary wins
 - Negation
