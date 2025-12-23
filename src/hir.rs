@@ -112,28 +112,19 @@ impl HIRProgram {
     } 
 
     pub fn collect_scope_vars(&self, scope_id: &ScopeId) -> HashMap<String, VarId> {
-        // Collects directly-in-scope vars upstream and everything downstream
-        
+        let mut result = HashMap::new();
 
-        // TODO: all sorts of errorhandling
-        
-        let mut result: HashMap<String, VarId> = HashMap::new();
-
-        // TODO: better comprehension?
+        // Collect variables from descendant scopes
         for child_scope_id in self.scopetree.get(scope_id).unwrap() {
             result.extend(self.collect_scope_vars(child_scope_id)); 
         }
-        
-        let mut curr_tent_scope = self.scopes.get(scope_id);
-
-        while let Some(curr_scope) = curr_tent_scope {
-            result.extend(curr_scope.scope_vars.clone());
-            curr_tent_scope = match curr_scope.parent_id {
-                None => None,
-                Some(id) => {
-                    self.scopes.get(&id)
-                }
-            }
+       
+        // Walk up the ancestor chain to collect from there
+        let mut curr_id = Some(scope_id.clone());
+        while let Some(id) = curr_id {
+            let scope = self.scopes.get(&id).unwrap();
+            result.extend(scope.scope_vars.clone());
+            curr_id = scope.parent_id.clone();
         }
         result
     }
