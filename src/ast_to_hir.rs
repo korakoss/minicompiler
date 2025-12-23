@@ -6,7 +6,6 @@ use std::{collections::HashMap};
 
 pub struct HIRBuilder {
     pub hir: HIRProgram,
-    function_map: HashMap<(String, Vec<Type>), FuncId>, // TODO: this should also go into HIRProg
 }
 
 
@@ -15,7 +14,6 @@ impl HIRBuilder {
     pub fn new() -> HIRBuilder {
         HIRBuilder {
             hir: HIRProgram::new(),
-            function_map: HashMap::new(),
         }
     }
 
@@ -28,7 +26,7 @@ impl HIRBuilder {
             parent_id: None,
             scope_vars: HashMap::new(),
             within_loop: false,
-            within_func: false,
+            ancestor_func: None,
             statements: Vec::new(),
         };
         let globscope_id = self.hir.add_scope(globscope);
@@ -45,7 +43,7 @@ impl HIRBuilder {
         let body_block = Scope{
             parent_id: None,
             scope_vars: HashMap::new(),
-            within_func: true,
+            ancestor_func: None,
             within_loop: false,
             statements: Vec::new(),
         };
@@ -56,8 +54,7 @@ impl HIRBuilder {
         for stmt in body {
             self.transform_statement(stmt, &scope_id);
         }
-        let func_id = self.hir.add_func(HIRFunction{args:args.clone(), body: scope_id, ret_type: ret_type.clone()});
-        self.function_map.insert((name, args.into_iter().map(|x| x.typ).collect()), func_id);
+        self.hir.add_func(name, HIRFunction{args:args.clone(), body: scope_id, ret_type: ret_type.clone()});
     }
 
 
@@ -187,10 +184,8 @@ impl HIRBuilder {
             },
             ASTExpression::FuncCall {funcname, args} => {
                 let hir_args: Vec<HIRExpression> = args.into_iter().map(|x| self.transform_expr(*x, active_scope)).collect();
-                let type_signature: Vec<Type> = hir_args.iter().map(|x| x.typ.clone()).collect();
-                let Some(funcid) = self.function_map.get(&(funcname, type_signature)) else {
-                    panic!("Function with name and signature not found");
-                };
+                let argtypes: Vec<Type> = hir_args.iter().map(|x| x.typ.clone()).collect();
+                let funcid = self.hir.get_funcid_from_signature(funcname, argtypes).expect("Function with name and signature not found");
                 let func_info = self.hir.functions.get(funcid).unwrap();
                 HIRExpression {
                     typ: func_info.ret_type.clone(),

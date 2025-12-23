@@ -73,7 +73,7 @@ pub struct HIRFunction {
 pub struct Scope {      
     pub parent_id: Option<ScopeId>,
     pub scope_vars: HashMap<String, VarId>,
-    pub within_func: bool,
+    pub ancestor_func: Option<FuncId>,                          // TODO: should check ret type against
     pub within_loop: bool,
     pub statements: Vec<HIRStatement>,
 }
@@ -85,6 +85,7 @@ pub struct HIRProgram {
     pub variables: HashMap<VarId, Variable>,
     pub functions: HashMap<FuncId, HIRFunction>,
     pub global_scope: Option<ScopeId>,
+    function_map: HashMap<(String, Vec<Type>), FuncId>, 
 }
 
 impl HIRProgram {
@@ -95,7 +96,8 @@ impl HIRProgram {
             scopetree: HashMap::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
-            global_scope: None
+            global_scope: None,
+            function_map: HashMap::new(),
         }
     }
 
@@ -106,10 +108,10 @@ impl HIRProgram {
         scope_id
     }
 
-    pub fn add_func(&mut self, func: HIRFunction) -> FuncId {
+    pub fn add_func(&mut self, name: String, func: HIRFunction){
         let func_id = FuncId(self.functions.len());
-        self.functions.insert(func_id, func);
-        func_id
+        self.functions.insert(func_id, func.clone());
+        self.function_map.insert((name, func.args.into_iter().map(|x| x.typ).collect()), func_id);
     }
     
     pub fn add_var(&mut self, var: Variable, active_scope: &ScopeId) -> VarId {
@@ -132,6 +134,10 @@ impl HIRProgram {
             None
         }
     } 
+
+    pub fn get_funcid_from_signature(&self, name: String, argtypes: Vec<Type>) -> Option<&FuncId> {
+        self.function_map.get(&(name, argtypes)).clone()
+    }
 
     pub fn collect_scope_vars(&self, scope_id: &ScopeId) -> HashMap<String, VarId> {
         let mut result = HashMap::new();
