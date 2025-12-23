@@ -38,7 +38,9 @@ Currently doing a finializing overhaul of the present codebase (renames, code cl
 ### FINISH
 - grep for TODOs
 - run tests 
-- clean up notes
+- final touches
+    - clean up notes
+    - more clearly declared imports?
 - merge
 
 

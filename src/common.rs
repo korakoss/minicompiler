@@ -28,3 +28,32 @@ pub enum BinaryOperator {
 }
 
 // TODO: eventually also UnaryOperation (eg. negation)
+
+
+pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type) -> Option<Type> {
+    
+    match op {
+        &BinaryOperator::Add | &BinaryOperator::Sub | &BinaryOperator::Mul| &BinaryOperator::Modulo=>{
+            if left_type == &Type::Integer && right_type == &Type::Integer {
+                Some(Type::Integer)
+            } else {
+                None
+            }
+        }
+        &BinaryOperator::Equals => {
+            if left_type == right_type {
+                // TODO: careful later
+                Some(Type::Bool)
+            } else {
+                None
+            }
+        }
+        &BinaryOperator::Less => {
+            if left_type == &Type::Integer && right_type == &Type::Integer {
+                Some(Type::Bool)
+            } else {
+                None
+            }
+        } 
+    }
+}

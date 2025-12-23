@@ -6,10 +6,7 @@ use std::{collections::HashMap};
 
 pub struct HIRBuilder {
     pub hir: HIRProgram,
-    function_map: HashMap<(String, Vec<Type>), FuncId>,
-    scope_counter: usize,
-    var_counter: usize,
-    func_counter: usize,
+    function_map: HashMap<(String, Vec<Type>), FuncId>, // TODO: this should also go into HIRProg
 }
 
 
@@ -19,13 +16,10 @@ impl HIRBuilder {
         HIRBuilder {
             hir: HIRProgram::new(),
             function_map: HashMap::new(),
-            scope_counter: 0,
-            var_counter: 0,
-            func_counter: 0,
         }
     }
 
-    pub fn lower_ast(&mut self, ast: ASTProgram) -> HIRProgram {
+    pub fn lower_ast(mut self, ast: ASTProgram) -> HIRProgram {
         let ASTProgram{functions, main_statements} = ast;
         for func in functions {
             self.transform_function(func);
@@ -37,40 +31,15 @@ impl HIRBuilder {
             within_func: false,
             statements: Vec::new(),
         };
-        let globscope_id = self.add_scope(globscope);
+        let globscope_id = self.hir.add_scope(globscope);
         for stmt in main_statements {
             self.transform_statement(stmt, &globscope_id);
         }
         self.hir.global_scope = Some(globscope_id);
-        self.hir.clone() 
+        self.hir 
     }
-
-    fn add_scope(&mut self, scope: Scope) -> ScopeId {
-        let scope_id = ScopeId(self.scope_counter);
-        self.scope_counter = self.scope_counter + 1;
-        self.hir.scopes.insert(scope_id, scope);
-        self.hir.scopetree.insert(scope_id, Vec::new());
-        scope_id
-    }
-
-    fn add_var(&mut self, var: Variable, active_scope: &ScopeId) -> VarId {
-        if self.hir.get_varid(&var.name, active_scope) != None {
-            panic!("Variable name exists in scope");
-        }    
-        let var_id = VarId(self.var_counter);
-        self.hir.scopes.get_mut(active_scope).unwrap().scope_vars.insert(var.name.clone(), var_id.clone());
-        self.var_counter = self.var_counter + 1;
-        self.hir.variables.insert(var_id, var);
-        var_id 
-    }
-
-    fn add_func(&mut self, func: HIRFunction) -> FuncId {
-        let func_id = FuncId(self.func_counter);
-        self.func_counter = self.func_counter + 1;
-        self.hir.functions.insert(func_id, func);
-        func_id
-    }
-
+    
+        
     fn transform_function(&mut self, function: ASTFunction) {
         let ASTFunction{name, args, body, ret_type} = function;
         let body_block = Scope{
@@ -80,14 +49,14 @@ impl HIRBuilder {
             within_loop: false,
             statements: Vec::new(),
         };
-        let scope_id = self.add_scope(body_block.clone());
+        let scope_id = self.hir.add_scope(body_block.clone());
         for arg in args.clone() {
-            self.add_var(arg, &scope_id);
+            self.hir.add_var(arg, &scope_id);
         }
         for stmt in body {
             self.transform_statement(stmt, &scope_id);
         }
-        let func_id = self.add_func(HIRFunction{args:args.clone(), body: scope_id, ret_type: ret_type.clone()});
+        let func_id = self.hir.add_func(HIRFunction{args:args.clone(), body: scope_id, ret_type: ret_type.clone()});
         self.function_map.insert((name, args.into_iter().map(|x| x.typ).collect()), func_id);
     }
 
@@ -97,7 +66,7 @@ impl HIRBuilder {
         let hir_statement = match statement {
             ASTStatement::Let{var, value} => {
                 let hir_val = self.transform_expr(value, active_scope);
-                let varid = self.add_var(var, active_scope); // TODO: error handling
+                let varid = self.hir.add_var(var, active_scope); // TODO: error handling
                 HIRStatement::Let { 
                     var: Place::Variable(varid), 
                     value: hir_val, 
@@ -171,7 +140,7 @@ impl HIRBuilder {
         block_scope.parent_id = Some(parent_scope.clone());
         block_scope.statements = Vec::new();
         block_scope.within_loop = block_scope.within_loop || is_loop_body;
-        let block_scope_id = self.add_scope(block_scope);
+        let block_scope_id = self.hir.add_scope(block_scope);
         self.hir.scopetree.get_mut(&block_scope_id).unwrap().push(parent_scope.clone());
         for stmt in statements {
             self.transform_statement(stmt, &block_scope_id);
@@ -229,36 +198,5 @@ impl HIRBuilder {
                 }
             }
         }
-    }
-}
-
-
-
-
-fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type) -> Option<Type> {
-    
-    match op {
-        &BinaryOperator::Add | &BinaryOperator::Sub | &BinaryOperator::Mul| &BinaryOperator::Modulo=>{
-            if left_type == &Type::Integer && right_type == &Type::Integer {
-                Some(Type::Integer)
-            } else {
-                None
-            }
-        }
-        &BinaryOperator::Equals => {
-            if left_type == right_type {
-                // TODO: careful later
-                Some(Type::Bool)
-            } else {
-                None
-            }
-        }
-        &BinaryOperator::Less => {
-            if left_type == &Type::Integer && right_type == &Type::Integer {
-                Some(Type::Bool)
-            } else {
-                None
-            }
-        } 
     }
 }

@@ -78,11 +78,10 @@ pub struct Scope {
     pub statements: Vec<HIRStatement>,
 }
 
-// TODO: could make this have a nice partially exposed interface
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
     pub scopes: HashMap<ScopeId, Scope>,
-    pub scopetree: HashMap<ScopeId, Vec<ScopeId>>,      
+    pub scopetree: HashMap<ScopeId, Vec<ScopeId>>,    // TODO: turn these to Vecs?  
     pub variables: HashMap<VarId, Variable>,
     pub functions: HashMap<FuncId, HIRFunction>,
     pub global_scope: Option<ScopeId>,
@@ -98,6 +97,29 @@ impl HIRProgram {
             functions: HashMap::new(),
             global_scope: None
         }
+    }
+
+    pub fn add_scope(&mut self, scope: Scope) -> ScopeId {
+        let scope_id = ScopeId(self.scopes.len());
+        self.scopes.insert(scope_id, scope);
+        self.scopetree.insert(scope_id, Vec::new());
+        scope_id
+    }
+
+    pub fn add_func(&mut self, func: HIRFunction) -> FuncId {
+        let func_id = FuncId(self.functions.len());
+        self.functions.insert(func_id, func);
+        func_id
+    }
+    
+    pub fn add_var(&mut self, var: Variable, active_scope: &ScopeId) -> VarId {
+        if self.get_varid(&var.name, active_scope) != None {
+            panic!("Variable name exists in scope");
+        }    
+        let var_id = VarId(self.variables.len());
+        self.variables.insert(var_id, var.clone());
+        self.scopes.get_mut(active_scope).unwrap().scope_vars.insert(var.name, var_id);
+        var_id 
     }
 
     pub fn get_varid(&self, varname: &String, scope_id: &ScopeId) -> Option<VarId>{
