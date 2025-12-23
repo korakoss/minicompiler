@@ -1,9 +1,5 @@
 use crate::common::*;
 use std::{collections::HashMap};
-use crate::ast::*;
-
-
-// AFTER TYPING+VARSCOPING
 
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]

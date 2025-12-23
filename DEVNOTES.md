@@ -3,6 +3,7 @@
 
 HIR->assembly codegen possibly works now. Test it, clean up, merge maybe.
 Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_ compiles and runs on pi, _yumpi_ jumps to project folder on pi. 
+Currently doing a finializing overhaul of the present codebase (renames, code cleanups, etc).
 
 ## OVERHAUL STUFF
 
@@ -13,34 +14,31 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
 - (lex.rs)
 - parse.rs 
 
-### PLAN
-- hir
+### CURRENT STEP
+> hir
 - ast-to-hir
-- hir codegen
-- (delete codegen)
+    - **TODOs:**
+        - returns in func bodies having the correct type
+        - assign values having the type of the target
 
-### QUESTION: 
-- who's checking being in a loop nest/fun currently. Is it the HIR lowerer?
-    - write a test case for this
-    - other testcase: write a nonparametric function
-        - unconfident about AST parsing there
-    - other testcase: long ass expression made of binops
+### PLAN
+- hir-codegen
+- delete the AST codegen
 
-# Current things
-
-## Next steps
-- finalize stuff
-    - possibly merge even
-    - grep for TODOs
-    - _significant_ cleanups on the codebase
+### TESTS
 - write a small "test suite" of yum programs to check compiler updates against
-    - create an automatic test script too
-- rename everything to make more sense
-
-## Typechecking gaps
-- returns in func bodies having the correct type
-- assign values having the type of the target
-
+- create an automatic test script too
+- specific test cases:
+    - being in a loop nest to break/cont and in a func for return (who's checking this btw? HIR-lowerer?)
+    - a nonparametric function -- unconfident about AST parsing there
+    - long ass binop expression
+    - loop/branch conditions being bool
+    
+### FINISH
+- grep for TODOs
+- run tests 
+- clean up notes
+- merge
 
 
 # Next progess steps
@@ -78,7 +76,7 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
 # "Meh, do it someday"
 
 ## Cringe things 
-- currently allocating 8 bits per var depspite it's 4 on arm32
+- currently allocating 8 bits per var depspite it's 4 on arm32 (or is it?)
 - refactor thing to do less clone()-s and other stopgap practices 
 
 ## Niceties
@@ -89,6 +87,7 @@ Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_
     - we want bool prints to print True/False not 1/0, etc
 - _if else_ syntax sugar
 - trailing expression returns
+- long ints
 
 ## Easy but unnecessary wins
 - Negation
