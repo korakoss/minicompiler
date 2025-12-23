@@ -30,7 +30,7 @@ impl HIRBuilder {
         for func in functions {
             self.transform_function(func);
         }
-        let globscope = ScopeBlock{
+        let globscope = Scope{
             parent_id: None,
             scope_vars: HashMap::new(),
             within_loop: false,
@@ -45,7 +45,7 @@ impl HIRBuilder {
         self.hir.clone() 
     }
 
-    fn add_scope(&mut self, scope: ScopeBlock) -> ScopeId {
+    fn add_scope(&mut self, scope: Scope) -> ScopeId {
         let scope_id = ScopeId(self.scope_counter);
         self.scope_counter = self.scope_counter + 1;
         self.hir.scopes.insert(scope_id, scope);
@@ -73,7 +73,7 @@ impl HIRBuilder {
 
     fn transform_function(&mut self, function: ASTFunction) {
         let ASTFunction{name, args, body, ret_type} = function;
-        let body_block = ScopeBlock{
+        let body_block = Scope{
             parent_id: None,
             scope_vars: HashMap::new(),
             within_func: true,

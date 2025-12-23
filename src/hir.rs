@@ -39,7 +39,7 @@ pub enum Place {
 
 
 #[derive(Clone, Debug)]
-pub struct ScopeBlock {      
+pub struct Scope {      
     pub parent_id: Option<ScopeId>,
     pub scope_vars: HashMap<String, VarId>,
     pub within_func: bool,
@@ -83,7 +83,7 @@ pub struct HIRFunction {
 // TODO: could make this have a nice partially exposed interface
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
-    pub scopes: HashMap<ScopeId, ScopeBlock>,
+    pub scopes: HashMap<ScopeId, Scope>,
     pub scopetree: HashMap<ScopeId, Vec<ScopeId>>,      
     pub variables: HashMap<VarId, Variable>,
     pub functions: HashMap<FuncId, HIRFunction>,
