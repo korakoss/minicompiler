@@ -26,7 +26,6 @@ impl HIRBuilder {
             parent_id: None,
             scope_vars: HashMap::new(),
             within_loop: false,
-            ancestor_func: None,
             statements: Vec::new(),
         };
         let globscope_id = self.hir_program.add_scope(globscope);
@@ -43,18 +42,17 @@ impl HIRBuilder {
         let body_scope = Scope{
             parent_id: None,
             scope_vars: HashMap::new(),
-            ancestor_func: None,
             within_loop: false,
             statements: Vec::new(),
         };
         let scope_id = self.hir_program.add_scope(body_scope.clone());
+        self.hir_program.add_func(name, HIRFunction{args:args.clone(), body: scope_id.clone(), ret_type: ret_type.clone()});
         for arg in args.clone() {
             self.hir_program.add_var(arg, &scope_id);
         }
         for stmt in body {
             self.lower_statement(stmt, &scope_id);
         }
-        self.hir_program.add_func(name, HIRFunction{args:args.clone(), body: scope_id, ret_type: ret_type.clone()});
     }
 
 
@@ -71,16 +69,22 @@ impl HIRBuilder {
             },
             ASTStatement::Assign { target, value } => {
                 match target {
-                    ASTExpression::Variable(varname) => {
-                        let varid = self.hir_program.get_varid(&varname, scope_id).expect("Unrecognized variable name in scope");
+                    ASTExpression::Variable(var_name) => {
+                        let var_id = self.hir_program.get_varid(&var_name, scope_id).expect("Unrecognized variable name in scope");
+                        let variable = self.hir_program.variables.get(&var_id).unwrap();
+
                         let hir_expr = self.lower_expression(value, scope_id);
-                        // TODO: typecheck!!! IMPORTANT!!!
+
+                        if hir_expr.typ != variable.typ {
+                            panic!("Attempted value assignment with non-matching types");
+                        }
+
                         HIRStatement::Assign { 
-                            target: Place::Variable(varid), 
+                            target: Place::Variable(var_id), 
                             value: hir_expr
                         }
                     },
-                    _ => {panic!("Invalid assignment target");}
+                    _ => {panic!("Invalid assignment target");}             // NOTE: eve
                 }
             },
             ASTStatement::If { condition, if_body, else_body } => {
@@ -118,8 +122,11 @@ impl HIRBuilder {
                 HIRStatement::Continue
             },
             ASTStatement::Return(expr) => {
-                // TODO: this needs type checks!!! IMPORTANT!!!
                 let hir_expr = self.lower_expression(expr, scope_id);
+                //let ret_type= self.hir_program.get_scope_ret_type(scope_id).expect("Return statement detected ioutside of a function");
+                //if ret_type != hir_expr.typ {
+                //    panic!("Type of return expression doesn't match function signature");
+                //}
                 HIRStatement::Return(hir_expr)
             },
             ASTStatement::Print(expr) => {

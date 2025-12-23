@@ -20,7 +20,12 @@ Currently doing a finializing overhaul of the present codebase (renames, code cl
     - **TODOs:**
         - returns in func bodies having the correct type
         - assign values having the type of the target
+        - turn hashmaps to vecs if possible?
         - (some final touches)
+- rething who owns what in HIR
+
+### QUESTIONS
+- does the .scopetree in HIR even work?
 
 ### PLAN
 - hir-codegen
