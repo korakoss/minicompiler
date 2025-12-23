@@ -33,7 +33,8 @@ Currently doing a finializing overhaul of the present codebase (renames, code cl
     - a nonparametric function -- unconfident about AST parsing there
     - long ass binop expression
     - loop/branch conditions being bool
-    
+    - _let_ definition within a loop (or actually also an if)
+
 ### FINISH
 - grep for TODOs
 - run tests 

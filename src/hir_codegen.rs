@@ -10,6 +10,14 @@ pub struct HIRCompiler {
     jumplabel_counter: usize,
 }
 
+#[derive(Clone)]
+struct ScopeInfo {
+    var_offsets: HashMap<VarId, usize>,
+    curr_loop_start: Option<String>,          // label for the end of innermost active loop
+    curr_loop_end: Option<String>,          
+    curr_func_epi: Option<String>,
+}
+
 impl HIRCompiler {
 
     pub fn new(hir_program: HIRProgram) -> Self {
@@ -269,10 +277,4 @@ impl HIRCompiler {
 }
 
 
-#[derive(Clone)]
-struct ScopeInfo {
-    var_offsets: HashMap<VarId, usize>,
-    curr_loop_start: Option<String>,          // label for the end of innermost active loop
-    curr_loop_end: Option<String>,          
-    curr_func_epi: Option<String>,
-}
+

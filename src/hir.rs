@@ -50,15 +50,15 @@ pub struct ScopeBlock {
 #[derive(Clone, Debug)]
 pub enum HIRStatement {
     Let {
-        var: Place,     // Expected to be Variable
+        var: Place,     
         value: HIRExpression,
     },
     Assign {
-        target: Place,   // Expected to be l-value
+        target: Place,  
         value: HIRExpression,
     },
     If {
-        condition: HIRExpression,    // Expected to be Boolean
+        condition: HIRExpression, 
         if_body: ScopeId,    
         else_body: Option<ScopeId>,
     },
@@ -79,10 +79,12 @@ pub struct HIRFunction {
     pub ret_type: Type,
 }
 
+
+// TODO: could make this have a nice partially exposed interface
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
     pub scopes: HashMap<ScopeId, ScopeBlock>,
-    pub scopetree: HashMap<ScopeId, Vec<ScopeId>>,
+    pub scopetree: HashMap<ScopeId, Vec<ScopeId>>,      
     pub variables: HashMap<VarId, Variable>,
     pub functions: HashMap<FuncId, HIRFunction>,
     pub global_scope: Option<ScopeId>,
