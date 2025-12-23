@@ -11,8 +11,8 @@ use crate::lex::*;
 mod parse;
 use crate::parse::*;
 
-mod ast_to_hir;
-use ast_to_hir::*;
+mod hir_builder;
+use hir_builder::*;
 
 mod hir_codegen;
 use hir_codegen::*;
@@ -37,7 +37,7 @@ fn main() {
 
     fs::write(ast_filepath, format!("{:#?}", ast)).unwrap();
     
-    let mut lowerer = HIRBuilder::new();
+    let lowerer = HIRBuilder::new();
     let hir = lowerer.lower_ast(ast.clone());
 
     fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
