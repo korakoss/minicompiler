@@ -57,3 +57,11 @@ pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type)
         } 
     }
 }
+
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FuncSignature {
+    pub name: String,
+    pub argtypes: Vec<Type>,
+    // NOTE: maybe return type sometime?
+}

@@ -21,20 +21,15 @@ impl Parser {
     }
 
     pub fn parse_program(mut self) -> ASTProgram {
-        let mut statements = Vec::new();
         while !self.tokens.peek().is_none() {
-            if self.tokens.peek() == Some(&Token::Function) {
-                self.tokens.next();
-                let func_decl = self.parse_function();
-                self.defined_funcs.push(func_decl);
-            } else {
-                statements.push(self.parse_statement());
-            }
+            let func = self.parse_function();
+            self.defined_funcs.push(func);
         }
-        ASTProgram { functions: self.defined_funcs, main_statements: statements}
+        ASTProgram { functions: self.defined_funcs} 
     }
     
     fn parse_function(&mut self) -> ASTFunction {
+        self.expect_unparametric_token(Token::Function);
         let funcname = self.expect_identifier(); 
         let mut args = Vec::new();
         self.expect_unparametric_token(Token::LeftParen);

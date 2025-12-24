@@ -8,6 +8,8 @@ Currently doing a finializing overhaul of the present codebase (renames, code cl
 ## OVERHAUL STUFF
 
 - **WE DIDN'T GET BOOLS ACTUALLY WORKING. SO DO THAT**
+- adding main() entry point
+- question: put break/cont validity checks in AST already?
 
 ### DONE, FINALIZED
 - main.rs 
