@@ -17,10 +17,11 @@ impl ASTFunction {
    
     pub fn get_signature(&self) -> FuncSignature {
         FuncSignature { 
-            name: self.name, 
-            argtypes: args.iter().map(|x| x.typ.clone()).collect(), 
+            name: self.name.clone(), 
+            argtypes: self.args.iter().map(|x| x.typ.clone()).collect(), 
         } 
     }
+}
 
 #[derive(Debug, Clone)]
 pub enum ASTStatement {

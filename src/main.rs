@@ -37,8 +37,7 @@ fn main() {
 
     fs::write(ast_filepath, format!("{:#?}", ast)).unwrap();
     
-    let lowerer = HIRBuilder::new();
-    let hir = lowerer.lower_ast(ast.clone());
+    let hir = lower_ast(ast);
 
     fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
     

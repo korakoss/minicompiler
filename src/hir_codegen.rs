@@ -10,13 +10,6 @@ pub struct HIRCompiler {
     jumplabel_counter: usize,
 }
 
-#[derive(Clone)]
-struct ScopeInfo {
-    var_offsets: HashMap<VarId, usize>,
-    curr_loop_start: Option<String>,          // label for the end of innermost active loop
-    curr_loop_end: Option<String>,          
-    curr_func_epi: Option<String>,
-}
 
 impl HIRCompiler {
 
@@ -37,29 +30,19 @@ impl HIRCompiler {
         self.emit(r#"fmt: .asciz "%d\n""#);
         self.emit(".text");
         
-        // TODO: ugh. Don't clone
-        for (f_id, func) in self.hir_program.functions.clone(){
+        for (f_id, func) in self.hir_program.functions.clone() {
             self.compile_function(f_id, func);
         }
-
-        let globscope_id = self.hir_program.global_scope.expect("Expected global statements");
-        let globvars = self.hir_program.collect_scope_vars(&globscope_id);
-        let stack_offsets: HashMap<VarId, usize> = globvars.values().enumerate().map(|(i,x)| (x.clone(), 8*i)).collect();  // TODO: incorporate size stuff later 
-        let globscope_info = ScopeInfo{
-            var_offsets: stack_offsets, 
-            curr_loop_start: None,
-            curr_loop_end: None, 
-            curr_func_epi: None, 
-        };
-        let reserved_stack = 8 * globvars.len();       // TODO: incorporate size stuff later 
-        self.emit_prologue("main".to_string(), reserved_stack); 
         
-        // TODO: compile global block or sth                
-        self.compile_block(&globscope_id, &globscope_info);
-        // Epilogue
-        self.emit_epilogue(reserved_stack);                    // TODO: change
-        
-        self.output.clone() 
+        if let Some(funcid) = self.hir_program.entry {
+            self.emit("main:");
+            self.emit("    push {lr}");
+            let flabel = format!("func_{}", funcid.0);
+            self.emit(&format!("    bl {}", flabel));
+            self.emit("    pop {lr}");
+            self.emit("    bx lr");
+        }
+        self.output.clone()
     }
     
     // WHAT THE FUCK IS THIS SIGNATURE?
@@ -68,61 +51,46 @@ impl HIRCompiler {
         let flabel = format!("func_{}", id.0);
         let retlabel = format!("ret_{}", id.0);
     
-        let HIRFunction{args, body, ret_type} = function;
+        let HIRFunction{args, body, variables, ret_type} = function;
 
-        let vars = self.hir_program.collect_scope_vars(&body);
-        let stack_offsets: HashMap<VarId, usize> = vars.values().enumerate().map(|(i,x)| (x.clone(), 8*(i+1))).collect();  // TODO: incorporate size stuff later 
+        // TODO: incorporate size stuff later 
+        let stack_offsets: HashMap<VarId, usize> = variables.keys().enumerate().map(|(i,x)| (x.clone(), 8*(i+1))).collect();  
+        let reserved_stack = 8 * variables.len(); 
         if args.len() > 4 {
                 panic!("Only up to 4 args supported at the moment");
         }
-        let reserved_stack = 8 * vars.len();       // TODO: incorporate size stuff later 
 
         self.emit_prologue(flabel, reserved_stack);
 
         for i in 0..args.len(){
                 self.emit(&format!("    str r{}, [fp, #-{}]", i, (i+1)*8)); 
         }
-
-        let func_scope = ScopeInfo{
-            var_offsets: stack_offsets, 
-            curr_loop_start: None,
-            curr_loop_end: None, 
-            curr_func_epi: Some(retlabel.clone())
+        let mut block_info = BlockInfo {
+            stack_offsets: stack_offsets,
+            looplabel_stack: Vec::new(),
+            ret_label: retlabel.clone(),
         };
-        self.compile_block(&body, &func_scope); 
+
+        self.compile_block(body, &mut block_info); 
         
         self.emit(&format!("{}:", retlabel));
         self.emit_epilogue(reserved_stack);
     }
-
-    fn get_jumplabel(&mut self) -> String {
-        let label = format!("{}", self.jumplabel_counter);
-        self.jumplabel_counter = self.jumplabel_counter + 1;
-        label
+    
+    fn compile_block(&mut self, statements: Vec<HIRStatement>, block_info: &mut BlockInfo) {
+        for stmt in statements {
+            self.compile_statement(stmt, block_info);
+        }
     }
-        
-    fn compile_statement(&mut self, statement: HIRStatement, scope: &ScopeInfo) {
-        match statement {
-            HIRStatement::Let{var, value} => {
-                self.compile_expression(value.expr, scope);
-                // TODO: eek! this sucks. refactor!
-                if let Place::Variable(varid) = var {
-                    let var_offset = scope.var_offsets.get(&varid).unwrap();
-                    self.emit(&format!("    str r0, [fp, #-{}]", var_offset));
-                } else {
-                    panic!("Unexpected Let lvalue");
-                }
-            }
-            HIRStatement::Assign { target, value } => {
-                self.compile_expression(value.expr, scope);
-                // TODO: eek! this sucks. refactor!
-                if let Place::Variable(varid) = target {
-                    let var_offset = scope.var_offsets.get(&varid).unwrap();
-                    self.emit(&format!("    str r0, [fp, #-{}]", var_offset));
-                } else {
-                    panic!("Unexpected Let lvalue");
-                }
 
+            
+    fn compile_statement(&mut self, statement: HIRStatement, block_info: &mut BlockInfo) {
+        match statement {
+            HIRStatement::Let{var: target, value} | HIRStatement::Assign { target, value } => {
+                self.compile_expression(value.expr, block_info);
+                let Place::Variable(var_id) = target else {panic!("Unexpected Let lvalue")};
+                let var_offset = block_info.stack_offsets.get(&var_id).unwrap();
+                self.emit(&format!("    str r0, [fp, #-{}]", var_offset));
             }
             HIRStatement::While { condition, body } => {
                 let jlabel = self.get_jumplabel();
@@ -130,55 +98,56 @@ impl HIRCompiler {
                 let end_label = format!("while_end_{}", jlabel);
                 
                 self.emit(&format!("{}:", start_label.clone()));
-                self.compile_expression(condition.expr, scope);
+                self.compile_expression(condition.expr, block_info);
                 self.emit("    cmp r0, #0");
                 self.emit(&format!("    beq {}", end_label.clone()));
                 
-                let mut block_scope = scope.clone();
-                block_scope.curr_loop_start = Some(start_label.clone());
-                block_scope.curr_loop_end = Some(end_label.clone());
+                block_info.looplabel_stack.push(jlabel);
                 
-                self.compile_block(&body, &block_scope);
-                
+                self.compile_block(body, block_info);
                 self.emit(&format!("    b {}", start_label));
                 self.emit(&format!("{}:", end_label));
+
+                block_info.looplabel_stack.pop();
             }
             HIRStatement::If {condition, if_body, else_body} => {
                 let jlabel = self.get_jumplabel();
                 let end_label = format!("branching_end_{}", jlabel);
                 
-                self.compile_expression(condition.expr, scope);
+                self.compile_expression(condition.expr, block_info);
                 self.emit("    cmp r0, #0");
 
                 match else_body {
                     None => {
                         self.emit(&format!("    beq {}", end_label));
-                        self.compile_block(&if_body, scope);
+                        self.compile_block(if_body, block_info);
                     }
                     Some(else_block) => {
                         let else_start_label = format!("else_start_{}", jlabel);
                         self.emit(&format!("    beq {}", else_start_label));
-                        self.compile_block(&if_body, scope); 
+                        self.compile_block(if_body, block_info); 
                         self.emit(&format!("    b {}", end_label));
                         self.emit(&format!("{}:", else_start_label));
-                        self.compile_block(&else_block, scope); 
+                        self.compile_block(else_block, block_info); 
                     }
                 }
                 self.emit(&format!("{}:",end_label));
             }
             // TODO: if
             HIRStatement::Break => {
-                self.emit(&format!("    b {}", scope.curr_loop_end.clone().unwrap()));
+                let curr_loop_end = format!("while_end_{}", block_info.looplabel_stack.last().unwrap());
+                self.emit(&format!("    b {}", curr_loop_end));
             }
             HIRStatement::Continue=> {
-                self.emit(&format!("    b {}", scope.curr_loop_start.clone().unwrap()));
+                let curr_loop_start = format!("while_start_{}", block_info.looplabel_stack.last().unwrap());
+                self.emit(&format!("    b {}", curr_loop_start));
             }
             HIRStatement::Return(expr) => {
-                self.compile_expression(expr.expr, scope);
-                self.emit(&format!("    b {}", scope.curr_func_epi.clone().unwrap()));
+                self.compile_expression(expr.expr, block_info);
+                self.emit(&format!("    b {}", block_info.ret_label));
             }
             HIRStatement::Print(expr) => {
-                self.compile_expression(expr.expr, scope);
+                self.compile_expression(expr.expr, block_info);
                 self.emit("    mov r1, r0");
                 self.emit("    ldr r0, =fmt");
                 self.emit("    bl printf");
@@ -186,28 +155,21 @@ impl HIRCompiler {
         }
     }
 
-    fn compile_block(&mut self, blockid: &ScopeId, block_scope: &ScopeInfo) {
-        let block = self.hir_program.scopes.get(&blockid).unwrap().clone(); 
-        for stmt in block.statements {
-            self.compile_statement(stmt, block_scope);
-        }
-    }
-
-    fn compile_expression(&mut self, expression: HIRExpressionKind, scope: &ScopeInfo) {
+    
+    fn compile_expression(&mut self, expression: HIRExpressionKind, block_info: &BlockInfo) {
         match expression {
             HIRExpressionKind::BinOp {op, left, right} => {
-                self.compile_binop(op, left.expr, right.expr, scope); 
+                self.compile_binop(op, left.expr, right.expr, block_info); 
             }
             HIRExpressionKind::Variable(varid) => {
-                let var_offset = scope.var_offsets.get(&varid).unwrap();
-                self.emit(&format!("    ldr r0, [fp, #-{}]", var_offset));     
+                self.emit(&format!("    ldr r0, [fp, #-{}]", block_info.stack_offsets.get(&varid).unwrap()));     
             }
             HIRExpressionKind::IntLiteral(n) => {
                 self.emit(&format!("    ldr r0, ={}", n));   
             }
             HIRExpressionKind::FuncCall{funcid:FuncId(funcid), args:args} => {
                 for arg in args.clone() {
-                    self.compile_expression(arg.expr, scope); 
+                    self.compile_expression(arg.expr, block_info); 
                     self.emit("    push {r0}");
                 }
                 for i in 0..args.len() {
@@ -228,7 +190,7 @@ impl HIRCompiler {
         }
     }
 
-    fn compile_binop(&mut self, op: BinaryOperator, left: HIRExpressionKind, right:HIRExpressionKind, scope: &ScopeInfo) {
+    fn compile_binop(&mut self, op: BinaryOperator, left: HIRExpressionKind, right:HIRExpressionKind, scope: &BlockInfo) {
         self.compile_expression(left, scope);
         self.emit("    push {r0}");
         self.compile_expression(right, scope);
@@ -279,8 +241,18 @@ impl HIRCompiler {
         self.emit("    pop {fp, lr}");
         self.emit("    bx lr");
     }
+    
+    fn get_jumplabel(&mut self) -> String {
+        let label = format!("{}", self.jumplabel_counter);
+        self.jumplabel_counter = self.jumplabel_counter + 1;
+        label
+    }
+} 
 
+
+
+struct BlockInfo {
+    looplabel_stack: Vec<String>,   
+    stack_offsets: HashMap<VarId, usize>,
+    ret_label: String,
 }
-
-
-

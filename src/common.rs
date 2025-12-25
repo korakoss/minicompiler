@@ -3,6 +3,7 @@
 pub enum Type {
     Integer,
     Bool,
+    None
 }
 
 #[derive(Debug, Clone)]

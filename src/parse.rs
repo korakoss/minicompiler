@@ -43,8 +43,15 @@ impl Parser {
             }
         }
         self.expect_unparametric_token(Token::RightParen);
-        self.expect_unparametric_token(Token::RightArrow);
-        let ret_type = self.parse_type();
+        let ret_type = match self.tokens.peek() {
+            Some(Token::RightArrow) => {
+                self.tokens.next();
+                self.parse_type()
+            }
+            _ => {
+                Type::None
+            }
+        };
         let body = self.expect_block();
         ASTFunction {name: funcname, args: args, body: body, ret_type}
     }
