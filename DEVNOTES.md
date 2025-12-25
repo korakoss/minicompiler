@@ -7,29 +7,6 @@ Currently doing a finializing overhaul of the present codebase (renames, code cl
 
 ## OVERHAUL STUFF
 
-
-### DONE, FINALIZED
-- main.rs 
-- common.rs 
-- ast.rs 
-- (lex.rs)
-- parse.rs 
-
-### CURRENT STEP
-- hir.rs (probaby in final form now)
-- hir_builder.rs
-    - **TODOs:**
-        - returns in func bodies having the correct type
-        - assign values having the type of the target
-        - turn hashmaps to vecs if possible?
-        - (some final touches)
-- rething who owns what in HIR
-
-
-### PLAN
-- hir-codegen
-- delete the AST codegen
-
 ### TESTS
 - write a small "test suite" of yum programs to check compiler updates against
 - create an automatic test script too
