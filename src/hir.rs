@@ -17,28 +17,6 @@ pub struct HIRFunction {
     pub ret_type: Type,
 }
 
-impl HIRFunction {
-
-    pub fn new(args: Vec<Variable>, ret_type: Type) -> Self {
-        let mut hir_func = HIRFunction {
-            args: Vec::new(),
-            body: Vec::new(),
-            variables: HashMap::new(),
-            ret_type: ret_type,
-        };
-        for arg in args {
-            let arg_id = hir_func.add_var(arg);
-            hir_func.args.push(arg_id);
-        }
-        hir_func
-    }
-            
-    pub fn add_var(&mut self, var: Variable) -> VarId {
-        let var_id = VarId(self.variables.len());
-        self.variables.insert(var_id, var.clone());
-        var_id 
-    }
-}
 
 #[derive(Clone, Debug)]
 pub enum HIRStatement {
@@ -65,6 +43,7 @@ pub enum HIRStatement {
     Print(HIRExpression),
 }
 
+
 #[derive(Clone, Debug)]
 pub struct HIRExpression {
     pub typ: Type,
@@ -87,6 +66,7 @@ pub enum HIRExpressionKind {
     BoolTrue,
     BoolFalse,
 }
+
 
 #[derive(Clone, Debug)]
 pub enum Place {

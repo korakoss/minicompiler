@@ -36,20 +36,7 @@ struct HIRFunctionBuilder {
 }
 
 impl HIRFunctionBuilder {
-
-    fn add_var_in_scope(&mut self, var: Variable) -> VarId {
-        let var_id = VarId(self.variables.len());
-        self.variables.insert(var_id, var.clone());
-        self.scope_var_stack.last_mut().unwrap().insert(var.name, var_id);
-        var_id
-    }
-
-    fn get_var_in_scope(&self, varname: &String) -> VarId {
-        // TODO: some typecheck
-        let scope_vars: HashMap<String, VarId> = self.scope_var_stack.clone().into_iter().flatten().collect();
-        scope_vars.get(varname).expect("Variable name not found in scope").clone()
-    }
-
+    
     fn lower_function(function: ASTFunction, signature_map: HashMap<FuncSignature, (FuncId, Type)>) -> HIRFunction {
         let ASTFunction{name, args, body, ret_type} = function;
        
@@ -105,11 +92,11 @@ impl HIRFunctionBuilder {
                 if hir_condition.typ != Type::Bool {
                     panic!("If condition expression not boolean");
                 }
-                let hir_if_body = self.transform_block(if_body); 
+                let hir_if_body = self.lower_block(if_body); 
                 let hir_else_body = match else_body {
                     None => None,
                     Some(stmts) => {
-                        Some(self.transform_block(stmts))
+                        Some(self.lower_block(stmts))
                     }
                 };
                 HIRStatement::If { condition: hir_condition, if_body: hir_if_body, else_body: hir_else_body}
@@ -119,7 +106,7 @@ impl HIRFunctionBuilder {
                 if hir_condition.typ != Type::Bool {
                     panic!("If condition expression not boolean");
                 }
-                let hir_body = self.transform_block(body); 
+                let hir_body = self.lower_block(body); 
                 HIRStatement::While { condition: hir_condition, body: hir_body}
             },
             ASTStatement::Break => {
@@ -150,7 +137,7 @@ impl HIRFunctionBuilder {
         hir_statement
     }
     
-    fn transform_block(&mut self, statements: Vec<ASTStatement>) -> Vec<HIRStatement>{
+    fn lower_block(&mut self, statements: Vec<ASTStatement>) -> Vec<HIRStatement>{
         self.scope_var_stack.push(HashMap::new());
         let hir_stmts = statements.into_iter().map(|stmt| self.lower_statement(stmt)).collect();
         self.scope_var_stack.pop();
@@ -212,6 +199,20 @@ impl HIRFunctionBuilder {
             }
         }
     }
+
+    fn add_var_in_scope(&mut self, var: Variable) -> VarId {
+        let var_id = VarId(self.variables.len());
+        self.variables.insert(var_id, var.clone());
+        self.scope_var_stack.last_mut().unwrap().insert(var.name, var_id);
+        var_id
+    }
+
+    fn get_var_in_scope(&self, varname: &String) -> VarId {
+        // TODO: some typecheck
+        let scope_vars: HashMap<String, VarId> = self.scope_var_stack.clone().into_iter().flatten().collect();
+        scope_vars.get(varname).expect("Variable name not found in scope").clone()
+    }
+
 }
 
 

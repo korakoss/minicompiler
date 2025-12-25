@@ -45,7 +45,6 @@ impl HIRCompiler {
         self.output.clone()
     }
     
-    // WHAT THE FUCK IS THIS SIGNATURE?
     fn compile_function(&mut self, id: FuncId, function: HIRFunction) {
 
         let flabel = format!("func_{}", id.0);
