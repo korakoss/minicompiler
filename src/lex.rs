@@ -20,14 +20,14 @@ pub enum Token {
     Colon,
 
     // Values 
-    IntLiteral(i32),
     Identifier(String),
 
     // Literals
     // TODO: None
     True,
     False,
-    
+    IntLiteral(i32),
+
     // Keywords
     Print,
     If,
@@ -38,6 +38,7 @@ pub enum Token {
     Function,
     Return,
     Let,
+    Struct,
     
     // Type stuff
     Int, 
@@ -84,6 +85,7 @@ pub fn lex(program: &str) -> Vec<Token> {
                 "bool" => Token::Bool,
                 "true" => Token::True,
                 "false" => Token::False,
+                "struct" => Token::Struct,
                 _ => Token::Identifier(word),
             };  
             tokens.push(token); 

@@ -57,6 +57,8 @@ Planning to write a test suite that we can use going forward.
 ### Floats
 - which also enable the Division binop etc
 
+### Strings
+
 ## Phase 2: Stack args 
 - support arbitrary number of arguments via pushing to stack
 
