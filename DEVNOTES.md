@@ -14,8 +14,6 @@ Planning to write a test suite that we can use going forward.
 
 ### Specific test cases
 - being in a loop nest to break/cont and in a func for return (who's checking this btw? HIR-lowerer?)
-- a nonparametric function -- unconfident about AST parsing there
-- long ass binop expression
 - loop/branch conditions being bool
 - _let_ definition within a loop (or actually also an if)
 - various typechecking tests

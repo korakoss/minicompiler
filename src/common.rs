@@ -1,9 +1,14 @@
+use std::{collections::HashMap};
 
-#[derive(PartialEq,Eq, Debug, Hash, Clone)]
+#[derive(PartialEq,Eq, Hash, Debug, Clone)]
 pub enum Type {
     Integer,
     Bool,
-    None
+    None,
+    Struct {
+        name: String,
+        fields: Vec<(String, Type)>,
+    }
 }
 
 #[derive(Debug, Clone)]
