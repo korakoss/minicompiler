@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+failures=()
+
+for t in primetest nonparam_func long_ass_binop; do
+    src_path="./tests/src/$t.yum"
+    ass_path="./tests/ass/$t.s"
+    tok_path="./tests/tok/$t.txt"
+    ast_path="./tests/ast/$t.txt"
+    hir_path="./tests/hir/$t.txt"
+    ex_path="./tests/bin/$t"
+
+    rm -f "$ass_path" "$tok_path" "$ast_path" "$hir_path" "$ex_path"
+
+    RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" "$ass_path" "$tok_path" "$ast_path" "$hir_path"
+    as -o TEMP.o "$ass_path"
+    gcc -o "$ex_path" TEMP.o
+    rm TEMP.o
+    sync
+    
+    ./"$ex_path"
+    exit_code=$?
+    
+    if [ $exit_code -ne 1 ]; then
+        failures+=("$t (exit code: $exit_code)")
+    fi
+done
+
+echo ""
+echo "================================"
+if [ ${#failures[@]} -eq 1 ]; then
+    echo "All tests passed!"
+else
+    echo "FAILURES (${#failures[@]}):"
+    for f in "${failures[@]}"; do
+        echo "  - $f"
+    done
+    exit 1
+fi

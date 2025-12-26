@@ -1,0 +1,7 @@
+fun nonp() -> int {
+    return 42;
+}
+
+fun main() -> bool {
+    return nonp()==42;
+}

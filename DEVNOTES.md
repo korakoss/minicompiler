@@ -1,26 +1,28 @@
 
-# Capn log XII.22
+# Captain's log XII.26
 
 HIR->assembly codegen possibly works now. Test it, clean up, merge maybe.
 Improved the running scripts: _yumc_ compiles, and (courtesy of dotfiles/) _ycp_ compiles and runs on pi, _yumpi_ jumps to project folder on pi. 
-Currently doing a finializing overhaul of the present codebase (renames, code cleanups, etc).
+Overhauled most codefiles, maybe there is some more work on hir_codegen.rs (and deleting the old AST-codegen after).
+Planning to write a test suite that we can use going forward.
 
-## OVERHAUL STUFF
-
-### TESTS
+## TESTS
 - write a small "test suite" of yum programs to check compiler updates against
 - create an automatic test script too
     - (maybe we should wait until the 'sync' reliability works again, ie home network(?))
-- specific test cases:
-    - being in a loop nest to break/cont and in a func for return (who's checking this btw? HIR-lowerer?)
-    - a nonparametric function -- unconfident about AST parsing there
-    - long ass binop expression
-    - loop/branch conditions being bool
-    - _let_ definition within a loop (or actually also an if)
-    - various typechecking tests
-        - typing binops, funcs, etc
+- think about main() return type
 
-### FINISH
+### Specific test cases
+- being in a loop nest to break/cont and in a func for return (who's checking this btw? HIR-lowerer?)
+- a nonparametric function -- unconfident about AST parsing there
+- long ass binop expression
+- loop/branch conditions being bool
+- _let_ definition within a loop (or actually also an if)
+- various typechecking tests
+    - typing binops, funcs, etc
+
+
+## FINISH
 - grep for TODOs
 - run tests 
 - final touches
