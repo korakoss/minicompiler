@@ -18,7 +18,7 @@ pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
         let id = signature_map.get(&sgn).unwrap().clone().0;
         let hir_func = HIRFunctionBuilder::lower_function(func.clone(), signature_map.clone());
         hir_functions.insert(id, hir_func);
-        if func.name == "main" && func.ret_type == Type::None {
+        if func.name == "main" {
             entry = Some(id);
         }
     }
