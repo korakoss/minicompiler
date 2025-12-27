@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use crate::common::*;
 
 #[derive(Debug, Clone)]
 pub struct ASTProgram {
-    pub struct_defs: Vec<DerivedType>,
+    pub struct_defs: HashMap<String, ASTStructDef>,
     pub functions: Vec<ASTFunction>,
 }
 
@@ -69,6 +71,7 @@ pub enum ASTExpression {
 }
 
 
-
-
-
+#[derive(Debug, Clone)]
+pub struct ASTStructDef {
+    pub fields: HashMap<String, Type>
+}

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::iter::Peekable;
 
 use crate::lex::*;
@@ -8,6 +9,7 @@ use crate::common::*;
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
     defined_funcs: Vec<ASTFunction>,
+    defined_structs: HashMap<String, ASTStructDef>
 }
 
 
@@ -16,33 +18,46 @@ impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Parser {
             tokens: tokens.into_iter().peekable(),
-            defined_funcs: Vec::new(),
+            defined_funcs: Vec::new(),              // Could be a hashmap indexed by sign?
+            defined_structs: HashMap::new(),
         }
     }
 
     pub fn parse_program(mut self) -> ASTProgram {
         while !self.tokens.peek().is_none() {
-            let func = self.parse_function();
-            self.defined_funcs.push(func);
+            match self.tokens.peek().unwrap() {
+                &Token::Struct => {
+                    self.tokens.next();
+                    let struct_name = self.expect_identifier();
+                    let struct_def = self.parse_struct_def();
+                    self.defined_structs.insert(struct_name, struct_def);
+                }
+                &Token::Function => {
+                    let func = self.parse_function();
+                    self.defined_funcs.push(func);
+                }
+                _ => {panic!("Invalid token, expected struct or func def");}
+            }
         }
         ASTProgram { 
-            struct_defs: Vec::new(),
-            functions: self.defined_funcs} 
+            struct_defs: self.defined_structs,
+            functions: self.defined_funcs,
+        } 
     }
 
-    fn parse_struct_def(&mut self) -> Type {
-        self.expect_unparametric_token(Token::Struct);
-        let struct_name = self.expect_identifier();
+    fn parse_struct_def(&mut self) -> ASTStructDef {
         self.expect_unparametric_token(Token::LeftBrace);
-        let mut fields = Vec::new();
+        let mut fields = HashMap::new();
         while self.tokens.peek() != Some(&Token::RightBrace) {
             let field_name = self.expect_identifier();
+            self.expect_unparametric_token(Token::Colon);
             let field_type = self.parse_type();           // TODO: do this better later
-            fields.push((field_name, field_type));
+            self.expect_unparametric_token(Token::Comma);
+            fields.insert(field_name, field_type);
         }
-        Type::Derived { 
-            name: struct_name, 
-            typ: DerivedType::Struct {fields}, 
+        self.expect_unparametric_token(Token::RightBrace);
+        ASTStructDef { 
+            fields 
         }
     }
     
@@ -166,7 +181,7 @@ impl Parser {
         match self.tokens.next() {
             Some(Token::Int) => {Type::Integer},
             Some(Token::Bool) => {Type::Bool},
-            _ => {panic!("Unexpected token in typing");}
+            other => {panic!("Unexpected token in typing: {:?}", other);}
         }
     }
 
