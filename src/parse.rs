@@ -25,7 +25,25 @@ impl Parser {
             let func = self.parse_function();
             self.defined_funcs.push(func);
         }
-        ASTProgram { functions: self.defined_funcs} 
+        ASTProgram { 
+            struct_defs: Vec::new(),
+            functions: self.defined_funcs} 
+    }
+
+    fn parse_struct_def(&mut self) -> Type {
+        self.expect_unparametric_token(Token::Struct);
+        let struct_name = self.expect_identifier();
+        self.expect_unparametric_token(Token::LeftBrace);
+        let mut fields = Vec::new();
+        while self.tokens.peek() != Some(&Token::RightBrace) {
+            let field_name = self.expect_identifier();
+            let field_type = self.parse_type();           // TODO: do this better later
+            fields.push((field_name, field_type));
+        }
+        Type::Derived { 
+            name: struct_name, 
+            typ: DerivedType::Struct {fields}, 
+        }
     }
     
     fn parse_function(&mut self) -> ASTFunction {

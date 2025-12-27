@@ -2,6 +2,7 @@ use crate::common::*;
 
 #[derive(Debug, Clone)]
 pub struct ASTProgram {
+    pub struct_defs: Vec<DerivedType>,
     pub functions: Vec<ASTFunction>,
 }
 

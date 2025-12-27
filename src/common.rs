@@ -5,11 +5,20 @@ pub enum Type {
     Integer,
     Bool,
     None,
-    Struct {
+    Derived {
         name: String,
+        typ: DerivedType,
+    }
+}
+
+#[derive(PartialEq,Eq, Hash, Debug, Clone)]
+pub enum DerivedType {
+    Struct {
         fields: Vec<(String, Type)>,
     }
 }
+
+
 
 #[derive(Debug, Clone)]
 pub struct Variable {
