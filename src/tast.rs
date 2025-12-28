@@ -33,6 +33,10 @@ pub enum TASTStatement {
         value: TASTExpression,
         // TODO: type field
     },
+    LetStruct {
+        var: Variable,
+        value: TASTStruct,
+    },
     Assign {
         target: TASTExpression,         
         value: TASTExpression
@@ -70,5 +74,10 @@ pub enum TASTExpression {
     // TODO: negation 
 }
 
+#[derive(Debug, Clone)]
+pub struct TASTStruct {
+    pub typ: TypeIdentifier,
+    pub fields: HashMap<String, TASTExpression>,
+}
 
 

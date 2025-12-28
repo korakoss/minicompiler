@@ -62,14 +62,16 @@ fn get_type_size(typ: &Type, typetable: &HashMap<TypeIdentifier, Type>) -> usize
 
 fn convert_stmt(stmt: UASTStatement, typetable: &HashMap<TypeIdentifier, Type>) -> TASTStatement{
     match stmt {
-        UASTStatement::Let { var, value } => {
+        UASTStatement::Let{ var, value } => {
             TASTStatement::Let {
                 var: convert_var(var, typetable),
                 value: convert_expr(value, typetable),
             }
         }
         UASTStatement::LetStruct {var,value} => {
-            unimplemented!();
+            TASTStatement::LetStruct { 
+                var: convert_var(var, typetable),
+                value: convert_struct(value, typetable) }
         }
         UASTStatement::Assign { target, value } => {
             TASTStatement::Assign {
@@ -128,6 +130,15 @@ fn convert_expr(uexpr: UASTExpression, typetable: &HashMap<TypeIdentifier, Type>
         }
     }
 }
+
+fn convert_struct(ustr: UASTStruct, typetable: &HashMap<TypeIdentifier, Type>) -> TASTStruct {
+    let UASTStruct{retar_type, fields} = ustr;
+    TASTStruct {
+        typ: retar_type,
+        fields: fields.into_iter().map(|(fname, expr)| (fname, convert_expr(expr, typetable))).collect(),
+    }
+}
+
 
 
 fn convert_structdefs(struct_defs: HashMap<TypeIdentifier, UASTStructDef>) -> HashMap<TypeIdentifier, Type> {

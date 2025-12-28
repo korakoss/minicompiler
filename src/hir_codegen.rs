@@ -186,6 +186,9 @@ impl HIRCompiler {
             HIRExpressionKind::BoolFalse => {
                 self.emit(&"    ldr r0, =0");   
             }
+            HIRExpressionKind::Struct { fields } => {
+                unimplemented!();
+            }
         }
     }
 

@@ -65,6 +65,9 @@ pub enum HIRExpressionKind {
     },
     BoolTrue,
     BoolFalse,
+    Struct {
+        fields: HashMap<String, HIRExpression>
+    }
 }
 
 

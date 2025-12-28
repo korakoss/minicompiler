@@ -16,7 +16,7 @@ pub fn lower_ast(ast: TASTProgram) -> HIRProgram {
     for func in functions {
         let sgn = func.get_signature();
         let id = signature_map.get(&sgn).unwrap().clone().0;
-        let hir_func = HIRFunctionBuilder::lower_function(func.clone(), signature_map.clone());
+        let hir_func = HIRFunctionBuilder::lower_function(func.clone(), signature_map.clone(), struct_defs.clone());
         hir_functions.insert(id, hir_func);
         if func.name == "main" {
             entry = Some(id);
@@ -28,6 +28,7 @@ pub fn lower_ast(ast: TASTProgram) -> HIRProgram {
 
 
 struct HIRFunctionBuilder {
+    typetable: HashMap<TypeIdentifier, Type>,
     signature_map: HashMap<FuncSignature, (FuncId, Type)>,
     variables: HashMap<VarId, Variable>,
     ret_type: Type,
@@ -37,11 +38,12 @@ struct HIRFunctionBuilder {
 
 impl HIRFunctionBuilder {
     
-    fn lower_function(function: TASTFunction, signature_map: HashMap<FuncSignature, (FuncId, Type)>) -> HIRFunction {
+    fn lower_function(function: TASTFunction, signature_map: HashMap<FuncSignature, (FuncId, Type)>, typetable: HashMap<TypeIdentifier, Type>) -> HIRFunction {
         let TASTFunction{name, args, body, ret_type} = function;
        
         let mut builder = HIRFunctionBuilder {
             signature_map: signature_map,
+            typetable: typetable,
             variables: HashMap::new(),
             ret_type: ret_type.clone(),
             scope_var_stack: Vec::new(),
@@ -69,7 +71,17 @@ impl HIRFunctionBuilder {
                     value: hir_val, 
                 }
             },
+            TASTStatement::LetStruct { var, value } => {
+                let hir_val = self.lower_struct_init(value);
+                let varid = self.add_var_in_scope(var);
+                HIRStatement::Let { 
+                    var: Place::Variable(varid), 
+                    value: hir_val, 
+                }
+            }
+
             TASTStatement::Assign { target, value } => {
+
                 match target {
                     TASTExpression::Variable(var_name) => {
                         let var_id = self.get_var_in_scope(&var_name);
@@ -135,6 +147,24 @@ impl HIRFunctionBuilder {
             }       
         };
         hir_statement
+    }
+
+    fn lower_struct_init(&mut self, stru: TASTStruct) -> HIRExpression{
+        let stru_type = self.typetable[&stru.typ].clone();
+        let Type::Derived {name, typ: DerivedType::Struct {fields}} = stru_type.clone() else {panic!("You fucked up struct typing");}; 
+        let mut checked_fields = HashMap::new();
+        for (fname, ftype) in fields {
+            let stru_f_expr = stru.fields.get(&fname).unwrap().clone();
+            let hir_fexpr = self.lower_expression(stru_f_expr);
+            if hir_fexpr.typ != ftype {
+                panic!("Field type mismatch");
+            }
+            checked_fields.insert(fname, hir_fexpr);
+        }
+        HIRExpression { 
+            typ: stru_type,
+            expr:HIRExpressionKind::Struct { fields: checked_fields } 
+        }
     }
     
     fn lower_block(&mut self, statements: Vec<TASTStatement>) -> Vec<HIRStatement>{
