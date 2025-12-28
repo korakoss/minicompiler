@@ -10,8 +10,8 @@ use lex::*;
 mod parse;
 use parse::*;
 
-mod type_ast;
-use type_ast::*;
+mod convert_ast;
+use convert_ast::*;
 
 /*
 mod hir;
@@ -41,7 +41,7 @@ fn main() {
 
     fs::write(uast_filepath, format!("{:#?}", uast)).unwrap();
 
-    let tast = convert_uast(uast);
+    let tast = ASTConverter::convert_uast(uast);
     fs::write(tast_filepath, format!("{:#?}", tast)).unwrap();
 
 
