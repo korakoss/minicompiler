@@ -124,7 +124,7 @@ impl HIRFunctionBuilder {
             TASTStatement::Return(expr) => {
                 let hir_expr = self.lower_expression(expr);
                 if hir_expr.typ != self.ret_type {
-                    panic!("Type of return expression doesn't match function signature");
+                    panic!("Type of return expression doesn't match function signature: {:?} vs {:?}", hir_expr.typ, self.ret_type);
                 }
                 HIRStatement::Return(hir_expr)
             },

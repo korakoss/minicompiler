@@ -49,7 +49,7 @@ impl Parser {
         match self.tokens.next() {
             Some(Token::Identifier(type_name)) => TypeIdentifier(type_name),
             Some(Token::Int) => TypeIdentifier("int".to_string()),
-            Some(Token::Bool) => TypeIdentifier("int".to_string()),
+            Some(Token::Bool) => TypeIdentifier("bool".to_string()),
             _ => {panic!("Expected type identifier");}
         }
     }

@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 
+cargo build
+
 failures=()
 
 for t in primetest nonparam_func long_ass_binop; do
     src_path="./tests/src/$t.yum"
     ass_path="./tests/ass/$t.s"
     tok_path="./tests/tok/$t.txt"
-    ast_path="./tests/ast/$t.txt"
+    uast_path="./tests/uast/$t.txt"
+    tast_path="./tests/tast/$t.txt"
     hir_path="./tests/hir/$t.txt"
     ex_path="./tests/bin/$t"
 
     rm -f "$ass_path" "$tok_path" "$ast_path" "$hir_path" "$ex_path"
 
-    RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" "$ass_path" "$tok_path" "$ast_path" "$hir_path"
+    RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" "$ass_path" "$tok_path" "$uast_path" "$tast_path" "$hir_path"
     as -o TEMP.o "$ass_path"
     gcc -o "$ex_path" TEMP.o
     rm TEMP.o

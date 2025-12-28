@@ -17,8 +17,8 @@ use type_ast::*;
 mod hir_builder;
 use hir_builder::*;
 
-//mod hir_codegen;
-//use hir_codegen::*;
+mod hir_codegen;
+use hir_codegen::*;
 
 
 fn main() {
@@ -47,10 +47,10 @@ fn main() {
     let hir = lower_ast(tast);
     fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
     
-    //let mut hircomp = HIRCompiler::new(hir);
-    //let assembly = hircomp.compile();
+    let mut hircomp = HIRCompiler::new(hir);
+    let assembly = hircomp.compile();
 
-    //fs::write(assembly_filename, assembly).unwrap();
+    fs::write(assembly_filename, assembly).unwrap();
 }
 
 

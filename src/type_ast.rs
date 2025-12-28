@@ -21,6 +21,7 @@ fn convert_function(func: UASTFunction, typetable: &HashMap<TypeIdentifier, Type
     let targs: Vec<Variable> = args.into_iter().map(|t| convert_var(t, typetable)).collect();
     let tbody: Vec<TASTStatement> = body.into_iter().map(|stmt| convert_stmt(stmt, typetable)).collect();
     let tret = typetable[&ret_type].clone();
+    println!("{:?} function typed {:?} from original {:?}", name, tret, ret_type);
     TASTFunction {
         name,
         args: targs,
@@ -30,9 +31,12 @@ fn convert_function(func: UASTFunction, typetable: &HashMap<TypeIdentifier, Type
 }
 
 fn convert_var(var: UASTVariable, typetable: &HashMap<TypeIdentifier, Type> ) -> Variable {
-   let UASTVariable{name, retar_type} = var; 
-   let var_type = typetable[&retar_type].clone();
-   Variable {
+    let UASTVariable{name, retar_type} = var; 
+ 
+    println!("{:?}",retar_type);
+    println!("{:?}",typetable);
+    let var_type = typetable[&retar_type].clone();
+    Variable {
         name,
         typ: var_type.clone(),
         size: get_type_size(&var_type, typetable),
@@ -128,16 +132,11 @@ fn convert_structdefs(struct_defs: HashMap<TypeIdentifier, UASTStructDef>) -> Ha
     let topo_order = toposort_depgraph(&dep_graph);
     println!("{:?}", topo_order);
     let mut result: HashMap<TypeIdentifier, Type> = HashMap::new();
+
+    result.insert(INT_ID.clone(), Type::Integer);
+    result.insert(BOOL_ID.clone(), Type::Bool);
+
     for type_id in topo_order { 
-        println!("{:?}",type_id);
-        if is_primitive(&type_id) {
-            println!("Booya");
-            result.insert(type_id.clone(), convert_primitive_type(type_id.clone()));
-            continue;
-        } else {
-            println!("Boo");
-        }
-        println!("{:?}", result);
         let stru_def = struct_defs.get(&type_id).unwrap();
         let converted_def = DerivedType::Struct { 
             fields: stru_def.fields
@@ -149,17 +148,6 @@ fn convert_structdefs(struct_defs: HashMap<TypeIdentifier, UASTStructDef>) -> Ha
     }
     result
 }
-
-fn convert_primitive_type(prim_id: TypeIdentifier) -> Type {
-    if prim_id == INT_ID.clone() {
-        Type::Integer
-    } else if prim_id == BOOL_ID.clone() {
-        Type::Bool
-    } else {
-        unreachable!();
-    }
-}
-
 
 fn build_depgraph(struct_defs: HashMap<TypeIdentifier, UASTStructDef>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
     let all_def_ids: Vec<TypeIdentifier> = struct_defs.keys().cloned().collect();
