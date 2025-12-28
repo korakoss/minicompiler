@@ -4,7 +4,7 @@ use crate::common::*;
 
 #[derive(Debug, Clone)]
 pub struct UASTProgram {
-    pub struct_defs: HashMap<TypeIdentifier, UASTStructDef>,
+    pub type_defs: HashMap<TypeIdentifier, UASTNewType>,
     pub functions: Vec<UASTFunction>,
 }
 
@@ -69,21 +69,28 @@ pub enum UASTExpression {
     // TODO: negation 
 }
 
+#[derive(Debug, Clone)]
+pub enum UASTType {
+    Defined(Type),
+    Deferred(TypeIdentifier)
+}
 
 #[derive(Debug, Clone)]
-pub struct UASTStructDef {
-    pub fields: HashMap<String, TypeIdentifier>
+pub enum UASTNewType {
+    Struct {
+        fields: HashMap<String, UASTType>
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct UASTStruct {
-    pub retar_type: TypeIdentifier,
+    pub retar_type: UASTType,
     pub fields: HashMap<String, UASTExpression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct UASTVariable {
     pub name: String,
-    pub retar_type: TypeIdentifier,
+    pub retar_type: UASTType,
 }
 

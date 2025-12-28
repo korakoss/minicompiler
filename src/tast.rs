@@ -4,7 +4,7 @@ use crate::common::*;
 
 #[derive(Debug, Clone)]
 pub struct TASTProgram {
-    pub struct_defs: HashMap<TypeIdentifier, Type>,
+    pub struct_defs: HashMap<TypeIdentifier, NewType>,
     pub functions: Vec<TASTFunction>,
 }
 

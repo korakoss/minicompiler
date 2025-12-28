@@ -6,14 +6,11 @@ pub enum Type {
     Integer,
     Bool,
     None,
-    Derived {
-        name: TypeIdentifier,
-        typ: DerivedType,
-    }
+    NewType(NewType),
 }
 
 #[derive(PartialEq,Eq, Debug, Hash, Clone)]
-pub enum DerivedType {
+pub enum NewType {
     Struct {
         fields: BTreeMap<String, Type>,
     }

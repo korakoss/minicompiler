@@ -1,4 +1,5 @@
 
+use std::collections::BTreeMap;
 use std::collections::{HashMap, VecDeque};
 
 use crate::common::*;
@@ -7,8 +8,8 @@ use crate::tast::*;
 
 
 pub fn type_ast(uast: UASTProgram) -> TASTProgram {
-    let UASTProgram{struct_defs, functions} = uast;
-    let typetable = convert_structdefs(struct_defs);
+    let UASTProgram{type_defs, functions} = uast;
+    let typetable = convert_newtype_defs(type_defs);
     TASTProgram { 
         struct_defs: typetable.clone(),
         functions: functions.into_iter().map(|func| convert_function(func, &typetable)).collect()
@@ -16,13 +17,72 @@ pub fn type_ast(uast: UASTProgram) -> TASTProgram {
 }
 
 
-fn convert_function(func: UASTFunction, typetable: &HashMap<TypeIdentifier, Type> ) -> TASTFunction {
+fn convert_newtype_defs(newtype_defs: HashMap<TypeIdentifier, UASTNewType>) -> HashMap<TypeIdentifier, NewType> {
+
+    let dep_graph = build_newtype_depgraph(newtype_defs.clone());
+    let topo_order = toposort_depgraph(&dep_graph);
+
+    let mut result: HashMap<TypeIdentifier, NewType> = HashMap::new();
+
+    for type_id in topo_order { 
+        let newtype = newtype_defs.get(&type_id).unwrap();
+        match newtype {
+            UASTNewType::Struct { fields } => {
+                result.insert(type_id, convert_struct_typedef(fields.clone(), &result));
+            }
+        }
+    }
+    result
+}
+
+fn convert_struct_typedef(fields: HashMap<String, UASTType>, prev_types_map: &HashMap<TypeIdentifier, NewType>) -> NewType {
+    let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
+    for (fname, ftype) in fields {
+        let actual_type = match ftype {
+            UASTType::Defined(typ) => typ,
+            UASTType::Deferred(type_id) => Type::NewType(prev_types_map[&type_id].clone()),
+        };
+        tfields.insert(fname, actual_type);
+    }
+    NewType::Struct { 
+        fields: tfields
+    }
+}
+
+fn build_newtype_depgraph(newtype_defs: HashMap<TypeIdentifier, UASTNewType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
+    let all_def_ids: Vec<TypeIdentifier> = newtype_defs.keys().cloned().collect();
+    let dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = newtype_defs.iter().map(|(id, def)| (id.clone(), extract_deps(def, all_def_ids.clone()))).collect();
+    dep_graph 
+}
+
+fn extract_deps(struct_def: &UASTNewType, all_defn_ids: Vec<TypeIdentifier>) -> Vec<TypeIdentifier> {
+    let mut deps = Vec::new();
+    match struct_def {
+        UASTNewType::Struct { fields } => {
+            for (_, field_type) in fields.iter() {
+                match field_type {
+                    UASTType::Defined(_) => {continue;},
+                    UASTType::Deferred(type_id) => {
+                        if !all_defn_ids.contains(type_id) {
+                            panic!("Unrecognized type name");
+                        }
+                        deps.push(type_id.clone());
+                    }
+                }
+            }
+            deps
+        }
+    }
+}
+
+
+
+
+fn convert_function(func: UASTFunction, newtype_table: &HashMap<TypeIdentifier, NewType> ) -> TASTFunction {
     let UASTFunction{name, args, body, ret_type} = func;
-    let targs: Vec<Variable> = args.into_iter().map(|t| convert_var(t, typetable)).collect();
+    let targs: Vec<Variable> = args.into_iter().map(|t| convert_var(t, &newtype_table)).collect();
     let tbody: Vec<TASTStatement> = body.into_iter().map(|stmt| convert_stmt(stmt, typetable)).collect();
-    println!("Typetable: {:?}", typetable);
     let tret = typetable[&ret_type].clone();
-    println!("{:?} function typed {:?} from original {:?}", name, tret, ret_type);
     TASTFunction {
         name,
         args: targs,
@@ -31,47 +91,17 @@ fn convert_function(func: UASTFunction, typetable: &HashMap<TypeIdentifier, Type
     }
 }
 
-fn convert_var(var: UASTVariable, typetable: &HashMap<TypeIdentifier, Type> ) -> Variable {
-    let UASTVariable{name, retar_type} = var; 
- 
-    println!("{:?}",retar_type);
-    println!("{:?}",typetable);
-    let var_type = typetable[&retar_type].clone();
-    Variable {
-        name,
-        typ: var_type.clone(),
-        size: get_type_size(&var_type, typetable),
-    }
-}
-
-fn get_type_size(typ: &Type, typetable: &HashMap<TypeIdentifier, Type>) -> usize {
-    match typ {
-        Type::Integer => 8,
-        Type::Bool => 8,
-        Type::None => 0,
-        Type::Derived{name, typ: derived_type} => {
-            match derived_type {
-                DerivedType::Struct { fields } => {
-                    let fsum: usize = fields.iter().map(|(fname, ftype)| get_type_size(ftype, typetable)).sum();
-                    fsum
-                }
-            }
-        }
-    }
-}
-
-
-fn convert_stmt(stmt: UASTStatement, typetable: &HashMap<TypeIdentifier, Type>) -> TASTStatement{
+fn convert_stmt(stmt: UASTStatement, typetable: &HashMap<TypeIdentifier, NewType>) -> TASTStatement{
     match stmt {
         UASTStatement::Let{ var, value } => {
             TASTStatement::Let {
-                var: convert_var(var, typetable),
+                var: convert_var(var, &typetable),
                 value: convert_expr(value, typetable),
             }
         }
         UASTStatement::LetStruct {var,value} => {
             TASTStatement::LetStruct { 
-                var: convert_var(var, typetable),
+                var: convert_var(var, &typetable),
                 value: convert_struct(value, typetable) }
         }
         UASTStatement::Assign { target, value } => {
@@ -110,7 +140,7 @@ fn convert_stmt(stmt: UASTStatement, typetable: &HashMap<TypeIdentifier, Type>) 
     }
 }
 
-fn convert_expr(uexpr: UASTExpression, typetable: &HashMap<TypeIdentifier, Type>) -> TASTExpression {
+fn convert_expr(uexpr: UASTExpression, typetable: &HashMap<TypeIdentifier, NewType>) -> TASTExpression {
     match uexpr {
         UASTExpression::IntLiteral(num) => TASTExpression::IntLiteral(num),
         UASTExpression::Variable(name) => TASTExpression::Variable(name),
@@ -138,7 +168,7 @@ fn convert_expr(uexpr: UASTExpression, typetable: &HashMap<TypeIdentifier, Type>
     }
 }
 
-fn convert_struct(ustr: UASTStruct, typetable: &HashMap<TypeIdentifier, Type>) -> TASTStruct {
+fn convert_struct(ustr: UASTStruct, newtype_table: &HashMap<TypeIdentifier, NewType>) -> TASTStruct {
     let UASTStruct{retar_type, fields} = ustr;
     TASTStruct {
         typ: retar_type,
@@ -147,51 +177,13 @@ fn convert_struct(ustr: UASTStruct, typetable: &HashMap<TypeIdentifier, Type>) -
 }
 
 
-
-fn convert_structdefs(struct_defs: HashMap<TypeIdentifier, UASTStructDef>) -> HashMap<TypeIdentifier, Type> {
-    let dep_graph = build_depgraph(struct_defs.clone());
-    let topo_order = toposort_depgraph(&dep_graph);
-    println!("{:?}", topo_order);
-    let mut result: HashMap<TypeIdentifier, Type> = HashMap::new();
-
-    result.insert(INT_ID.clone(), Type::Integer);
-    result.insert(BOOL_ID.clone(), Type::Bool);
-    result.insert(NONE_ID.clone(), Type::None);
-
-    for type_id in topo_order { 
-        println!("{:?}", type_id);
-        let stru_def = struct_defs.get(&type_id).unwrap();
-        let converted_def = DerivedType::Struct { 
-            fields: stru_def.fields
-                .iter()
-                .map(|(fname, ftype)| (fname.clone(), result[ftype].clone()))
-                .collect()
-        };
-        result.insert(type_id.clone(), Type::Derived { name: type_id, typ: converted_def });
-    }
-    result
+fn convert_uast_type(utyp: UASTType) -> Type {
+    unimplemented!();
 }
 
-fn build_depgraph(struct_defs: HashMap<TypeIdentifier, UASTStructDef>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
-    let all_def_ids: Vec<TypeIdentifier> = struct_defs.keys().cloned().collect();
-    let dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = struct_defs.iter().map(|(id, def)| (id.clone(), extract_deps(def, all_def_ids.clone()))).collect();
-    dep_graph 
-}
 
-fn extract_deps(struct_def: &UASTStructDef, all_defn_ids: Vec<TypeIdentifier>) -> Vec<TypeIdentifier> {
-    let mut deps = Vec::new();
-    for (_, field_type) in struct_def.fields.iter() {
-        if is_primitive(&field_type) {
-            deps.push(field_type.clone());                 // Branching here so primitives cannot
-                                                            // be overritten, TODO: do nicer
-        } else if all_defn_ids.contains(&field_type) {
-            deps.push(field_type.clone());
-        } else {
-            panic!("Unrecognized field type");
-        }
-    }
-    deps
-}
+
+// Clean parts from here on !
 
 fn toposort_depgraph(depgraph: &HashMap<TypeIdentifier, Vec<TypeIdentifier>>) -> Vec<TypeIdentifier> {
     let mut indegrees: HashMap<TypeIdentifier, usize> = HashMap::new();
@@ -239,7 +231,30 @@ fn toposort_depgraph(depgraph: &HashMap<TypeIdentifier, Vec<TypeIdentifier>>) ->
     }
 } 
 
-fn is_primitive(id: &TypeIdentifier) -> bool {
-        id == &*INT_ID || id == &*BOOL_ID 
+
+
+fn convert_var(var: UASTVariable, newtype_table: &HashMap<TypeIdentifier, NewType> ) -> Variable {
+    let UASTVariable{name, retar_type} = var; 
+    let var_type = match retar_type {
+        UASTType::Defined(typ) => typ,
+        UASTType::Deferred(type_id) => {
+            Type::NewType(newtype_table[&type_id].clone())
+        }
+    };
+    Variable {
+        name,
+        typ: var_type.clone(),
+        size: get_type_size(&var_type),
+    }
 }
 
+fn get_type_size(typ: &Type) -> usize {
+    match typ {
+        Type::Integer => 8,
+        Type::Bool => 8,
+        Type::None => 0,
+        Type::NewType(NewType::Struct { fields }) => {
+            fields.into_iter().map(|(f_name, f_type)| get_type_size(f_type)).sum()            
+        }
+    }
+}
