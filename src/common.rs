@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 
 #[derive(Debug, Clone)]
-pub struct Variable {
+pub struct Variable<T> {
     pub name: String,
-    pub typ: Type,
+    pub typ: T,
     pub size: usize,
     // TODO: mutable, etc
 }
@@ -14,17 +14,21 @@ pub enum Type {
     Integer,
     Bool,
     None,
-    NewType(NewType),
+    NewType(NewType<Type>),
+}
+
+#[derive(Debug, Clone)]
+pub enum DeferredType {
+    Resolved(Type),
+    Unresolved(TypeIdentifier)
 }
 
 #[derive(PartialEq,Eq, Debug, Hash, Clone)]
-pub enum NewType {
+pub enum NewType<T> {
     Struct {
-        fields: BTreeMap<String, Type>,
+        fields: BTreeMap<String, T>,
     }
 }
-
-
 
 
 #[derive(Debug, Clone)]

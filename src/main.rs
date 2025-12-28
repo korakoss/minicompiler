@@ -2,12 +2,13 @@ use std::fs;
 use std::env;
 
 mod common;
+mod ast;
 mod uast;
 mod tast;
 mod hir;
 
 mod lex;
-use crate::lex::*;
+use lex::*;
 
 mod parse;
 use parse::*;
