@@ -68,6 +68,9 @@ fn convert_stmt(stmt: UASTStatement, typetable: &HashMap<TypeIdentifier, Type>) 
                 value: convert_expr(value, typetable),
             }
         }
+        UASTStatement::LetStruct {var,value} => {
+            unimplemented!();
+        }
         UASTStatement::Assign { target, value } => {
             TASTStatement::Assign {
                 target: convert_expr(target, typetable),

@@ -23,6 +23,10 @@ pub enum UASTStatement {
         value: UASTExpression,
         // TODO: type field
     },
+    LetStruct {
+        var: UASTVariable,
+        value: UASTStruct,
+    },
     Assign {
         target: UASTExpression,         
         value: UASTExpression
@@ -57,6 +61,7 @@ pub enum UASTExpression {
     },
     BoolTrue,
     BoolFalse,
+
     // TODO: negation 
 }
 
@@ -64,6 +69,12 @@ pub enum UASTExpression {
 #[derive(Debug, Clone)]
 pub struct UASTStructDef {
     pub fields: HashMap<String, TypeIdentifier>
+}
+
+#[derive(Debug, Clone)]
+pub struct UASTStruct {
+    pub retar_type: TypeIdentifier,
+    pub fields: HashMap<String, UASTExpression>,
 }
 
 #[derive(Debug, Clone)]

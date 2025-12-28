@@ -157,10 +157,24 @@ impl Parser {
                 let varname = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
                 let type_identifier = self.expect_type_identifier();
-                let var = UASTVariable{name: varname, retar_type: type_identifier};
-                let value = self.parse_expression();
+
+                let var = UASTVariable{name: varname, retar_type: type_identifier.clone()};
+                self.expect_unparametric_token(Token::Assign);
+                let stmt = if self.tokens.peek() == Some(&Token::LeftBrace) {      // Struct def
+                    let fields = self.parse_struct_init();
+                    UASTStatement::LetStruct {
+                        var,
+                        value: UASTStruct{
+                            retar_type: type_identifier,
+                            fields: fields,
+                        }
+                    }
+                } else {
+                    let value = self.parse_expression();
+                    UASTStatement::Let { var: var, value}
+                };
                 self.expect_unparametric_token(Token::Semicolon);
-                UASTStatement::Let { var: var, value}
+                stmt
             },
             other => {                                      
                 println!("{:#?}", self.defined_funcs);
@@ -182,12 +196,7 @@ impl Parser {
     }
     
     fn parse_expression(&mut self) -> UASTExpression {
-        if self.tokens.peek() == Some(&Token::LeftBrace) {      // Struct def
-            let fields = self.parse_struct_init();
-            UASTExpression::StructInstance{fields}
-        } else {
-            self.parse_expression_with_precedence(0)
-        }
+        self.parse_expression_with_precedence(0)
     }
 
     fn parse_struct_init(&mut self) -> HashMap<String, UASTExpression>{
