@@ -2,28 +2,25 @@ use crate::common::*;
 use std::collections::HashMap;
 
 
-type UASTProgram = ASTProgram<DeferredType>;
-type UASTFunction = ASTFunction<DeferredType>;
-type UASTStatement = ASTStatement<DeferredType>;
+pub type UASTProgram = ASTProgram<DeferredType>;
+pub type UASTFunction = ASTFunction<DeferredType>;
+pub type UASTStatement = ASTStatement<DeferredType>;
 
-type TASTProgram = ASTProgram<Type>;
-type TASTFunction = ASTFunction<Type>;
-type TASTStatement = ASTStatement<Type>;
-
-type DeferredTypeVariable = Variable<DeferredType>;
-type TypedVariable = Variable<Type>;
+pub type TASTProgram = ASTProgram<Type>;
+pub type TASTFunction = ASTFunction<Type>;
+pub type TASTStatement = ASTStatement<Type>;
 
 
 #[derive(Debug, Clone)]
 pub struct ASTProgram<T> {
-    pub struct_defs: HashMap<TypeIdentifier, NewType<T>>,
+    pub new_types: HashMap<TypeIdentifier, NewType<T>>,
     pub functions: Vec<ASTFunction<T>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ASTFunction<T> {
     pub name: String,
-    pub args: Vec<Variable<T>>,
+    pub args: Vec<Variable<T>>,             // TODO: could be a name:type HMAP instead?
     pub body: Vec<ASTStatement<T>>,
     pub ret_type: T,
 }
@@ -33,10 +30,6 @@ pub enum ASTStatement<T> {
     Let {
         var: Variable<T>,
         value: ASTExpression,
-    },
-    LetStruct {
-        var: Variable<T>,
-        value: ASTStructLiteral<T>,
     },
     Assign {
         target: ASTExpression,         
@@ -74,7 +67,7 @@ pub enum ASTExpression {
     },
     FuncCall {
         funcname: String,
-        args: Vec<Box<ASTExpression>>,
+        args: Vec<ASTExpression>,
     },
     BoolTrue,
     BoolFalse,
