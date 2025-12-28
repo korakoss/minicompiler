@@ -88,3 +88,5 @@ pub struct TypeIdentifier(pub String);
 
 pub static INT_ID: LazyLock<TypeIdentifier> = LazyLock::new(|| TypeIdentifier("int".into()));
 pub static BOOL_ID: LazyLock<TypeIdentifier> = LazyLock::new(|| TypeIdentifier("bool".into()));
+pub static NONE_ID: LazyLock<TypeIdentifier> = LazyLock::new(|| TypeIdentifier("none".into()));
+

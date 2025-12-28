@@ -20,6 +20,7 @@ fn convert_function(func: UASTFunction, typetable: &HashMap<TypeIdentifier, Type
     let UASTFunction{name, args, body, ret_type} = func;
     let targs: Vec<Variable> = args.into_iter().map(|t| convert_var(t, typetable)).collect();
     let tbody: Vec<TASTStatement> = body.into_iter().map(|stmt| convert_stmt(stmt, typetable)).collect();
+    println!("Typetable: {:?}", typetable);
     let tret = typetable[&ret_type].clone();
     println!("{:?} function typed {:?} from original {:?}", name, tret, ret_type);
     TASTFunction {
@@ -149,8 +150,10 @@ fn convert_structdefs(struct_defs: HashMap<TypeIdentifier, UASTStructDef>) -> Ha
 
     result.insert(INT_ID.clone(), Type::Integer);
     result.insert(BOOL_ID.clone(), Type::Bool);
+    result.insert(NONE_ID.clone(), Type::None);
 
     for type_id in topo_order { 
+        println!("{:?}", type_id);
         let stru_def = struct_defs.get(&type_id).unwrap();
         let converted_def = DerivedType::Struct { 
             fields: stru_def.fields
@@ -192,8 +195,10 @@ fn toposort_depgraph(depgraph: &HashMap<TypeIdentifier, Vec<TypeIdentifier>>) ->
     }
     
     for neighbors in depgraph.values().clone() {
-        for neighbor in neighbors.clone() {
-            *indegrees.entry(neighbor).or_insert(0) += 1;
+        for neighbor in neighbors {
+            if let Some(count) = indegrees.get_mut(neighbor) {
+                *count += 1;
+            }
         }
     }
     
@@ -210,10 +215,11 @@ fn toposort_depgraph(depgraph: &HashMap<TypeIdentifier, Vec<TypeIdentifier>>) ->
         
         if let Some(neighbors) = depgraph.get(&node) {
             for neighbor in neighbors {
-                let deg = indegrees.get_mut(neighbor).unwrap();
-                *deg -= 1;
-                if *deg == 0 {
-                    queue.push_back(neighbor.clone());
+                if let Some(deg) = indegrees.get_mut(neighbor) {
+                    *deg -= 1;
+                    if *deg == 0 {
+                        queue.push_back(neighbor.clone());
+                    }
                 }
             }
         }
