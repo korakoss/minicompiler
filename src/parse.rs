@@ -22,12 +22,12 @@ impl Parser {
             new_types: HashMap::new(),
         };
         while !parser.tokens.peek().is_none() {
-            match self.tokens.peek().unwrap() {
+            match parser.tokens.peek().unwrap() {
                 &Token::Struct => {
-                    self.process_struct_typedef(); 
+                    parser.process_struct_typedef(); 
                 }
                 &Token::Function => {
-                    self.process_function_definition();
+                    parser.process_function_definition();
                 }
                 _ => {panic!("Invalid token, expected struct or func def");}
             }
@@ -225,7 +225,7 @@ impl Parser {
     fn parse_expression_atom(&mut self) -> ASTExpression {
         let token = self.tokens.next().unwrap();  
         match token {
-            Token::IntLiteral(int) => UASTExpression::IntLiteral(int),
+            Token::IntLiteral(int) => ASTExpression::IntLiteral(int),
             Token::Identifier(name) => {
                 if self.tokens.peek() == Some(&Token::LeftParen) {        // Function call 
                     self.tokens.next();

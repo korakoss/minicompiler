@@ -154,7 +154,7 @@ pub enum Token {
 
 // TODO: instead of these two funcs, maybe we should make a big binop info table with rows like: Token, Binoptype,precedence 
 
-fn get_connector_precedence(op_token: &Token) -> u8 {
+pub fn get_connector_precedence(op_token: &Token) -> usize {
     match *op_token {
         Token::Dot => 3, 
         Token::Multiply | Token::Modulo => 2,
@@ -164,7 +164,7 @@ fn get_connector_precedence(op_token: &Token) -> u8 {
     }
 }
 
-fn map_binop_token(op_token: &Token) -> BinaryOperator {
+pub fn map_binop_token(op_token: &Token) -> BinaryOperator {
     match *op_token {
         Token::Plus => BinaryOperator::Add,
         Token::Minus => BinaryOperator::Sub,

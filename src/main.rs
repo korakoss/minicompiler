@@ -3,7 +3,6 @@ use std::env;
 
 mod common;
 mod ast;
-mod hir;
 
 mod lex;
 use lex::*;
@@ -11,14 +10,17 @@ use lex::*;
 mod parse;
 use parse::*;
 
+/*
 mod type_ast;
 use type_ast::*;
-mod hir_builder;
+
+mod hir;
+mod make_hir;
 use hir_builder::*;
 
 mod hir_codegen;
 use hir_codegen::*;
-
+*/
 
 fn main() {
     
@@ -35,11 +37,11 @@ fn main() {
     
     fs::write(tokens_filepath, format!("{:#?}", tokens)).unwrap();
 
-    let parser = Parser::new(tokens);
-    let uast = parser.parse_program();
+    let uast = Parser::parse_program(tokens);
 
     fs::write(uast_filepath, format!("{:#?}", uast)).unwrap();
-    
+   
+    /* 
     let tast = type_ast(uast);
     fs::write(tast_filepath, format!("{:#?}", tast)).unwrap();
 
@@ -50,6 +52,7 @@ fn main() {
     let assembly = hircomp.compile();
 
     fs::write(assembly_filename, assembly).unwrap();
+    */
 }
 
 
