@@ -31,11 +31,30 @@ fn convert_function(func: UASTFunction, typetable: &HashMap<TypeIdentifier, Type
 
 fn convert_var(var: UASTVariable, typetable: &HashMap<TypeIdentifier, Type> ) -> Variable {
    let UASTVariable{name, retar_type} = var; 
+   let var_type = typetable[&retar_type].clone();
    Variable {
         name,
-        typ: typetable[&retar_type].clone(),
+        typ: var_type.clone(),
+        size: get_type_size(&var_type, typetable),
     }
 }
+
+fn get_type_size(typ: &Type, typetable: &HashMap<TypeIdentifier, Type>) -> usize {
+    match typ {
+        Type::Integer => 8,
+        Type::Bool => 8,
+        Type::None => 0,
+        Type::Derived{name, typ: derived_type} => {
+            match derived_type {
+                DerivedType::Struct { fields } => {
+                    let fsum: usize = fields.iter().map(|(fname, ftype)| get_type_size(ftype, typetable)).sum();
+                    fsum
+                }
+            }
+        }
+    }
+}
+
 
 fn convert_stmt(stmt: UASTStatement, typetable: &HashMap<TypeIdentifier, Type>) -> TASTStatement{
     match stmt {

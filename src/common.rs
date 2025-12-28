@@ -25,6 +25,7 @@ pub enum DerivedType {
 pub struct Variable {
     pub name: String,
     pub typ: Type,
+    pub size: usize,
     // TODO: mutable, etc
 }
 
