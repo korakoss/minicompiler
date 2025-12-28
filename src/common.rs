@@ -1,4 +1,5 @@
 use std::{collections::HashMap};
+use std::sync::LazyLock;
 
 #[derive(PartialEq,Eq, Hash, Debug, Clone)]
 pub enum Type {
@@ -83,3 +84,6 @@ pub struct FuncSignature {
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct TypeIdentifier(pub String); 
+
+pub static INT_ID: LazyLock<TypeIdentifier> = LazyLock::new(|| TypeIdentifier("int".into()));
+pub static BOOL_ID: LazyLock<TypeIdentifier> = LazyLock::new(|| TypeIdentifier("bool".into()));

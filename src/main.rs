@@ -13,6 +13,7 @@ mod parse;
 use parse::*;
 
 mod type_ast;
+use type_ast::*;
 //mod hir_builder;
 //use hir_builder::*;
 
@@ -40,6 +41,8 @@ fn main() {
 
     fs::write(uast_filepath, format!("{:#?}", uast)).unwrap();
     
+    let tast = type_ast(uast);
+    fs::write(tast_filepath, format!("{:#?}", tast)).unwrap();
     //let hir = lower_ast(ast);
 
     //fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();

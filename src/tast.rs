@@ -4,15 +4,15 @@ use crate::common::*;
 
 #[derive(Debug, Clone)]
 pub struct TASTProgram {
-    pub struct_defs: HashMap<TypeIdentifier, DerivedType>,
-    pub functions: Vec<ASTFunction>,
+    pub struct_defs: HashMap<TypeIdentifier, Type>,
+    pub functions: Vec<TASTFunction>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TASTFunction {
     pub name: String,
     pub args: Vec<Variable>,
-    pub body: Vec<ASTStatement>,
+    pub body: Vec<TASTStatement>,
     pub ret_type: Type,
 }
 
