@@ -3,183 +3,155 @@ use std::collections::BTreeMap;
 use std::collections::{HashMap, VecDeque};
 
 use crate::common::*;
-use crate::uast::*;
-use crate::tast::*;
+use crate::ast::*;
 
 
-pub fn type_ast(uast: UASTProgram) -> TASTProgram {
-    let UASTProgram{type_defs, functions} = uast;
-    let typetable = convert_newtype_defs(type_defs);
-    TASTProgram { 
-        struct_defs: typetable.clone(),
-        functions: functions.into_iter().map(|func| convert_function(func, &typetable)).collect()
-    }
+pub struct ASTConverter {
+    complete_newtypes: HashMap<TypeIdentifier, CompleteNewType> 
 }
 
+impl ASTConverter {
+    
+    pub fn convert_uast(uast: UASTProgram) -> TASTProgram {
+        let UASTProgram{new_types, functions} = uast;
+        let converter = ASTConverter::convert_newtype_defs(new_types);
 
-fn convert_newtype_defs(newtype_defs: HashMap<TypeIdentifier, DeferredNewType>) -> HashMap<TypeIdentifier, NewType> {
-
-    let dep_graph = build_newtype_depgraph(newtype_defs.clone());
-    let topo_order = toposort_depgraph(&dep_graph);
-
-    let mut result: HashMap<TypeIdentifier, NewType> = HashMap::new();
-
-    for type_id in topo_order { 
-        let newtype = newtype_defs.get(&type_id).unwrap();
-        match newtype {
-            DeferredNewType::Struct { fields } => {
-                result.insert(type_id, convert_struct_typedef(fields.clone(), &result));
-            }
+        let mut tfuncs: Vec<TASTFunction> = Vec::new();
+        for func in functions {
+            let tfunc = converter.convert_function(func);
+            tfuncs.push(tfunc);
+        }
+        TASTProgram { 
+            new_types: converter.complete_newtypes, 
+            functions:tfuncs,
         }
     }
-    result
-}
 
-fn convert_struct_typedef(fields: HashMap<String, DeferredType>, prev_types_map: &HashMap<TypeIdentifier, NewType>) -> NewType {
-    let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
-    for (fname, ftype) in fields {
-        let actual_type = match ftype {
-            DeferredType::Resolved(typ) => typ,
-            DeferredType::Unresolved(type_id) => Type::NewType(prev_types_map[&type_id].clone()),
+    fn convert_newtype_defs(newtype_defs: HashMap<TypeIdentifier, DeferredNewType>) -> ASTConverter { 
+
+        let dep_graph = get_newtype_dependencies(&newtype_defs); 
+        let topo_order = toposort_depgraph(&dep_graph);
+
+        let mut converter = ASTConverter{
+            complete_newtypes: HashMap::new(),
         };
-        tfields.insert(fname, actual_type);
+        for type_id in topo_order { 
+            let deferred_newtype = newtype_defs[&type_id].clone();
+            let complete_newtype = converter.convert_struct_typedef(deferred_newtype);        
+            converter.complete_newtypes.insert(type_id, complete_newtype);
+        }
+        converter
     }
-    NewType::Struct { 
-        fields: tfields
+
+    fn convert_struct_typedef(&mut self, dnt: DeferredNewType) -> CompleteNewType { 
+        let DeferredNewType::Struct { fields } = dnt; 
+        let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
+        for (fname, ftype) in fields {
+            let actual_type = match ftype {
+                DeferredType::Resolved(typ) => typ,
+                DeferredType::Unresolved(type_id) => Type::NewType(self.complete_newtypes[&type_id].clone()),
+            };
+            tfields.insert(fname, actual_type);
+        }
+        NewType::Struct { 
+            fields: tfields
+        }
     }
-}
 
-fn build_newtype_depgraph(newtype_defs: HashMap<TypeIdentifier, DeferredNewType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
-    let all_def_ids: Vec<TypeIdentifier> = newtype_defs.keys().cloned().collect();
-    let dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = newtype_defs.iter().map(|(id, def)| (id.clone(), extract_deps(def, all_def_ids.clone()))).collect();
-    dep_graph 
-}
-
-fn extract_deps(struct_def: &DeferredNewType, all_defn_ids: Vec<TypeIdentifier>) -> Vec<TypeIdentifier> {
-    let mut deps = Vec::new();
-    match struct_def {
-        DeferredNewType::Struct { fields } => {
-            for (_, field_type) in fields.iter() {
-                match field_type {
-                    DeferredType::Resolved(_) => {continue;},
-                    DeferredType::Unresolved(type_id) => {
-                        if !all_defn_ids.contains(type_id) {
-                            panic!("Unrecognized type name");
-                        }
-                        deps.push(type_id.clone());
+    fn convert_function(&self, func: UASTFunction) -> TASTFunction {
+        let UASTFunction{name, args, body, ret_type} = func;
+        TASTFunction {
+            name,
+            args: args.into_iter().map(|arg| self.convert_var(arg)).collect(),
+            body: body.into_iter().map(|stmt| self.convert_statement(stmt)).collect(),
+            ret_type: self.convert_type(ret_type)
+        }
+    }
+    
+    fn convert_statement(&self, statement: UASTStatement) -> TASTStatement {
+        match statement {
+            UASTStatement::Let { var, value } => {
+                TASTStatement::Let { 
+                    var: self.convert_var(var), 
+                    value 
+                }
+            }
+            UASTStatement::Assign { target, value } => {
+                TASTStatement::Assign { target, value }
+            }
+            UASTStatement::If { condition, if_body, else_body } => {
+                TASTStatement::If { 
+                    condition, 
+                    if_body: if_body.into_iter().map(|stmt| self.convert_statement(stmt)).collect(),
+                    else_body: match else_body {
+                        None => None,
+                        Some(else_statements) => Some(else_statements.into_iter().map(|stmt| self.convert_statement(stmt)).collect()),
                     }
                 }
             }
-            deps
+            UASTStatement::While { condition, body } => {
+                TASTStatement::While { 
+                    condition, 
+                    body: body.into_iter().map(|stmt| self.convert_statement(stmt)).collect(),
+                } 
+            }
+            UASTStatement::Break => TASTStatement::Break,
+            UASTStatement::Continue => TASTStatement::Continue,
+            UASTStatement::Return(expr) => TASTStatement::Return(expr),
+            UASTStatement::Print(expr) => TASTStatement::Print(expr),
+        }
+    }
+
+    fn convert_var(&self, var: DeferredTypeVariable) -> TypedVariable {
+        let DeferredTypeVariable{name, typ} = var; 
+        TypedVariable {
+            name,
+            typ: self.convert_type(typ),         
+        }
+    }
+
+    fn convert_type(&self, deferred_type: DeferredType) -> Type {
+        match deferred_type {
+            DeferredType::Resolved(t) => t,
+            DeferredType::Unresolved(t_id) => {
+                Type::NewType(self.complete_newtypes[&t_id].clone())
+            }
+        }
+    }
+
+
+}
+
+fn get_type_size(typ: &Type) -> usize {
+    match typ {
+        Type::Integer => 8,
+        Type::Bool => 8,
+        Type::None => 0,
+        Type::NewType(NewType::Struct { fields }) => {
+            fields.into_iter().map(|(f_name, f_type)| get_type_size(f_type)).sum()            
         }
     }
 }
 
 
 
+// THE GOOD PLACE
 
-fn convert_function(func: UASTFunction, newtype_table: &HashMap<TypeIdentifier, NewType> ) -> TASTFunction {
-    let UASTFunction{name, args, body, ret_type} = func;
-    let targs: Vec<Variable> = args.into_iter().map(|t| convert_var(t, &newtype_table)).collect();
-    let tbody: Vec<TASTStatement> = body.into_iter().map(|stmt| convert_stmt(stmt, newtype_table)).collect();
-    let tret = convert_uast_type(ret_type, newtype_table); 
-    TASTFunction {
-        name,
-        args: targs,
-        body: tbody,
-        ret_type: tret,
+
+fn get_newtype_dependencies(newtype_defs: &HashMap<TypeIdentifier, DeferredNewType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
+    let mut dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = HashMap::new();
+    for (type_id, newtype) in newtype_defs {
+        let mut deps: Vec<TypeIdentifier> = Vec::new();
+        let DeferredNewType::Struct {fields} = newtype; 
+        for (_, field_type) in fields {
+            if let DeferredType::Unresolved(dep_id) = field_type {
+                deps.push(dep_id.clone());
+            }
+        }
+        dep_graph.insert(type_id.clone(), deps);
     }
+    dep_graph
 }
-
-fn convert_stmt(stmt: UASTStatement, typetable: &HashMap<TypeIdentifier, NewType>) -> TASTStatement{
-    match stmt {
-        UASTStatement::Let{ var, value } => {
-            TASTStatement::Let {
-                var: convert_var(var, &typetable),
-                value: convert_expr(value, typetable),
-            }
-        }
-        UASTStatement::Assign { target, value } => {
-            TASTStatement::Assign {
-                target: convert_expr(target, typetable),
-                value: convert_expr(value, typetable)
-            }
-        }
-        UASTStatement::If { condition, if_body, else_body } => {
-            let tast_else_body = match else_body {
-                Some(stmts) => {Some(stmts.into_iter().map(|stmt| convert_stmt(stmt, typetable)).collect())},
-                None => None
-            };
-            TASTStatement::If {
-                condition: convert_expr(condition, typetable),
-                if_body: if_body.into_iter().map(|stmt| convert_stmt(stmt, typetable)).collect(),
-                else_body:  tast_else_body,
-            }
-        }
-        UASTStatement::While {condition, body} => {
-            TASTStatement::While { 
-                condition: convert_expr(condition, typetable), 
-                    body: body.into_iter().map(|stmt| convert_stmt(stmt, typetable)).collect()
-            }
-        }
-        UASTStatement::Break => TASTStatement::Break,
-        UASTStatement::Continue => TASTStatement::Continue,
-        UASTStatement::Return(uexpr) => {
-            let texpr = convert_expr(uexpr, typetable);
-            TASTStatement::Return(texpr)
-        }
-        UASTStatement::Print(uexpr) => {
-            let texpr = convert_expr(uexpr, typetable);
-            TASTStatement::Print(texpr)
-        }
-    }
-}
-
-fn convert_expr(uexpr: UASTExpression, typetable: &HashMap<TypeIdentifier, NewType>) -> TASTExpression {
-    match uexpr {
-        UASTExpression::IntLiteral(num) => TASTExpression::IntLiteral(num),
-        UASTExpression::Variable(name) => TASTExpression::Variable(name),
-        UASTExpression::BoolTrue => TASTExpression::BoolTrue,
-        UASTExpression::BoolFalse => TASTExpression::BoolFalse,
-        UASTExpression::BinOp { op, left, right } => {
-            TASTExpression::BinOp {
-                op,
-                left: Box::new(convert_expr(*left, typetable)),
-                right: Box::new(convert_expr(*right, typetable)),
-            }
-        }
-        UASTExpression::FuncCall { funcname, args } => {
-            TASTExpression::FuncCall { 
-                funcname, 
-                args: args.into_iter().map(|arg| Box::new(convert_expr(*arg, typetable))).collect(),
-            }
-        }
-        UASTExpression::FieldAccess { expr, field } => {
-            TASTExpression::FieldAccess { 
-                expr: Box::new(convert_expr(*expr, typetable)), 
-                field
-            }
-        }
-        UASTExpression::StructLiteral { fields } => {
-            TASTExpression::StructLiteral { 
-                fields: fields.into_iter().map(|(fname, fexpr)| (fname, convert_expr(fexpr, typetable))).collect()
-            }
-        }
-    }
-}
-
-fn convert_uast_type(utype: DeferredType, newtype_table: &HashMap<TypeIdentifier, NewType>) -> Type {
-    match utype {
-        DeferredType::Resolved(typ) => typ,
-        DeferredType::Unresolved(type_id) => {
-            Type::NewType(newtype_table[&type_id].clone())
-        }
-    }
-}
-
-
-
-// Clean parts from here on !
 
 fn toposort_depgraph(depgraph: &HashMap<TypeIdentifier, Vec<TypeIdentifier>>) -> Vec<TypeIdentifier> {
     let mut indegrees: HashMap<TypeIdentifier, usize> = HashMap::new();
@@ -226,31 +198,3 @@ fn toposort_depgraph(depgraph: &HashMap<TypeIdentifier, Vec<TypeIdentifier>>) ->
         panic!("Cycle detected in type definitions");
     }
 } 
-
-
-
-fn convert_var(var: DeferredTypeVariable, newtype_table: &HashMap<TypeIdentifier, NewType> ) -> Variable {
-    let DeferredTypeVariable{name, retar_type} = var; 
-    let var_type = match retar_type {
-        DeferredType::Resolved(typ) => typ,
-        DeferredType::Unresolved(type_id) => {
-            Type::NewType(newtype_table[&type_id].clone())
-        }
-    };
-    Variable {
-        name,
-        typ: var_type.clone(),
-        size: get_type_size(&var_type),
-    }
-}
-
-fn get_type_size(typ: &Type) -> usize {
-    match typ {
-        Type::Integer => 8,
-        Type::Bool => 8,
-        Type::None => 0,
-        Type::NewType(NewType::Struct { fields }) => {
-            fields.into_iter().map(|(f_name, f_type)| get_type_size(f_type)).sum()            
-        }
-    }
-}
