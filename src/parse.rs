@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::iter::Peekable;
 
 use crate::lex::*;
-use crate::ast::*;
+use crate::uast::*;
 use crate::common::*;
 
 
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
-    defined_funcs: Vec<ASTFunction>,
-    defined_structs: HashMap<String, ASTStructDef>
+    defined_funcs: Vec<UASTFunction>,
+    defined_structs: HashMap<TypeIdentifier, UASTStructDef>
 }
 
 
@@ -23,12 +23,12 @@ impl Parser {
         }
     }
 
-    pub fn parse_program(mut self) -> ASTProgram {
+    pub fn parse_program(mut self) -> UASTProgram {
         while !self.tokens.peek().is_none() {
             match self.tokens.peek().unwrap() {
                 &Token::Struct => {
                     self.tokens.next();
-                    let struct_name = self.expect_identifier();
+                    let struct_name = self.expect_type_identifier();
                     let struct_def = self.parse_struct_def();
                     self.defined_structs.insert(struct_name, struct_def);
                 }
@@ -39,29 +39,38 @@ impl Parser {
                 _ => {panic!("Invalid token, expected struct or func def");}
             }
         }
-        ASTProgram { 
+        UASTProgram { 
             struct_defs: self.defined_structs,
             functions: self.defined_funcs,
         } 
     }
 
-    fn parse_struct_def(&mut self) -> ASTStructDef {
+    fn expect_type_identifier(&mut self) -> TypeIdentifier {
+        match self.tokens.next() {
+            Some(Token::Identifier(type_name)) => TypeIdentifier(type_name),
+            Some(Token::Int) => TypeIdentifier("int".to_string()),
+            Some(Token::Bool) => TypeIdentifier("int".to_string()),
+            _ => {panic!("Expected type identifier");}
+        }
+    }
+
+    fn parse_struct_def(&mut self) -> UASTStructDef {
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = HashMap::new();
         while self.tokens.peek() != Some(&Token::RightBrace) {
             let field_name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
-            let field_type = self.parse_type();           // TODO: do this better later
+            let field_type = self.expect_type_identifier();
             self.expect_unparametric_token(Token::Comma);
             fields.insert(field_name, field_type);
         }
         self.expect_unparametric_token(Token::RightBrace);
-        ASTStructDef { 
+        UASTStructDef { 
             fields 
         }
     }
     
-    fn parse_function(&mut self) -> ASTFunction {
+    fn parse_function(&mut self) -> UASTFunction {
         self.expect_unparametric_token(Token::Function);
         let funcname = self.expect_identifier(); 
         let mut args = Vec::new();
@@ -69,27 +78,27 @@ impl Parser {
         while self.tokens.peek() != Some(&Token::RightParen) {         // TODO: much later, this might not vibe with tuples maybe?
             let name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
-            let typ = self.parse_type();
-            args.push(Variable{name,typ});
+            let type_id = self.expect_type_identifier(); 
+            args.push(UASTVariable{name, retar_type: type_id});
             if self.tokens.peek() == Some(&Token::Comma) {
                 self.tokens.next();
             }
         }
         self.expect_unparametric_token(Token::RightParen);
-        let ret_type = match self.tokens.peek() {
+        let ret_type_id = match self.tokens.peek() {
             Some(Token::RightArrow) => {
                 self.tokens.next();
-                self.parse_type()
+                self.expect_type_identifier()
             }
             _ => {
-                Type::None
+               TypeIdentifier("none".to_string()) 
             }
         };
         let body = self.expect_block();
-        ASTFunction {name: funcname, args: args, body: body, ret_type}
+        UASTFunction {name: funcname, args: args, body: body, ret_type: ret_type_id}
     }
     
-    fn expect_block(&mut self) -> Vec<ASTStatement> {
+    fn expect_block(&mut self) -> Vec<UASTStatement> {
         let mut statements = Vec::new();
         self.expect_unparametric_token(Token::LeftBrace);
         while !matches!(self.tokens.peek(), Some(Token::RightBrace)){
@@ -99,13 +108,13 @@ impl Parser {
         statements
     }
     
-    fn parse_statement(&mut self) -> ASTStatement {
+    fn parse_statement(&mut self) -> UASTStatement {
         if self.is_expression_start() {
             let expr = self.parse_expression();
             self.expect_unparametric_token(Token::Assign);
             let assign_value = self.parse_expression();
             self.expect_unparametric_token(Token::Semicolon);
-            return ASTStatement::Assign { target: expr, value: assign_value};
+            return UASTStatement::Assign { target: expr, value: assign_value};
         }
         match self.tokens.next() {           
             Some(Token::If) => {
@@ -114,45 +123,45 @@ impl Parser {
                 let else_body =  if matches!(self.tokens.peek(), Some(Token::Else)) {
                     Some(self.expect_block())
                 } else {None};
-                ASTStatement::If {condition, if_body, else_body}
+                UASTStatement::If {condition, if_body, else_body}
             }
             Some(Token::While) => {
                 let cond = self.parse_expression();
                 let body = self.expect_block();
-                ASTStatement::While { 
+                UASTStatement::While { 
                     condition: cond, 
                     body: body,
                 }
             }
             Some(Token::Break) => {         
                 self.expect_unparametric_token(Token::Semicolon);
-                ASTStatement::Break
+                UASTStatement::Break
             }
             Some(Token::Continue) => {         
                 self.expect_unparametric_token(Token::Semicolon);
-                ASTStatement::Continue
+                UASTStatement::Continue
             }
             Some(Token::Return) => {
                 let return_expr = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
-                ASTStatement::Return(return_expr)
+                UASTStatement::Return(return_expr)
             }
             Some(Token::Print) => {
                 self.expect_unparametric_token(Token::LeftParen);
                 let expr = self.parse_expression();
                 self.expect_unparametric_token(Token::RightParen);
                 self.expect_unparametric_token(Token::Semicolon);        
-                ASTStatement::Print(expr)
+                UASTStatement::Print(expr)
             },
             Some(Token::Let) => {
                 let varname = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
-                let typ = self.parse_type();
-                let var = Variable{name: varname, typ: typ};
+                let type_identifier = self.expect_type_identifier();
+                let var = UASTVariable{name: varname, retar_type: type_identifier};
                 self.expect_unparametric_token(Token::Assign);
                 let value = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
-                ASTStatement::Let { var: var, value}
+                UASTStatement::Let { var: var, value}
             },
             other => {                                      
                 println!("{:#?}", self.defined_funcs);
@@ -161,7 +170,7 @@ impl Parser {
         }
     } 
     
-    fn parse_funccall_args(&mut self) -> Vec<Box<ASTExpression>> {
+    fn parse_funccall_args(&mut self) -> Vec<Box<UASTExpression>> {
         let mut args = Vec::new();
         if self.is_expression_start() {
             args.push(Box::new(self.parse_expression()));
@@ -173,18 +182,10 @@ impl Parser {
         args
     }
     
-    fn parse_expression(&mut self) -> ASTExpression {
+    fn parse_expression(&mut self) -> UASTExpression {
         self.parse_expression_with_precedence(0)
     }
-
-    fn parse_type(&mut self) -> Type {
-        match self.tokens.next() {
-            Some(Token::Int) => {Type::Integer},
-            Some(Token::Bool) => {Type::Bool},
-            other => {panic!("Unexpected token in typing: {:?}", other);}
-        }
-    }
-
+    
     fn expect_unparametric_token(&mut self, expected_token: Token) {
         if self.tokens.peek() != Some(&expected_token) {
             panic!("Expected token {:?}, got token {:?}.", expected_token, self.tokens.peek().unwrap()); 
@@ -207,7 +208,7 @@ impl Parser {
         matches!(self.tokens.peek(), Some(Token::IntLiteral(_) | Token::Identifier(_) | Token::LeftParen))
     }
     
-    fn parse_expression_with_precedence(&mut self, current_level: u8) -> ASTExpression {
+    fn parse_expression_with_precedence(&mut self, current_level: u8) -> UASTExpression {
         let mut current_expr = self.parse_expression_atom();
         loop {
             let prec = match self.tokens.peek() {
@@ -222,22 +223,22 @@ impl Parser {
             let optoken = self.tokens.next().unwrap();  
             let op = map_binop_token(&optoken);
             let next_expr = self.parse_expression_with_precedence(prec + 1);
-            current_expr = ASTExpression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr) };
+            current_expr = UASTExpression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr) };
         }
         current_expr
     }
     
-    fn parse_expression_atom(&mut self) -> ASTExpression {
+    fn parse_expression_atom(&mut self) -> UASTExpression {
          match self.tokens.next() {
-            Some(Token::IntLiteral(int)) => {ASTExpression::IntLiteral(int)},
+            Some(Token::IntLiteral(int)) => {UASTExpression::IntLiteral(int)},
             Some(Token::Identifier(name)) => {
                 if self.tokens.peek() == Some(&Token::LeftParen) {        // Function call 
                     self.tokens.next();
                     let args = self.parse_funccall_args(); 
                     self.expect_unparametric_token(Token::RightParen);
-                    ASTExpression::FuncCall { funcname: name, args: args}
+                    UASTExpression::FuncCall { funcname: name, args: args}
                 } else {
-                    ASTExpression::Variable(name)
+                    UASTExpression::Variable(name)
                 }
             },
             Some(Token::LeftParen) => {
@@ -245,8 +246,8 @@ impl Parser {
                 self.expect_unparametric_token(Token::RightParen);
                 paren_expr
             },
-            Some(Token::True) => {ASTExpression::BoolTrue},
-            Some(Token::False) => {ASTExpression::BoolFalse},
+            Some(Token::True) => {UASTExpression::BoolTrue},
+            Some(Token::False) => {UASTExpression::BoolFalse},
             other => {
                 panic!("Unexpected token {:?} during expression parsing", other);
             },

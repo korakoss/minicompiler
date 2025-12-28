@@ -6,7 +6,7 @@ pub enum Type {
     Bool,
     None,
     Derived {
-        name: String,
+        name: TypeIdentifier,
         typ: DerivedType,
     }
 }
@@ -80,3 +80,6 @@ pub struct FuncSignature {
     pub argtypes: Vec<Type>,
     // NOTE: maybe return type sometime?
 }
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct TypeIdentifier(pub String); 

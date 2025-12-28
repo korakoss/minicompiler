@@ -3,13 +3,14 @@
 src_path="./yum/src/$1.yum"
 ass_path="./yum/ass/$1.s"
 tok_path="./yum/tok/$1.txt"
-ast_path="./yum/ast/$1.txt"
+uast_path="./yum/uast/$1.txt"
+tast_path="./yum/tast/$1.txt"
 hir_path="./yum/hir/$1.txt"
 ex_path="./yum/bin/$1" 
 
 rm -f "$ass_path" "$tok_path" "$ast_path" "$hir_path" "$ex_path"
 
-RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" "$ass_path" "$tok_path" "$ast_path" "$hir_path"
+RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" "$ass_path" "$tok_path" "$uast_path" "$tast_path" "$hir_path"
 as -o TEMP.o "$ass_path" 
 gcc -o "$ex_path" TEMP.o
 rm TEMP.o

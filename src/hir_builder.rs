@@ -5,8 +5,8 @@ use std::{collections::HashMap};
 
 
     
-pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
-    let ASTProgram{functions, struct_defs} = ast;
+pub fn lower_ast(ast: TASTProgram) -> HIRProgram {
+    let TASTProgram{functions, struct_defs} = ast;
 
     let signature_map: HashMap<FuncSignature, (FuncId, Type)> = functions.iter().enumerate().map(|(i,f)| (f.get_signature(), (FuncId(i), f.ret_type.clone()))).collect();
     
