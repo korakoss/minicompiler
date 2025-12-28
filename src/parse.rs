@@ -29,7 +29,7 @@ impl Parser {
                 &Token::Struct => {
                     self.tokens.next();
                     let struct_name = self.expect_type_identifier();
-                    let struct_def = self.parse_struct_def();
+                    let struct_def = self.parse_struct_typedef();
                     self.defined_structs.insert(struct_name, struct_def);
                 }
                 &Token::Function => {
@@ -54,7 +54,7 @@ impl Parser {
         }
     }
 
-    fn parse_struct_def(&mut self) -> UASTStructDef {
+    fn parse_struct_typedef(&mut self) -> UASTStructDef {
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = HashMap::new();
         while self.tokens.peek() != Some(&Token::RightBrace) {
@@ -158,7 +158,6 @@ impl Parser {
                 self.expect_unparametric_token(Token::Colon);
                 let type_identifier = self.expect_type_identifier();
                 let var = UASTVariable{name: varname, retar_type: type_identifier};
-                self.expect_unparametric_token(Token::Assign);
                 let value = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
                 UASTStatement::Let { var: var, value}
@@ -183,7 +182,26 @@ impl Parser {
     }
     
     fn parse_expression(&mut self) -> UASTExpression {
-        self.parse_expression_with_precedence(0)
+        if self.tokens.peek() == Some(&Token::LeftBrace) {      // Struct def
+            let fields = self.parse_struct_init();
+            UASTExpression::StructInstance{fields}
+        } else {
+            self.parse_expression_with_precedence(0)
+        }
+    }
+
+    fn parse_struct_init(&mut self) -> HashMap<String, UASTExpression>{
+        self.expect_unparametric_token(Token::LeftBrace);
+        let mut fields = HashMap::new();
+        while self.tokens.peek() != Some(&Token::RightBrace) {
+            let field_name = self.expect_identifier();
+            self.expect_unparametric_token(Token::Colon);
+            let field_value = self.parse_expression();
+            self.expect_unparametric_token(Token::Comma);
+            fields.insert(field_name, field_value);
+        }
+        self.expect_unparametric_token(Token::RightBrace);
+        fields
     }
     
     fn expect_unparametric_token(&mut self, expected_token: Token) {
