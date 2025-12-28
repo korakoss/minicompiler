@@ -4,7 +4,7 @@ use std::env;
 mod common;
 mod uast;
 mod tast;
-//mod hir;
+mod hir;
 
 mod lex;
 use crate::lex::*;
@@ -14,8 +14,8 @@ use parse::*;
 
 mod type_ast;
 use type_ast::*;
-//mod hir_builder;
-//use hir_builder::*;
+mod hir_builder;
+use hir_builder::*;
 
 //mod hir_codegen;
 //use hir_codegen::*;
@@ -43,9 +43,9 @@ fn main() {
     
     let tast = type_ast(uast);
     fs::write(tast_filepath, format!("{:#?}", tast)).unwrap();
-    //let hir = lower_ast(ast);
 
-    //fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
+    let hir = lower_ast(tast);
+    fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
     
     //let mut hircomp = HIRCompiler::new(hir);
     //let assembly = hircomp.compile();

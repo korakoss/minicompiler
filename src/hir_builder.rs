@@ -1,4 +1,4 @@
-use crate::ast::*;
+use crate::tast::*;
 use crate::hir::*;
 use crate::common::*;
 use std::{collections::HashMap};
@@ -37,8 +37,8 @@ struct HIRFunctionBuilder {
 
 impl HIRFunctionBuilder {
     
-    fn lower_function(function: ASTFunction, signature_map: HashMap<FuncSignature, (FuncId, Type)>) -> HIRFunction {
-        let ASTFunction{name, args, body, ret_type} = function;
+    fn lower_function(function: TASTFunction, signature_map: HashMap<FuncSignature, (FuncId, Type)>) -> HIRFunction {
+        let TASTFunction{name, args, body, ret_type} = function;
        
         let mut builder = HIRFunctionBuilder {
             signature_map: signature_map,
@@ -59,9 +59,9 @@ impl HIRFunctionBuilder {
     }
 
 
-    fn lower_statement(&mut self, statement: ASTStatement) -> HIRStatement { 
+    fn lower_statement(&mut self, statement: TASTStatement) -> HIRStatement { 
         let hir_statement = match statement {
-            ASTStatement::Let{var, value} => {
+            TASTStatement::Let{var, value} => {
                 let hir_val = self.lower_expression(value);
                 let varid = self.add_var_in_scope(var);
                 HIRStatement::Let { 
@@ -69,9 +69,9 @@ impl HIRFunctionBuilder {
                     value: hir_val, 
                 }
             },
-            ASTStatement::Assign { target, value } => {
+            TASTStatement::Assign { target, value } => {
                 match target {
-                    ASTExpression::Variable(var_name) => {
+                    TASTExpression::Variable(var_name) => {
                         let var_id = self.get_var_in_scope(&var_name);
                         let hir_expr = self.lower_expression(value);
 
@@ -87,7 +87,7 @@ impl HIRFunctionBuilder {
                     _ => {panic!("Invalid assignment target");}             // NOTE: eventually other lvalues too
                 }
             },
-            ASTStatement::If { condition, if_body, else_body } => {
+            TASTStatement::If { condition, if_body, else_body } => {
                 let hir_condition = self.lower_expression(condition);
                 if hir_condition.typ != Type::Bool {
                     panic!("If condition expression not boolean");
@@ -101,7 +101,7 @@ impl HIRFunctionBuilder {
                 };
                 HIRStatement::If { condition: hir_condition, if_body: hir_if_body, else_body: hir_else_body}
             },
-            ASTStatement::While { condition, body } => {
+            TASTStatement::While { condition, body } => {
                 let hir_condition = self.lower_expression(condition);
                 if hir_condition.typ != Type::Bool {
                     panic!("If condition expression not boolean");
@@ -109,26 +109,26 @@ impl HIRFunctionBuilder {
                 let hir_body = self.lower_block(body); 
                 HIRStatement::While { condition: hir_condition, body: hir_body}
             },
-            ASTStatement::Break => {
+            TASTStatement::Break => {
                 if self.loop_nest_level < 1{
                     panic!("Break statement detected out of loop");
                 }
                 HIRStatement::Break
             },
-            ASTStatement::Continue => {
+            TASTStatement::Continue => {
                 if self.loop_nest_level < 1{
                     panic!("Break statement detected out of loop");
                 }
                 HIRStatement::Continue
             },
-            ASTStatement::Return(expr) => {
+            TASTStatement::Return(expr) => {
                 let hir_expr = self.lower_expression(expr);
                 if hir_expr.typ != self.ret_type {
                     panic!("Type of return expression doesn't match function signature");
                 }
                 HIRStatement::Return(hir_expr)
             },
-            ASTStatement::Print(expr) => {
+            TASTStatement::Print(expr) => {
                 // TODO: this needs subtler type shit later
                 let hir_expr = self.lower_expression(expr);
                 HIRStatement::Print(hir_expr)
@@ -137,22 +137,22 @@ impl HIRFunctionBuilder {
         hir_statement
     }
     
-    fn lower_block(&mut self, statements: Vec<ASTStatement>) -> Vec<HIRStatement>{
+    fn lower_block(&mut self, statements: Vec<TASTStatement>) -> Vec<HIRStatement>{
         self.scope_var_stack.push(HashMap::new());
         let hir_stmts = statements.into_iter().map(|stmt| self.lower_statement(stmt)).collect();
         self.scope_var_stack.pop();
         hir_stmts
     }
 
-    fn lower_expression(&self, expression: ASTExpression) -> HIRExpression {
+    fn lower_expression(&self, expression: TASTExpression) -> HIRExpression {
         match expression {
-            ASTExpression::IntLiteral(num) => {
+            TASTExpression::IntLiteral(num) => {
                 HIRExpression{
                     typ: Type::Integer,
                     expr: HIRExpressionKind::IntLiteral(num),
                 }
             },
-            ASTExpression::Variable(name) => {
+            TASTExpression::Variable(name) => {
                 let var_id = self.get_var_in_scope(&name);
                 let var_type = self.variables.get(&var_id).unwrap().typ.clone();
                 HIRExpression {
@@ -160,7 +160,7 @@ impl HIRFunctionBuilder {
                     expr: HIRExpressionKind::Variable(var_id),
                 }
             },
-            ASTExpression::BinOp {op, left, right} => {
+            TASTExpression::BinOp {op, left, right} => {
                 let left_hir = self.lower_expression(*left);
                 let right_hir = self.lower_expression(*right);
                 let inferred_type = binop_typecheck(&op, &left_hir.typ, &right_hir.typ).expect("Binop typecheck error");  
@@ -173,7 +173,7 @@ impl HIRFunctionBuilder {
                     }
                 }
             },
-            ASTExpression::FuncCall {funcname, args} => {
+            TASTExpression::FuncCall {funcname, args} => {
                 let hir_args: Vec<HIRExpression> = args.into_iter().map(|x| self.lower_expression(*x)).collect();
                 let signature = FuncSignature {
                     name: funcname,
@@ -185,13 +185,13 @@ impl HIRFunctionBuilder {
                     expr: HIRExpressionKind::FuncCall { funcid: func_id.clone(), args: hir_args},
                 }
             }
-            ASTExpression::BoolTrue => {
+            TASTExpression::BoolTrue => {
                 HIRExpression{
                     typ: Type::Bool,
                     expr: HIRExpressionKind::BoolTrue,
                 }
             }
-            ASTExpression::BoolFalse => {
+            TASTExpression::BoolFalse => {
                 HIRExpression{
                     typ: Type::Bool,
                     expr: HIRExpressionKind::BoolFalse,
