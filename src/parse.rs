@@ -79,7 +79,7 @@ impl Parser {
             let name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
             let type_id = self.expect_type_identifier(); 
-            args.push(UASTVariable{name, retar_type: type_id});
+            args.push(DeferredTypeVariable{name, retar_type: type_id});
             if self.tokens.peek() == Some(&Token::Comma) {
                 self.tokens.next();
             }
@@ -158,13 +158,13 @@ impl Parser {
                 self.expect_unparametric_token(Token::Colon);
                 let type_identifier = self.expect_type_identifier();
 
-                let var = UASTVariable{name: varname, retar_type: type_identifier.clone()};
+                let var = DeferredTypeVariable{name: varname, retar_type: type_identifier.clone()};
                 self.expect_unparametric_token(Token::Assign);
                 let stmt = if self.tokens.peek() == Some(&Token::LeftBrace) {      // Struct def
                     let fields = self.parse_struct_init();
                     UASTStatement::LetStruct {
                         var,
-                        value: UASTStruct{
+                        value: UASTStructLiteral{
                             retar_type: type_identifier,
                             fields: fields,
                         }

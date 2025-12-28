@@ -75,14 +75,17 @@ pub enum TASTExpression {
     FieldAccess {
         expr: Box<TASTExpression>,
         field: String,
-    }
+    },
 
+    StructLiteral {
+        fields: HashMap<String, TASTExpression>,
+    },
     // TODO: negation 
 }
 
 #[derive(Debug, Clone)]
 pub struct TASTStruct {
-    pub typ: TypeIdentifier,
+    pub typ: Type,
     pub fields: HashMap<String, TASTExpression>,
 }
 

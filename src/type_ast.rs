@@ -17,7 +17,7 @@ pub fn type_ast(uast: UASTProgram) -> TASTProgram {
 }
 
 
-fn convert_newtype_defs(newtype_defs: HashMap<TypeIdentifier, UASTNewType>) -> HashMap<TypeIdentifier, NewType> {
+fn convert_newtype_defs(newtype_defs: HashMap<TypeIdentifier, DeferredNewType>) -> HashMap<TypeIdentifier, NewType> {
 
     let dep_graph = build_newtype_depgraph(newtype_defs.clone());
     let topo_order = toposort_depgraph(&dep_graph);
@@ -27,7 +27,7 @@ fn convert_newtype_defs(newtype_defs: HashMap<TypeIdentifier, UASTNewType>) -> H
     for type_id in topo_order { 
         let newtype = newtype_defs.get(&type_id).unwrap();
         match newtype {
-            UASTNewType::Struct { fields } => {
+            DeferredNewType::Struct { fields } => {
                 result.insert(type_id, convert_struct_typedef(fields.clone(), &result));
             }
         }
@@ -35,12 +35,12 @@ fn convert_newtype_defs(newtype_defs: HashMap<TypeIdentifier, UASTNewType>) -> H
     result
 }
 
-fn convert_struct_typedef(fields: HashMap<String, UASTType>, prev_types_map: &HashMap<TypeIdentifier, NewType>) -> NewType {
+fn convert_struct_typedef(fields: HashMap<String, DeferredType>, prev_types_map: &HashMap<TypeIdentifier, NewType>) -> NewType {
     let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
     for (fname, ftype) in fields {
         let actual_type = match ftype {
-            UASTType::Defined(typ) => typ,
-            UASTType::Deferred(type_id) => Type::NewType(prev_types_map[&type_id].clone()),
+            DeferredType::Resolved(typ) => typ,
+            DeferredType::Unresolved(type_id) => Type::NewType(prev_types_map[&type_id].clone()),
         };
         tfields.insert(fname, actual_type);
     }
@@ -49,20 +49,20 @@ fn convert_struct_typedef(fields: HashMap<String, UASTType>, prev_types_map: &Ha
     }
 }
 
-fn build_newtype_depgraph(newtype_defs: HashMap<TypeIdentifier, UASTNewType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
+fn build_newtype_depgraph(newtype_defs: HashMap<TypeIdentifier, DeferredNewType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
     let all_def_ids: Vec<TypeIdentifier> = newtype_defs.keys().cloned().collect();
     let dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = newtype_defs.iter().map(|(id, def)| (id.clone(), extract_deps(def, all_def_ids.clone()))).collect();
     dep_graph 
 }
 
-fn extract_deps(struct_def: &UASTNewType, all_defn_ids: Vec<TypeIdentifier>) -> Vec<TypeIdentifier> {
+fn extract_deps(struct_def: &DeferredNewType, all_defn_ids: Vec<TypeIdentifier>) -> Vec<TypeIdentifier> {
     let mut deps = Vec::new();
     match struct_def {
-        UASTNewType::Struct { fields } => {
+        DeferredNewType::Struct { fields } => {
             for (_, field_type) in fields.iter() {
                 match field_type {
-                    UASTType::Defined(_) => {continue;},
-                    UASTType::Deferred(type_id) => {
+                    DeferredType::Resolved(_) => {continue;},
+                    DeferredType::Unresolved(type_id) => {
                         if !all_defn_ids.contains(type_id) {
                             panic!("Unrecognized type name");
                         }
@@ -81,8 +81,8 @@ fn extract_deps(struct_def: &UASTNewType, all_defn_ids: Vec<TypeIdentifier>) -> 
 fn convert_function(func: UASTFunction, newtype_table: &HashMap<TypeIdentifier, NewType> ) -> TASTFunction {
     let UASTFunction{name, args, body, ret_type} = func;
     let targs: Vec<Variable> = args.into_iter().map(|t| convert_var(t, &newtype_table)).collect();
-    let tbody: Vec<TASTStatement> = body.into_iter().map(|stmt| convert_stmt(stmt, typetable)).collect();
-    let tret = typetable[&ret_type].clone();
+    let tbody: Vec<TASTStatement> = body.into_iter().map(|stmt| convert_stmt(stmt, newtype_table)).collect();
+    let tret = convert_uast_type(ret_type, newtype_table); 
     TASTFunction {
         name,
         args: targs,
@@ -98,11 +98,6 @@ fn convert_stmt(stmt: UASTStatement, typetable: &HashMap<TypeIdentifier, NewType
                 var: convert_var(var, &typetable),
                 value: convert_expr(value, typetable),
             }
-        }
-        UASTStatement::LetStruct {var,value} => {
-            TASTStatement::LetStruct { 
-                var: convert_var(var, &typetable),
-                value: convert_struct(value, typetable) }
         }
         UASTStatement::Assign { target, value } => {
             TASTStatement::Assign {
@@ -165,20 +160,21 @@ fn convert_expr(uexpr: UASTExpression, typetable: &HashMap<TypeIdentifier, NewTy
                 field
             }
         }
+        UASTExpression::StructLiteral { fields } => {
+            TASTExpression::StructLiteral { 
+                fields: fields.into_iter().map(|(fname, fexpr)| (fname, convert_expr(fexpr, typetable))).collect()
+            }
+        }
     }
 }
 
-fn convert_struct(ustr: UASTStruct, newtype_table: &HashMap<TypeIdentifier, NewType>) -> TASTStruct {
-    let UASTStruct{retar_type, fields} = ustr;
-    TASTStruct {
-        typ: retar_type,
-        fields: fields.into_iter().map(|(fname, expr)| (fname, convert_expr(expr, typetable))).collect(),
+fn convert_uast_type(utype: DeferredType, newtype_table: &HashMap<TypeIdentifier, NewType>) -> Type {
+    match utype {
+        DeferredType::Resolved(typ) => typ,
+        DeferredType::Unresolved(type_id) => {
+            Type::NewType(newtype_table[&type_id].clone())
+        }
     }
-}
-
-
-fn convert_uast_type(utyp: UASTType) -> Type {
-    unimplemented!();
 }
 
 
@@ -233,11 +229,11 @@ fn toposort_depgraph(depgraph: &HashMap<TypeIdentifier, Vec<TypeIdentifier>>) ->
 
 
 
-fn convert_var(var: UASTVariable, newtype_table: &HashMap<TypeIdentifier, NewType> ) -> Variable {
-    let UASTVariable{name, retar_type} = var; 
+fn convert_var(var: DeferredTypeVariable, newtype_table: &HashMap<TypeIdentifier, NewType> ) -> Variable {
+    let DeferredTypeVariable{name, retar_type} = var; 
     let var_type = match retar_type {
-        UASTType::Defined(typ) => typ,
-        UASTType::Deferred(type_id) => {
+        DeferredType::Resolved(typ) => typ,
+        DeferredType::Unresolved(type_id) => {
             Type::NewType(newtype_table[&type_id].clone())
         }
     };

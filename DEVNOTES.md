@@ -18,5 +18,8 @@ implement structs
 - then just decide on some random uniform layout and do the codegen. boom.
 - probably parsing needs to be rolled back to directly parsing out primitive types            
 
+- put the DeferredType in a central place
+    - up until HIR (or wherever we determine layouts) it's best to keep it indirect like that
+
 ## Details
 - hashmap.insert() overwrites -- pay more agttention to this everywhere

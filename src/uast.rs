@@ -4,28 +4,24 @@ use crate::common::*;
 
 #[derive(Debug, Clone)]
 pub struct UASTProgram {
-    pub type_defs: HashMap<TypeIdentifier, UASTNewType>,
+    pub type_defs: HashMap<TypeIdentifier, DeferredNewType>,
     pub functions: Vec<UASTFunction>,
 }
 
 #[derive(Debug, Clone)]
 pub struct UASTFunction {
     pub name: String,
-    pub args: Vec<UASTVariable>,
+    pub args: Vec<DeferredTypeVariable>,
     pub body: Vec<UASTStatement>,
-    pub ret_type: TypeIdentifier,
+    pub ret_type: DeferredType,
 }
 
 #[derive(Debug, Clone)]
 pub enum UASTStatement {
     Let {
-        var: UASTVariable,
+        var: DeferredTypeVariable,
         value: UASTExpression,
         // TODO: type field
-    },
-    LetStruct {
-        var: UASTVariable,
-        value: UASTStruct,
     },
     Assign {
         target: UASTExpression,         
@@ -65,32 +61,36 @@ pub enum UASTExpression {
     FieldAccess {
         expr: Box<UASTExpression>,
         field: String,
+    },
+
+    StructLiteral {
+        fields: HashMap<String, UASTExpression>,
     }
     // TODO: negation 
 }
 
 #[derive(Debug, Clone)]
-pub enum UASTType {
-    Defined(Type),
-    Deferred(TypeIdentifier)
+pub enum DeferredType {
+    Resolved(Type),
+    Unresolved(TypeIdentifier)
 }
 
 #[derive(Debug, Clone)]
-pub enum UASTNewType {
+pub enum DeferredNewType {
     Struct {
-        fields: HashMap<String, UASTType>
+        fields: HashMap<String, DeferredType>
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct UASTStruct {
-    pub retar_type: UASTType,
+pub struct UASTStructLiteral {
+    pub retar_type: DeferredType,
     pub fields: HashMap<String, UASTExpression>,
 }
 
 #[derive(Debug, Clone)]
-pub struct UASTVariable {
+pub struct DeferredTypeVariable {
     pub name: String,
-    pub retar_type: UASTType,
+    pub retar_type: DeferredType,
 }
 

@@ -1,5 +1,13 @@
 use std::collections::BTreeMap;
-use std::sync::LazyLock;
+
+
+#[derive(Debug, Clone)]
+pub struct Variable {
+    pub name: String,
+    pub typ: Type,
+    pub size: usize,
+    // TODO: mutable, etc
+}
 
 #[derive(PartialEq,Eq, Debug, Hash, Clone)]
 pub enum Type {
@@ -18,13 +26,6 @@ pub enum NewType {
 
 
 
-#[derive(Debug, Clone)]
-pub struct Variable {
-    pub name: String,
-    pub typ: Type,
-    pub size: usize,
-    // TODO: mutable, etc
-}
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
@@ -42,6 +43,21 @@ pub enum BinaryOperator {
 }
 
 // TODO: eventually also UnaryOperation (eg. negation)
+
+
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FuncSignature {
+    pub name: String,
+    pub argtypes: Vec<Type>,
+    // NOTE: maybe return type sometime?
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct TypeIdentifier(pub String); 
+
+
+
 
 
 pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type) -> Option<Type> {
@@ -72,18 +88,4 @@ pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type)
     }
 }
 
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FuncSignature {
-    pub name: String,
-    pub argtypes: Vec<Type>,
-    // NOTE: maybe return type sometime?
-}
-
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct TypeIdentifier(pub String); 
-
-pub static INT_ID: LazyLock<TypeIdentifier> = LazyLock::new(|| TypeIdentifier("int".into()));
-pub static BOOL_ID: LazyLock<TypeIdentifier> = LazyLock::new(|| TypeIdentifier("bool".into()));
-pub static NONE_ID: LazyLock<TypeIdentifier> = LazyLock::new(|| TypeIdentifier("none".into()));
 
