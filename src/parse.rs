@@ -82,7 +82,7 @@ impl Parser {
                 self.expect_deferred_type()
             },
             _ => {
-                DeferredType::Resolved(Type::None) 
+                DeferredType::Resolved(Type::Primitive(PrimitiveType::None)) 
             }
         };
         let body = self.parse_statement_block();
@@ -284,8 +284,8 @@ impl Parser {
     fn expect_deferred_type(&mut self) -> DeferredType {
         let token = self.tokens.next().unwrap(); 
         match token {
-            Token::Int => DeferredType::Resolved(Type::Integer),
-            Token::Bool => DeferredType::Resolved(Type::Bool),
+            Token::Int => DeferredType::Resolved(Type::Primitive(PrimitiveType::Integer)),
+            Token::Bool => DeferredType::Resolved(Type::Primitive(PrimitiveType::Bool)),
             Token::Identifier(type_id) => DeferredType::Unresolved(TypeIdentifier(type_id)),
             _ => {panic!("Expected primitive type or identifer token, got {:?}", token);}
         }

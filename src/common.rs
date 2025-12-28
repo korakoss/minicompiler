@@ -19,10 +19,15 @@ pub struct Variable<T> {
 }
 
 #[derive(PartialEq,Eq, Debug, Hash, Clone)]
-pub enum Type {
+pub enum PrimitiveType {
     Integer,
     Bool,
     None,
+}
+
+#[derive(PartialEq,Eq, Debug, Hash, Clone)]
+pub enum Type {
+    Primitive(PrimitiveType), 
     NewType(NewType<Type>),
 }
 
@@ -77,8 +82,8 @@ pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type)
     
     match op {
         &BinaryOperator::Add | &BinaryOperator::Sub | &BinaryOperator::Mul| &BinaryOperator::Modulo=>{
-            if left_type == &Type::Integer && right_type == &Type::Integer {
-                Some(Type::Integer)
+            if left_type == &Type::Primitive(PrimitiveType::Integer) && right_type == &Type::Primitive(PrimitiveType::Integer){
+                Some(Type::Primitive(PrimitiveType::Integer))
             } else {
                 None
             }
@@ -86,14 +91,14 @@ pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type)
         &BinaryOperator::Equals => {
             if left_type == right_type {
                 // TODO: careful later
-                Some(Type::Bool)
+                Some(Type::Primitive(PrimitiveType::Bool))
             } else {
                 None
             }
         }
         &BinaryOperator::Less => {
-            if left_type == &Type::Integer && right_type == &Type::Integer {
-                Some(Type::Bool)
+            if left_type == &Type::Primitive(PrimitiveType::Integer) && right_type == &Type::Primitive(PrimitiveType::Integer){
+                Some(Type::Primitive(PrimitiveType::Bool))
             } else {
                 None
             }

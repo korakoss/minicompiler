@@ -13,8 +13,8 @@ use parse::*;
 mod convert_ast;
 use convert_ast::*;
 
-/*
 mod hir;
+/*
 mod make_hir;
 use hir_builder::*;
 

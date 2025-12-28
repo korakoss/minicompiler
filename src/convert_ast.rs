@@ -122,6 +122,7 @@ impl ASTConverter {
 
 }
 
+/*
 fn get_type_size(typ: &Type) -> usize {
     match typ {
         Type::Integer => 8,
@@ -132,7 +133,7 @@ fn get_type_size(typ: &Type) -> usize {
         }
     }
 }
-
+*/
 
 
 // THE GOOD PLACE

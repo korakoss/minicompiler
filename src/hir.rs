@@ -86,3 +86,7 @@ pub struct VarId(pub usize);
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct FuncId(pub usize);
 
+
+//pub enum HIRVariable {
+    
+
