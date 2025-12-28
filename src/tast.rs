@@ -71,6 +71,12 @@ pub enum TASTExpression {
     },
     BoolTrue,
     BoolFalse,
+    
+    FieldAccess {
+        expr: Box<TASTExpression>,
+        field: String,
+    }
+
     // TODO: negation 
 }
 

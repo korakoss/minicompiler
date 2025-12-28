@@ -1,7 +1,7 @@
-use std::{collections::HashMap};
+use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
-#[derive(PartialEq,Eq, Hash, Debug, Clone)]
+#[derive(PartialEq,Eq, Debug, Hash, Clone)]
 pub enum Type {
     Integer,
     Bool,
@@ -12,10 +12,10 @@ pub enum Type {
     }
 }
 
-#[derive(PartialEq,Eq, Hash, Debug, Clone)]
+#[derive(PartialEq,Eq, Debug, Hash, Clone)]
 pub enum DerivedType {
     Struct {
-        fields: Vec<(String, Type)>,
+        fields: BTreeMap<String, Type>,
     }
 }
 

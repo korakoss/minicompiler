@@ -166,7 +166,7 @@ impl HIRFunctionBuilder {
             expr:HIRExpressionKind::Struct { fields: checked_fields } 
         }
     }
-    
+
     fn lower_block(&mut self, statements: Vec<TASTStatement>) -> Vec<HIRStatement>{
         self.scope_var_stack.push(HashMap::new());
         let hir_stmts = statements.into_iter().map(|stmt| self.lower_statement(stmt)).collect();
@@ -225,6 +225,18 @@ impl HIRFunctionBuilder {
                 HIRExpression{
                     typ: Type::Bool,
                     expr: HIRExpressionKind::BoolFalse,
+                }
+            }
+            TASTExpression::FieldAccess { expr, field } => {
+                let hir_expr = self.lower_expression(*expr);
+                let Type::Derived { name, typ: DerivedType::Struct { fields } } = hir_expr.typ.clone() else { panic!("Access attempted on non-struct expression");}; 
+                let ftype = fields.get(&field).expect("Nonexistent field bruh").clone();
+                HIRExpression {
+                    typ: ftype,
+                    expr: HIRExpressionKind::FieldAccess { 
+                        expr: Box::new(hir_expr), 
+                        field: field, 
+                    }
                 }
             }
         }

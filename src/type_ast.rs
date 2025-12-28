@@ -129,6 +129,12 @@ fn convert_expr(uexpr: UASTExpression, typetable: &HashMap<TypeIdentifier, Type>
                 args: args.into_iter().map(|arg| Box::new(convert_expr(*arg, typetable))).collect(),
             }
         }
+        UASTExpression::FieldAccess { expr, field } => {
+            TASTExpression::FieldAccess { 
+                expr: Box::new(convert_expr(*expr, typetable)), 
+                field
+            }
+        }
     }
 }
 

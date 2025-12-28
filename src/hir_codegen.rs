@@ -189,6 +189,9 @@ impl HIRCompiler {
             HIRExpressionKind::Struct { fields } => {
                 unimplemented!();
             }
+            HIRExpressionKind::FieldAccess { expr, field } => {
+                unimplemented!();
+            }
         }
     }
 

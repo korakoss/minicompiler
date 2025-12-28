@@ -239,18 +239,30 @@ impl Parser {
         let mut current_expr = self.parse_expression_atom();
         loop {
             let prec = match self.tokens.peek() {
-                Some(Token::Plus | Token::Minus | Token::Multiply | Token::Equals | Token::Less | Token::Modulo) => {
-                    get_binop_precedence(self.tokens.peek().unwrap())
+                Some(Token::Plus | Token::Minus | Token::Multiply | Token::Equals | Token::Less | Token::Modulo | Token::Dot) => {
+                    get_connector_precedence(self.tokens.peek().unwrap())
                 }
+                
                 _ => break,
             };
             if prec < current_level {
                 break;
             }
-            let optoken = self.tokens.next().unwrap();  
-            let op = map_binop_token(&optoken);
-            let next_expr = self.parse_expression_with_precedence(prec + 1);
-            current_expr = UASTExpression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr) };
+            let conn_token = self.tokens.next().unwrap();  
+            current_expr = match conn_token.clone() {
+                Token::Dot => {
+                    let field = self.expect_identifier();
+                    UASTExpression::FieldAccess { 
+                        expr: Box::new(current_expr), 
+                        field 
+                    }
+                }
+                _ => {
+                    let op = map_binop_token(&conn_token);
+                    let next_expr = self.parse_expression_with_precedence(prec + 1);
+                    UASTExpression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr) }
+                }
+            };
         }
         current_expr
     }
@@ -285,10 +297,11 @@ impl Parser {
 
 // TODO: instead of these two funcs, maybe we should make a big binop info table with rows like: Token, Binoptype,precedence 
 
-fn get_binop_precedence(op_token: &Token) -> u8 {
+fn get_connector_precedence(op_token: &Token) -> u8 {
     match op_token {
-        &Token::Plus| Token::Minus => 1,
+        &Token::Dot => 3, 
         &Token::Multiply | Token::Modulo => 2,
+        &Token::Plus| Token::Minus => 1,
         &Token::Equals | Token::Less => 0,
         _ => panic!("Unexpected token found where binary operator was expected"), 
     }

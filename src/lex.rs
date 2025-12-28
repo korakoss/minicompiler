@@ -18,6 +18,7 @@ pub enum Token {
     RightBrace,
     Comma,
     Colon,
+    Dot,
 
     // Values 
     Identifier(String),
@@ -140,6 +141,7 @@ pub fn lex(program: &str) -> Vec<Token> {
                 '%' => Token::Modulo,
                 ',' => Token::Comma,
                 ':' => Token::Colon,
+                '.' => Token::Dot,
                 _ => {panic!("Unexpected character: {}",c)},
             };
             chars.next();

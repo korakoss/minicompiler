@@ -67,6 +67,10 @@ pub enum HIRExpressionKind {
     BoolFalse,
     Struct {
         fields: HashMap<String, HIRExpression>
+    },
+    FieldAccess {
+        expr: Box<HIRExpression>,
+        field: String,
     }
 }
 

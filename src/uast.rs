@@ -62,6 +62,10 @@ pub enum UASTExpression {
     BoolTrue,
     BoolFalse,
 
+    FieldAccess {
+        expr: Box<UASTExpression>,
+        field: String,
+    }
     // TODO: negation 
 }
 
