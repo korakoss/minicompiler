@@ -1,4 +1,4 @@
-use crate::tast::*;
+use crate::ast::*;
 use crate::hir::*;
 use crate::common::*;
 use std::{collections::HashMap};
@@ -30,7 +30,7 @@ pub fn lower_ast(ast: TASTProgram) -> HIRProgram {
 struct HIRFunctionBuilder {
     typetable: HashMap<TypeIdentifier, Type>,
     signature_map: HashMap<FuncSignature, (FuncId, Type)>,
-    variables: HashMap<VarId, Variable>,
+    variables: HashMap<VarId, HIRVariable>,
     ret_type: Type,
     scope_var_stack: Vec<HashMap<String, VarId>>,
     loop_nest_level: usize,
@@ -67,23 +67,14 @@ impl HIRFunctionBuilder {
                 let hir_val = self.lower_expression(value);
                 let varid = self.add_var_in_scope(var);
                 HIRStatement::Let { 
-                    var: Place::Variable(varid), 
+var: Place::Variable(varid), 
                     value: hir_val, 
                 }
             },
-            TASTStatement::LetStruct { var, value } => {
-                let hir_val = self.lower_struct_init(value);
-                let varid = self.add_var_in_scope(var);
-                HIRStatement::Let { 
-                    var: Place::Variable(varid), 
-                    value: hir_val, 
-                }
-            }
-
             TASTStatement::Assign { target, value } => {
 
                 match target {
-                    TASTExpression::Variable(var_name) => {
+                    ASTExpression::Variable(var_name) => {
                         let var_id = self.get_var_in_scope(&var_name);
                         let hir_expr = self.lower_expression(value);
 
@@ -101,7 +92,7 @@ impl HIRFunctionBuilder {
             },
             TASTStatement::If { condition, if_body, else_body } => {
                 let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != Type::Bool {
+                if hir_condition.typ != Type::Primitive(PrimitiveType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 let hir_if_body = self.lower_block(if_body); 
@@ -115,7 +106,7 @@ impl HIRFunctionBuilder {
             },
             TASTStatement::While { condition, body } => {
                 let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != Type::Bool {
+                if hir_condition.typ != Type::Primitive(PrimitiveType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 let hir_body = self.lower_block(body); 
@@ -149,24 +140,6 @@ impl HIRFunctionBuilder {
         hir_statement
     }
 
-    fn lower_struct_init(&mut self, stru: TASTStruct) -> HIRExpression{
-        let stru_type = self.typetable[&stru.typ].clone();
-        let Type::Derived {name, typ: DerivedType::Struct {fields}} = stru_type.clone() else {panic!("You fucked up struct typing");}; 
-        let mut checked_fields = HashMap::new();
-        for (fname, ftype) in fields {
-            let stru_f_expr = stru.fields.get(&fname).unwrap().clone();
-            let hir_fexpr = self.lower_expression(stru_f_expr);
-            if hir_fexpr.typ != ftype {
-                panic!("Field type mismatch");
-            }
-            checked_fields.insert(fname, hir_fexpr);
-        }
-        HIRExpression { 
-            typ: stru_type,
-            expr:HIRExpressionKind::Struct { fields: checked_fields } 
-        }
-    }
-
     fn lower_block(&mut self, statements: Vec<TASTStatement>) -> Vec<HIRStatement>{
         self.scope_var_stack.push(HashMap::new());
         let hir_stmts = statements.into_iter().map(|stmt| self.lower_statement(stmt)).collect();
@@ -174,15 +147,15 @@ impl HIRFunctionBuilder {
         hir_stmts
     }
 
-    fn lower_expression(&self, expression: TASTExpression) -> HIRExpression {
+    fn lower_expression(&self, expression: ASTExpression) -> HIRExpression {
         match expression {
-            TASTExpression::IntLiteral(num) => {
+            ASTExpression::IntLiteral(num) => {
                 HIRExpression{
-                    typ: Type::Integer,
+                    typ: Type::Primitive(PrimitiveType::Integer),
                     expr: HIRExpressionKind::IntLiteral(num),
                 }
             },
-            TASTExpression::Variable(name) => {
+            ASTExpression::Variable(name) => {
                 let var_id = self.get_var_in_scope(&name);
                 let var_type = self.variables.get(&var_id).unwrap().typ.clone();
                 HIRExpression {
@@ -190,7 +163,7 @@ impl HIRFunctionBuilder {
                     expr: HIRExpressionKind::Variable(var_id),
                 }
             },
-            TASTExpression::BinOp {op, left, right} => {
+            ASTExpression::BinOp {op, left, right} => {
                 let left_hir = self.lower_expression(*left);
                 let right_hir = self.lower_expression(*right);
                 let inferred_type = binop_typecheck(&op, &left_hir.typ, &right_hir.typ).expect("Binop typecheck error");  
@@ -203,7 +176,7 @@ impl HIRFunctionBuilder {
                     }
                 }
             },
-            TASTExpression::FuncCall {funcname, args} => {
+            ASTExpression::FuncCall {funcname, args} => {
                 let hir_args: Vec<HIRExpression> = args.into_iter().map(|x| self.lower_expression(*x)).collect();
                 let signature = FuncSignature {
                     name: funcname,
@@ -215,34 +188,43 @@ impl HIRFunctionBuilder {
                     expr: HIRExpressionKind::FuncCall { funcid: func_id.clone(), args: hir_args},
                 }
             }
-            TASTExpression::BoolTrue => {
+            ASTExpression::BoolTrue => {
                 HIRExpression{
-                    typ: Type::Bool,
+                    typ: Type::Primitive(PrimitiveType::Bool),
                     expr: HIRExpressionKind::BoolTrue,
                 }
             }
-            TASTExpression::BoolFalse => {
+            ASTExpression::BoolFalse => {
                 HIRExpression{
-                    typ: Type::Bool,
+                    typ: Type::Primitive(PrimitiveType::Bool),
                     expr: HIRExpressionKind::BoolFalse,
                 }
             }
-            TASTExpression::FieldAccess { expr, field } => {
+            ASTExpression::FieldAccess { expr, field } => {
                 let hir_expr = self.lower_expression(*expr);
-                let Type::Derived { name, typ: DerivedType::Struct { fields } } = hir_expr.typ.clone() else { panic!("Access attempted on non-struct expression");}; 
-                let ftype = fields.get(&field).expect("Nonexistent field bruh").clone();
+                let Type::NewType(NewType::Struct{fields}) = hir_expr.typ else {
+                    panic!("Attempted field access on non-struct expression!");
+                };
+                let field_type = fields
+                    .get(&field)
+                    .expect(&format!("Attempted to access nonexistent field: {:?}", field))
+                    .clone();
                 HIRExpression {
-                    typ: ftype,
-                    expr: HIRExpressionKind::FieldAccess { 
+                    typ: field_type,
+                    expr: HIRExpressionKind::FieldAccess{
                         expr: Box::new(hir_expr), 
-                        field: field, 
+                        field
                     }
                 }
             }
         }
     }
 
-    fn add_var_in_scope(&mut self, var: Variable) -> VarId {
+
+
+    // HELPERS
+
+    fn add_var_in_scope(&mut self, var: HIRVariable) -> VarId {
         let var_id = VarId(self.variables.len());
         self.variables.insert(var_id, var.clone());
         self.scope_var_stack.last_mut().unwrap().insert(var.name, var_id);
@@ -251,6 +233,7 @@ impl HIRFunctionBuilder {
 
     fn get_var_in_scope(&self, varname: &String) -> VarId {
         // TODO: some typecheck
+            // ? ??? 
         let scope_vars: HashMap<String, VarId> = self.scope_var_stack.clone().into_iter().flatten().collect();
         scope_vars.get(varname).expect("Variable name not found in scope").clone()
     }

@@ -13,7 +13,7 @@ pub struct HIRProgram {
 pub struct HIRFunction {
     pub args: Vec<VarId>,
     pub body: Vec<HIRStatement>,
-    pub variables: HashMap<VarId, Variable>,
+    pub variables: HashMap<VarId, HIRVariable>,
     pub ret_type: Type,
 }
 
@@ -86,7 +86,17 @@ pub struct VarId(pub usize);
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct FuncId(pub usize);
 
+#[derive(Clone, Debug)]
+pub struct HIRVariable {
+    typ: Type,
+    size: usize,
+    layout: LayoutInfo,
+}
 
-//pub enum HIRVariable {
-    
-
+#[derive(Clone, Debug)]
+pub enum LayoutInfo {
+    Primitive,
+    Struct {
+        field_offsets: HashMap<String, usize>
+    }
+}

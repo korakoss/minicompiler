@@ -14,8 +14,11 @@ mod convert_ast;
 use convert_ast::*;
 
 mod hir;
-/*
+
 mod make_hir;
+use make_hir::*;
+
+/*
 use hir_builder::*;
 
 mod hir_codegen;
@@ -44,11 +47,11 @@ fn main() {
     let tast = ASTConverter::convert_uast(uast);
     fs::write(tast_filepath, format!("{:#?}", tast)).unwrap();
 
+    let hir = lower_ast(tast);
+    fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
 
     /* 
-        let hir = lower_ast(tast);
-    fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
-    
+        
     let mut hircomp = HIRCompiler::new(hir);
     let assembly = hircomp.compile();
 
