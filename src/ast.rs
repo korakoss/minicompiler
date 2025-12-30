@@ -15,7 +15,7 @@ pub type TASTStatement = ASTStatement<Type>;
 
 #[derive(Debug, Clone)]
 pub struct ASTProgram<T> {
-    pub new_types: HashMap<TypeIdentifier, NewType<T>>,
+    pub new_types: HashMap<TypeIdentifier, TypeConstructor<T>>,
     pub functions: HashMap<FuncSignature<T>, ASTFunction<T>>,
 }
 

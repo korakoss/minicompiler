@@ -2,51 +2,45 @@
 use std::collections::BTreeMap;
 use std::collections::{HashMap, VecDeque};
 
-
 use crate::ast::*;
-use crate::shared::typing::{CompleteFunctionSignature, DeferredFunctionSignature};
+use crate::shared::typing::*;
+
 
 struct TypeTable {
-    complete_newtypes: HashMap<TypeIdentifier, CompleteNewType>,
-    old_to_new: HashMap<DeferredNewType, CompleteNewType>,
+    complete_newtypes: HashMap<TypeIdentifier, DerivType>,
+    old_to_new: HashMap<DeferredDerivType, DerivType>,
 }
 
 impl TypeTable {
 
-    fn make(newtype_defs: HashMap<TypeIdentifier, DeferredNewType>) -> TypeTable { 
+    fn make(newtype_defs: HashMap<TypeIdentifier, DeferredDerivType>) -> TypeTable { 
 
         let dep_graph = get_newtype_dependencies(&newtype_defs); 
         let topo_order = toposort_depgraph(&dep_graph);
 
-        let complete_newtypes = HashMap::new();
-        let old_to_new = HashMap::new();
+        let mut complete_newtypes: HashMap<TypeIdentifier, DerivType> = HashMap::new();
+        let mut old_to_new = HashMap::new();
 
         for type_id in topo_order { 
             let deferred_newtype = newtype_defs[&type_id].clone();
-            let complete_newtype = converter.convert_struct_typedef(deferred_newtype);        
-            complete_newtypes.insert(type_id, complete_newtype);
-            old_to_new.insert(deferred_newtype, complete_newtypes);
+            let TypeConstructor::Struct { fields } = deferred_newtype.clone();
+            let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
+            for (fname, ftype) in fields {
+                let actual_type = match ftype {
+                    DeferredType::Prim(prim_typ) => Type::Prim(prim_typ),
+                    DeferredType::Symbolic(type_id) => Type::Derived(complete_newtypes[&type_id].clone()),
+                };
+                tfields.insert(fname, actual_type);
+            }
+            let complete_newtype = TypeConstructor::Struct { fields: tfields};
+            complete_newtypes.insert(type_id, complete_newtype.clone());
+            old_to_new.insert(deferred_newtype, complete_newtype);
         }
         TypeTable { complete_newtypes, old_to_new } 
     }
-
-    fn convert_struct_typedef(&mut self, dnt: DeferredNewType) -> CompleteNewType { 
-        let DeferredNewType::Struct { fields } = dnt; 
-        let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
-        for (fname, ftype) in fields {
-            let actual_type = match ftype {
-                DeferredType::Resolved(typ) => typ,
-                DeferredType::Unresolved(type_id) => Type::NewType(self.complete_newtypes[&type_id].clone()),
-            };
-            tfields.insert(fname, actual_type);
-        }
-        NewType::Struct { 
-            fields: tfields
-        }
-    }
-
-    fn map(&self, deferred_type: &DeferredType) -> Type {
-        old_to_new[deferred_type]         
+    
+    fn map(&self, deferred_type: &DeferredDerivType) -> DerivType {
+        self.old_to_new[deferred_type].clone()        
     }
 }
 
@@ -75,7 +69,7 @@ impl ASTConverter {
         let DeferredFunctionSignature{name, argtypes} = fsgn;
         CompleteFunctionSignature {
             name,
-            argtypes: argtypes.into_iter().map( |ftyp| (self.typetable.map(ftyp))).collect()
+            argtypes: argtypes.into_iter().map( |ftyp| (self.convert_type(ftyp))).collect()
         }
     }
 
@@ -86,10 +80,10 @@ impl ASTConverter {
             name,
             args: args
                 .into_iter()
-                .map(|(name, deftyp)| (name, self.typetable.map(deftyp)))
+                .map(|(name, deftyp)| (name, self.convert_type(deftyp)))
                 .collect(),
             body: body.into_iter().map(|stmt| self.convert_statement(stmt)).collect(),
-            ret_type: self.typetable.map(&ret_type)
+            ret_type: self.convert_type(ret_type)
         }
     }
     
@@ -131,7 +125,14 @@ impl ASTConverter {
         let DeferredTypeVariable{name, typ} = var; 
         TypedVariable {
             name,
-            typ: self.typetable.map(typ),         
+            typ: self.convert_type(typ)       
+        }
+    }
+
+    fn convert_type(&self, typ: DeferredType) -> Type {
+        match typ {
+            DeferredType::Prim(prim) => Type::Prim(prim),
+            DeferredType::Symbolic(type_id) => Type::Derived(self.typetable.complete_newtypes[&type_id].clone()),
         }
     }
 
@@ -145,7 +146,7 @@ fn get_type_size(typ: &Type) -> usize {
         Type::Integer => 8,
         Type::Bool => 8,
         Type::None => 0,
-        Type::NewType(NewType::Struct { fields }) => {
+        Type::DerivType(DerivType::Struct { fields }) => {
             fields.into_iter().map(|(f_name, f_type)| get_type_size(f_type)).sum()            
         }
     }
@@ -159,13 +160,13 @@ fn get_type_size(typ: &Type) -> usize {
 // THE GOOD PLACE
 
 
-fn get_newtype_dependencies(newtype_defs: &HashMap<TypeIdentifier, DeferredNewType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
+fn get_newtype_dependencies(newtype_defs: &HashMap<TypeIdentifier, DeferredDerivType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
     let mut dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = HashMap::new();
     for (type_id, newtype) in newtype_defs {
         let mut deps: Vec<TypeIdentifier> = Vec::new();
-        let DeferredNewType::Struct {fields} = newtype; 
+        let DeferredDerivType::Struct {fields} = newtype; 
         for (_, field_type) in fields {
-            if let DeferredType::Unresolved(dep_id) = field_type {
+            if let DeferredType::Symbolic(dep_id) = field_type {
                 deps.push(dep_id.clone());
             }
         }

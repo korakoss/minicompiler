@@ -32,7 +32,7 @@ impl Scope {
 
 struct HIRBuilder {
     scope_stack: Vec<Scope>,
-    new_types: HashMap<TypeIdentifier, CompleteNewType>,
+    new_types: HashMap<TypeIdentifier, DerivType>,
     variables: HashMap<VarId, TypedVariable>,
 }
 
@@ -50,7 +50,7 @@ impl HIRBuilder {
         let TASTProgram{new_types, functions} = tast;
 
         // TODO: nicer
-        let entry = functions.iter().filter(|(fsgn, func)| fsgn.name == "main").last().unwrap().0.clone();
+        let entry = functions.iter().filter(|(fsgn, _)| fsgn.name == "main").last().unwrap().0.clone();
         let mut builder = HIRBuilder::new();
 
         HIRProgram {
@@ -103,7 +103,7 @@ impl HIRBuilder {
                 }
             }
             TASTStatement::If { condition, if_body, else_body } => {
-                if self.infer_expression_type(condition.clone()) != Type::Primitive(PrimitiveType::Bool) {
+                if self.infer_expression_type(condition.clone()) != Type::Prim(PrimitiveType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::If {
@@ -116,7 +116,7 @@ impl HIRBuilder {
                 }
             }
             TASTStatement::While { condition, body } => {
-                if self.infer_expression_type(condition.clone()) != Type::Primitive(PrimitiveType::Bool) {
+                if self.infer_expression_type(condition.clone()) != Type::Prim(PrimitiveType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::While { 
@@ -177,7 +177,7 @@ impl HIRBuilder {
 
     fn infer_expression_type(&self, expr: ASTExpression) -> Type {
         match expr {
-            ASTExpression::IntLiteral(_) => Type::Primitive(PrimitiveType::Integer),            // This solution sucks btw, with the type type syntax
+            ASTExpression::IntLiteral(_) => Type::Prim(PrimitiveType::Integer),            
             ASTExpression::Variable(varname) => {
                 let var_id = self.get_var_from_scope(varname);
                 self.variables[&var_id].typ.clone()
@@ -186,10 +186,10 @@ impl HIRBuilder {
             ASTExpression::FuncCall { funcname, args } => {
                 unimplemented!();
             },
-            ASTExpression::BoolTrue => Type::Primitive(PrimitiveType::Bool),
-            ASTExpression::BoolFalse => Type::Primitive(PrimitiveType::Bool),
+            ASTExpression::BoolTrue => Type::Prim(PrimitiveType::Bool),
+            ASTExpression::BoolFalse => Type::Prim(PrimitiveType::Bool),
             ASTExpression::FieldAccess { expr, field } => {
-                let Type::NewType(NewType::Struct {fields}) = self.infer_expression_type(*expr) else {
+                let Type::Derived(DerivType::Struct {fields}) = self.infer_expression_type(*expr) else {
                     panic!("Attempted field access on non-struct value");
                 };
                 fields[&field]

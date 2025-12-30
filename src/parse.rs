@@ -4,10 +4,12 @@ use std::iter::Peekable;
 
 use crate::shared::tokens::*;
 use crate::ast::*;
+use crate::shared::typing::*;
+
 
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
-    new_types: HashMap<TypeIdentifier, DeferredNewType>,
+    new_types: HashMap<TypeIdentifier, DeferredDerivType>,
     functions: HashMap<FuncSignature<DeferredType>, UASTFunction>
 }
 
@@ -50,7 +52,7 @@ impl Parser {
             fields.insert(field_name, field_type);
         }
         self.expect_unparametric_token(Token::RightBrace);
-        let struct_type = DeferredNewType::Struct { 
+        let struct_type = DeferredDerivType::Struct { 
             fields: fields 
         };
         self.new_types.insert(struct_identifier, struct_type); 
@@ -90,7 +92,7 @@ impl Parser {
                 self.expect_deferred_type()
             },
             _ => {
-                DeferredType::Resolved(Type::Primitive(PrimitiveType::None)) 
+                DeferredType::Prim(PrimitiveType::None)
             }
         };
         let body = self.parse_statement_block();
@@ -293,9 +295,9 @@ impl Parser {
     fn expect_deferred_type(&mut self) -> DeferredType {
         let token = self.tokens.next().unwrap(); 
         match token {
-            Token::Int => DeferredType::Resolved(Type::Primitive(PrimitiveType::Integer)),
-            Token::Bool => DeferredType::Resolved(Type::Primitive(PrimitiveType::Bool)),
-            Token::Identifier(type_id) => DeferredType::Unresolved(TypeIdentifier(type_id)),
+            Token::Int => DeferredType::Prim(PrimitiveType::Integer),
+            Token::Bool => DeferredType::Prim(PrimitiveType::Bool),
+            Token::Identifier(type_id) => DeferredType::Symbolic(TypeIdentifier(type_id)),
             _ => {panic!("Expected primitive type or identifer token, got {:?}", token);}
         }
     }

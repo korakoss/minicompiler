@@ -62,26 +62,26 @@ pub struct TypeIdentifier(pub String);
 
 enum Type {
     Primitive(Primitive),
-    NewType(CompositeTypeKind<DeferredType>),
+    Symbolic(TypeConstructor<Type>),
 }
 
 enum DeferredType {
-    Resolved(Primitive),
-    Unresolved(TypeIdentifier),
+    Primitive(Primitive),
+    Symbolic(TypeIdentifier),
+}
+
+enum PrimitiveType {
+    Int,
+    Bool,
+    None,
 }
 
 
-
-enum TypeKind<T> {
-    Integer,
-    Bool,
-    None,
-
+enum TypeConstructor<T>{
     Struct {
-        fields: BTreeMap<String, T>,
+        fields: BTreeMap<String, T>
     }
-
-
+}
 
 
 
