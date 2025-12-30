@@ -1,4 +1,4 @@
-use crate::common::*;
+use crate::shared::tokens::*;
 
 
 pub fn lex(program: &str) -> Vec<Token> {

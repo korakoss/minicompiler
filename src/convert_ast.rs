@@ -2,45 +2,32 @@
 use std::collections::BTreeMap;
 use std::collections::{HashMap, VecDeque};
 
-use crate::common::*;
+
 use crate::ast::*;
+use crate::shared::typing::{CompleteFunctionSignature, DeferredFunctionSignature};
 
-
-pub struct ASTConverter {
-    complete_newtypes: HashMap<TypeIdentifier, CompleteNewType> 
+struct TypeTable {
+    complete_newtypes: HashMap<TypeIdentifier, CompleteNewType>,
+    old_to_new: HashMap<DeferredNewType, CompleteNewType>,
 }
 
-impl ASTConverter {
-    
-    pub fn convert_uast(uast: UASTProgram) -> TASTProgram {
-        let UASTProgram{new_types, functions} = uast;
-        let converter = ASTConverter::convert_newtype_defs(new_types);
+impl TypeTable {
 
-        let mut tfuncs: Vec<TASTFunction> = Vec::new();
-        for func in functions {
-            let tfunc = converter.convert_function(func);
-            tfuncs.push(tfunc);
-        }
-        TASTProgram { 
-            new_types: converter.complete_newtypes, 
-            functions:tfuncs,
-        }
-    }
-
-    fn convert_newtype_defs(newtype_defs: HashMap<TypeIdentifier, DeferredNewType>) -> ASTConverter { 
+    fn make(newtype_defs: HashMap<TypeIdentifier, DeferredNewType>) -> TypeTable { 
 
         let dep_graph = get_newtype_dependencies(&newtype_defs); 
         let topo_order = toposort_depgraph(&dep_graph);
 
-        let mut converter = ASTConverter{
-            complete_newtypes: HashMap::new(),
-        };
+        let complete_newtypes = HashMap::new();
+        let old_to_new = HashMap::new();
+
         for type_id in topo_order { 
             let deferred_newtype = newtype_defs[&type_id].clone();
             let complete_newtype = converter.convert_struct_typedef(deferred_newtype);        
-            converter.complete_newtypes.insert(type_id, complete_newtype);
+            complete_newtypes.insert(type_id, complete_newtype);
+            old_to_new.insert(deferred_newtype, complete_newtypes);
         }
-        converter
+        TypeTable { complete_newtypes, old_to_new } 
     }
 
     fn convert_struct_typedef(&mut self, dnt: DeferredNewType) -> CompleteNewType { 
@@ -58,13 +45,51 @@ impl ASTConverter {
         }
     }
 
+    fn map(&self, deferred_type: &DeferredType) -> Type {
+        old_to_new[deferred_type]         
+    }
+}
+
+pub struct ASTConverter {
+    typetable: TypeTable, 
+}
+
+impl ASTConverter {
+    
+    pub fn convert_uast(uast: UASTProgram) -> TASTProgram {
+        let UASTProgram{new_types, functions} = uast;
+        let typetable = TypeTable::make(new_types); 
+        
+        let converter = ASTConverter{typetable};
+        let t_functions = functions
+            .into_iter()
+            .map( |(sgn, func)| (converter.convert_function_signature(sgn), converter.convert_function(func)))
+            .collect();
+        TASTProgram { 
+            new_types: converter.typetable.complete_newtypes, 
+            functions: t_functions 
+        }
+    }
+
+    fn convert_function_signature(&self, fsgn: DeferredFunctionSignature) -> CompleteFunctionSignature {
+        let DeferredFunctionSignature{name, argtypes} = fsgn;
+        CompleteFunctionSignature {
+            name,
+            argtypes: argtypes.into_iter().map( |ftyp| (self.typetable.map(ftyp))).collect()
+        }
+    }
+
+    
     fn convert_function(&self, func: UASTFunction) -> TASTFunction {
         let UASTFunction{name, args, body, ret_type} = func;
         TASTFunction {
             name,
-            args: args.into_iter().map(|arg| self.convert_var(arg)).collect(),
+            args: args
+                .into_iter()
+                .map(|(name, deftyp)| (name, self.typetable.map(deftyp)))
+                .collect(),
             body: body.into_iter().map(|stmt| self.convert_statement(stmt)).collect(),
-            ret_type: self.convert_type(ret_type)
+            ret_type: self.typetable.map(&ret_type)
         }
     }
     
@@ -106,19 +131,11 @@ impl ASTConverter {
         let DeferredTypeVariable{name, typ} = var; 
         TypedVariable {
             name,
-            typ: self.convert_type(typ),         
+            typ: self.typetable.map(typ),         
         }
     }
 
-    fn convert_type(&self, deferred_type: DeferredType) -> Type {
-        match deferred_type {
-            DeferredType::Resolved(t) => t,
-            DeferredType::Unresolved(t_id) => {
-                Type::NewType(self.complete_newtypes[&t_id].clone())
-            }
-        }
-    }
-
+    
 
 }
 
@@ -134,6 +151,9 @@ fn get_type_size(typ: &Type) -> usize {
     }
 }
 */
+
+
+
 
 
 // THE GOOD PLACE

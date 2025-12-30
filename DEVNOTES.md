@@ -2,7 +2,6 @@
 # Goal
 implement structs
 
-STRUCT LITERALS!!!
 
 ## Main problem
 - we need a central newstruct collection in HIR too, to determine layouts uniformly

@@ -2,13 +2,15 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::iter::Peekable;
 
-use crate::shared::tokens::*;
 use crate::ast::*;
+use crate::common::*;
+
 
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
-    new_types: HashMap<TypeIdentifier, DeferredNewType>,
-    functions: HashMap<FuncSignature<DeferredType>, UASTFunction>
+    defined_funcs: Vec<UASTFunction>,           // Could be a hashmap indexed by sign?
+    new_types: HashMap<TypeIdentifier, DeferredNewType>
+    functions: HashMap<
 }
 
 
@@ -17,8 +19,8 @@ impl Parser {
     pub fn parse_program(tokens: Vec<Token>) -> UASTProgram {
         let mut parser = Parser {
             tokens: tokens.into_iter().peekable(),
+            defined_funcs: Vec::new(),              
             new_types: HashMap::new(),
-            functions: HashMap::new(),              
         };
         while !parser.tokens.peek().is_none() {
             match parser.tokens.peek().unwrap() {
@@ -33,7 +35,7 @@ impl Parser {
         }
         UASTProgram { 
             new_types: parser.new_types,
-            functions: parser.functions,
+            functions: parser.defined_funcs,
         } 
     }
     
@@ -59,33 +61,24 @@ impl Parser {
     fn process_function_definition(&mut self) {
         self.expect_unparametric_token(Token::Function);
         let funcname = self.expect_identifier(); 
-
+        let mut args = Vec::new();
         self.expect_unparametric_token(Token::LeftParen);
-        let args:HashMap<String, DeferredType> = match self.tokens.peek().unwrap() {
-            &Token::RightParen => HashMap::new(),
-            &Token::Identifier(_) => {
-                let name1 = self.expect_identifier();
-                self.expect_unparametric_token(Token::Colon);
-                let typ1 = self.expect_deferred_type();
-                let mut args = HashMap::new();
-                args.insert(name1, typ1);
 
-                while self.tokens.peek().unwrap() == &Token::Comma {
-                    let arg_name = self.expect_identifier();
-                    self.expect_unparametric_token(Token::Colon);
-                    let arg_type = self.expect_deferred_type();
-                    args.insert(arg_name, arg_type);
-                }
-                args
+        while self.tokens.peek() != Some(&Token::RightParen) {         // TODO: much later, this might not vibe with tuples maybe?
+            let arg_name = self.expect_identifier();
+            self.expect_unparametric_token(Token::Colon);
+            let arg_type = self.expect_deferred_type(); 
+            args.push(DeferredTypeVariable{
+                name: arg_name, 
+                typ: arg_type,
+            });
+            if self.tokens.peek() == Some(&Token::Comma) {
+                self.tokens.next();
             }
-            _ => {
-                panic!("Unexpected token encountered during function arg parsing");
-            }
-        };
+        }
         self.expect_unparametric_token(Token::RightParen);
-
-        let ret_type_id = match self.tokens.peek().unwrap() {
-            Token::RightArrow => {
+        let ret_type_id = match self.tokens.peek() {
+            Some(Token::RightArrow) => {
                 self.tokens.next();
                 self.expect_deferred_type()
             },
@@ -95,8 +88,7 @@ impl Parser {
         };
         let body = self.parse_statement_block();
         let func = UASTFunction {name: funcname, args: args, body: body, ret_type: ret_type_id};
-        let sgn: FuncSignature<DeferredType> = func.get_signature();
-        self.functions.insert(sgn, func);
+        self.defined_funcs.push(func);
     }
     
     fn parse_statement_block(&mut self) -> Vec<UASTStatement> {

@@ -1,19 +1,22 @@
-use crate::common::*;
+use crate::shared::typing::*;
 use std::{collections::HashMap};
+use crate::ast::*;
 
 
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
-    pub functions: HashMap<FuncId, HIRFunction>,
-    pub entry: Option<FuncId>,
+    pub functions: HashMap<CompleteFunctionSignature, HIRFunction>,
+    pub entry: CompleteFunctionSignature,
+    // pub layouts: HashMap<Type, LayoutInfo>,
+    pub variables: HashMap<VarId, TypedVariable>,
 }
 
 
 #[derive(Clone, Debug)]
 pub struct HIRFunction {
+    pub name: String,
     pub args: Vec<VarId>,
     pub body: Vec<HIRStatement>,
-    pub variables: HashMap<VarId, HIRVariable>,
     pub ret_type: Type,
 }
 
@@ -22,62 +25,32 @@ pub struct HIRFunction {
 pub enum HIRStatement {
     Let {
         var: Place,     
-        value: HIRExpression,
+        value: ASTExpression,
     },
     Assign {
         target: Place,  
-        value: HIRExpression,
+        value: ASTExpression,
     },
     If {
-        condition: HIRExpression, 
+        condition: ASTExpression, 
         if_body: Vec<HIRStatement>,    
         else_body: Option<Vec<HIRStatement>>,
     },
     While {
-        condition: HIRExpression,
+        condition: ASTExpression, 
         body: Vec<HIRStatement>,
 },
     Break,
     Continue,
-    Return(HIRExpression),
-    Print(HIRExpression),
-}
-
-
-#[derive(Clone, Debug)]
-pub struct HIRExpression {
-    pub typ: Type,
-    pub expr: HIRExpressionKind,
-}
-
-#[derive(Clone, Debug)]
-pub enum HIRExpressionKind {
-    IntLiteral(i32),
-    Variable(VarId),
-    BinOp {
-        op: BinaryOperator,
-        left: Box<HIRExpression>,
-        right: Box<HIRExpression>,
-    },
-    FuncCall {
-        funcid: FuncId,
-        args: Vec<HIRExpression>,
-    },
-    BoolTrue,
-    BoolFalse,
-    Struct {
-        fields: HashMap<String, HIRExpression>
-    },
-    FieldAccess {
-        expr: Box<HIRExpression>,
-        field: String,
-    }
+    Return(ASTExpression),
+    Print(ASTExpression),
 }
 
 
 #[derive(Clone, Debug)]
 pub enum Place {
     Variable(VarId),
+    // TODO: StructField
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
@@ -88,9 +61,9 @@ pub struct FuncId(pub usize);
 
 #[derive(Clone, Debug)]
 pub struct HIRVariable {
+    name: String,           // Not directly necessary, but for errors later
     typ: Type,
     size: usize,
-    layout: LayoutInfo,
 }
 
 #[derive(Clone, Debug)]
@@ -100,3 +73,4 @@ pub enum LayoutInfo {
         field_offsets: HashMap<String, usize>
     }
 }
+

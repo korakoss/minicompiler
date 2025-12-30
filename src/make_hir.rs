@@ -1,244 +1,202 @@
 use crate::ast::*;
 use crate::hir::*;
-use crate::common::*;
+use crate::shared::binops::binop_typecheck;
 use std::{collections::HashMap};
+use crate::shared::typing::*;
 
 
-    
-pub fn lower_ast(ast: TASTProgram) -> HIRProgram {
-    let TASTProgram{functions, struct_defs} = ast;
-
-    let signature_map: HashMap<FuncSignature, (FuncId, Type)> = functions.iter().enumerate().map(|(i,f)| (f.get_signature(), (FuncId(i), f.ret_type.clone()))).collect();
-    
-    let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
-    // Second pass: lower the functions one by one
-    let mut entry: Option<FuncId> = None;
-    for func in functions {
-        let sgn = func.get_signature();
-        let id = signature_map.get(&sgn).unwrap().clone().0;
-        let hir_func = HIRFunctionBuilder::lower_function(func.clone(), signature_map.clone(), struct_defs.clone());
-        hir_functions.insert(id, hir_func);
-        if func.name == "main" {
-            entry = Some(id);
-        }
-    }
-    HIRProgram{ functions: hir_functions, entry: entry}
-}
-
-
-
-struct HIRFunctionBuilder {
-    typetable: HashMap<TypeIdentifier, Type>,
-    signature_map: HashMap<FuncSignature, (FuncId, Type)>,
-    variables: HashMap<VarId, HIRVariable>,
-    ret_type: Type,
-    scope_var_stack: Vec<HashMap<String, VarId>>,
+struct Scope {
+    scope_vars: HashMap<String, VarId>,
     loop_nest_level: usize,
+    ambient_ret_type: Type,
 }
 
-impl HIRFunctionBuilder {
-    
-    fn lower_function(function: TASTFunction, signature_map: HashMap<FuncSignature, (FuncId, Type)>, typetable: HashMap<TypeIdentifier, Type>) -> HIRFunction {
-        let TASTFunction{name, args, body, ret_type} = function;
-       
-        let mut builder = HIRFunctionBuilder {
-            signature_map: signature_map,
-            typetable: typetable,
-            variables: HashMap::new(),
-            ret_type: ret_type.clone(),
-            scope_var_stack: Vec::new(),
+impl Scope {
+    fn new(ret_type: Type) -> Scope {
+        Scope { 
+            scope_vars: HashMap::new(),
             loop_nest_level: 0,
-        };
-        builder.scope_var_stack.push(HashMap::new());
-        let arg_ids = args.into_iter().map(|arg| builder.add_var_in_scope(arg)).collect();
-        let hir_body = body.into_iter().map(|ast_stmt| builder.lower_statement(ast_stmt)).collect();     
-        HIRFunction {
-            args: arg_ids,
-            body: hir_body,
-            variables: builder.variables,
-            ret_type,
+            ambient_ret_type: ret_type,
         }
     }
 
+    fn copy_blank(&self) -> Scope {
+        Scope {
+            scope_vars: HashMap::new(),
+            loop_nest_level: self.loop_nest_level,
+            ambient_ret_type: self.ambient_ret_type.clone()
+        }
+    }
+}
 
-    fn lower_statement(&mut self, statement: TASTStatement) -> HIRStatement { 
-        let hir_statement = match statement {
-            TASTStatement::Let{var, value} => {
-                let hir_val = self.lower_expression(value);
-                let varid = self.add_var_in_scope(var);
-                HIRStatement::Let { 
-var: Place::Variable(varid), 
-                    value: hir_val, 
+
+struct HIRBuilder {
+    scope_stack: Vec<Scope>,
+    new_types: HashMap<TypeIdentifier, CompleteNewType>,
+    variables: HashMap<VarId, TypedVariable>,
+}
+
+impl HIRBuilder {
+
+    fn new() -> HIRBuilder {
+        HIRBuilder {
+            scope_stack: Vec::new(),
+            new_types: HashMap::new(),
+            variables: HashMap::new(),
+        }
+    }
+
+    pub fn lower_ast(tast: TASTProgram) -> HIRProgram {
+        let TASTProgram{new_types, functions} = tast;
+
+        // TODO: nicer
+        let entry = functions.iter().filter(|(fsgn, func)| fsgn.name == "main").last().unwrap().0.clone();
+        let mut builder = HIRBuilder::new();
+
+        HIRProgram {
+            functions: functions.into_iter().map(|(id, func)| (id, builder.lower_function(func))).collect(),
+            entry,
+            variables: builder.variables
+        }
+    }
+
+    fn lower_function(&mut self, func: TASTFunction) -> HIRFunction {
+        let TASTFunction { name, args, body, ret_type } = func;
+        self.scope_stack.push(Scope::new(ret_type.clone()));
+        let arg_ids: Vec<VarId>  = args
+            .into_iter()
+            .map(|arg| self.add_variable_in_active_scope(TypedVariable{name: arg.0, typ: arg.1}))
+            .collect();
+        let hir_func = HIRFunction { 
+            name, 
+            args: arg_ids,
+            body: body.into_iter().map(|stmt| self.lower_statement(stmt)).collect(), 
+            ret_type 
+        }; 
+        self.scope_stack.pop();
+        hir_func
+    }
+
+    fn lower_statement(&mut self, statement: TASTStatement) -> HIRStatement {
+        match statement {
+            TASTStatement::Let {var, value} => {
+                if self.infer_expression_type(value.clone()) != var.typ {
+                    panic!("Variable definition inconsistent with value type");
                 }
-            },
+                let var_id = self.add_variable_in_active_scope(var);
+                HIRStatement::Let {
+                    var: Place::Variable(var_id),
+                    value: value,
+                }
+            }
             TASTStatement::Assign { target, value } => {
-
-                match target {
-                    ASTExpression::Variable(var_name) => {
-                        let var_id = self.get_var_in_scope(&var_name);
-                        let hir_expr = self.lower_expression(value);
-
-                        if hir_expr.typ != self.variables.get(&var_id).unwrap().typ {
-                            panic!("Attempted value assignment with non-matching types");
-                        }
-
-                        HIRStatement::Assign { 
-                            target: Place::Variable(var_id), 
-                            value: hir_expr
-                        }
-                    },
-                    _ => {panic!("Invalid assignment target");}             // NOTE: eventually other lvalues too
-                }
-            },
-            TASTStatement::If { condition, if_body, else_body } => {
-                let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != Type::Primitive(PrimitiveType::Bool) {
-                    panic!("If condition expression not boolean");
-                }
-                let hir_if_body = self.lower_block(if_body); 
-                let hir_else_body = match else_body {
-                    None => None,
-                    Some(stmts) => {
-                        Some(self.lower_block(stmts))
-                    }
+                let ASTExpression::Variable(var_name) = target else {
+                    panic!("Invalid assignment target");
                 };
-                HIRStatement::If { condition: hir_condition, if_body: hir_if_body, else_body: hir_else_body}
-            },
-            TASTStatement::While { condition, body } => {
-                let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != Type::Primitive(PrimitiveType::Bool) {
+                let var_id = self.get_var_from_scope(var_name);
+                if self.infer_expression_type(value.clone()) != self.variables[&var_id].typ {
+                    panic!("Type mismatch in assign statement");
+                }
+                HIRStatement::Assign { 
+                    target: Place::Variable(var_id), 
+                    value 
+                }
+            }
+            TASTStatement::If { condition, if_body, else_body } => {
+                if self.infer_expression_type(condition.clone()) != Type::Primitive(PrimitiveType::Bool) {
                     panic!("If condition expression not boolean");
                 }
-                let hir_body = self.lower_block(body); 
-                HIRStatement::While { condition: hir_condition, body: hir_body}
-            },
+                HIRStatement::If {
+                    condition, 
+                    if_body: self.lower_block(if_body), 
+                    else_body: match else_body {
+                        None => None,
+                        Some(block) => Some(self.lower_block(block)),
+                    }
+                }
+            }
+            TASTStatement::While { condition, body } => {
+                if self.infer_expression_type(condition.clone()) != Type::Primitive(PrimitiveType::Bool) {
+                    panic!("If condition expression not boolean");
+                }
+                HIRStatement::While { 
+                    condition,
+                    body: self.lower_block(body),
+                }
+            }
             TASTStatement::Break => {
-                if self.loop_nest_level < 1{
+                if self.scope_stack.last().unwrap().loop_nest_level < 1 {
                     panic!("Break statement detected out of loop");
                 }
                 HIRStatement::Break
-            },
+            }
             TASTStatement::Continue => {
-                if self.loop_nest_level < 1{
-                    panic!("Break statement detected out of loop");
+                if self.scope_stack.last().unwrap().loop_nest_level < 1 {
+                    panic!("Continue statement detected out of loop");
                 }
                 HIRStatement::Continue
-            },
+            }
             TASTStatement::Return(expr) => {
-                let hir_expr = self.lower_expression(expr);
-                if hir_expr.typ != self.ret_type {
-                    panic!("Type of return expression doesn't match function signature: {:?} vs {:?}", hir_expr.typ, self.ret_type);
+                if self.infer_expression_type(expr.clone()) != self.scope_stack.last().unwrap().ambient_ret_type {
+                    panic!("Return statement has unexpected type");
                 }
-                HIRStatement::Return(hir_expr)
-            },
-            TASTStatement::Print(expr) => {
-                // TODO: this needs subtler type shit later
-                let hir_expr = self.lower_expression(expr);
-                HIRStatement::Print(hir_expr)
-            }       
-        };
-        hir_statement
-    }
-
-    fn lower_block(&mut self, statements: Vec<TASTStatement>) -> Vec<HIRStatement>{
-        self.scope_var_stack.push(HashMap::new());
-        let hir_stmts = statements.into_iter().map(|stmt| self.lower_statement(stmt)).collect();
-        self.scope_var_stack.pop();
-        hir_stmts
-    }
-
-    fn lower_expression(&self, expression: ASTExpression) -> HIRExpression {
-        match expression {
-            ASTExpression::IntLiteral(num) => {
-                HIRExpression{
-                    typ: Type::Primitive(PrimitiveType::Integer),
-                    expr: HIRExpressionKind::IntLiteral(num),
-                }
-            },
-            ASTExpression::Variable(name) => {
-                let var_id = self.get_var_in_scope(&name);
-                let var_type = self.variables.get(&var_id).unwrap().typ.clone();
-                HIRExpression {
-                    typ: var_type,
-                    expr: HIRExpressionKind::Variable(var_id),
-                }
-            },
-            ASTExpression::BinOp {op, left, right} => {
-                let left_hir = self.lower_expression(*left);
-                let right_hir = self.lower_expression(*right);
-                let inferred_type = binop_typecheck(&op, &left_hir.typ, &right_hir.typ).expect("Binop typecheck error");  
-                HIRExpression {
-                    typ: inferred_type,
-                    expr: HIRExpressionKind::BinOp { 
-                        op: op,
-                        left: Box::new(left_hir), 
-                        right: Box::new(right_hir), 
-                    }
-                }
-            },
-            ASTExpression::FuncCall {funcname, args} => {
-                let hir_args: Vec<HIRExpression> = args.into_iter().map(|x| self.lower_expression(*x)).collect();
-                let signature = FuncSignature {
-                    name: funcname,
-                    argtypes: hir_args.iter().map(|x| x.typ.clone()).collect(),
-                };
-                let (func_id, ret_type) = self.signature_map.get(&signature).expect("Function with name and signature not found").clone();
-                HIRExpression {
-                    typ: ret_type,
-                    expr: HIRExpressionKind::FuncCall { funcid: func_id.clone(), args: hir_args},
-                }
+                HIRStatement::Return(expr)
             }
-            ASTExpression::BoolTrue => {
-                HIRExpression{
-                    typ: Type::Primitive(PrimitiveType::Bool),
-                    expr: HIRExpressionKind::BoolTrue,
-                }
-            }
-            ASTExpression::BoolFalse => {
-                HIRExpression{
-                    typ: Type::Primitive(PrimitiveType::Bool),
-                    expr: HIRExpressionKind::BoolFalse,
-                }
-            }
-            ASTExpression::FieldAccess { expr, field } => {
-                let hir_expr = self.lower_expression(*expr);
-                let Type::NewType(NewType::Struct{fields}) = hir_expr.typ else {
-                    panic!("Attempted field access on non-struct expression!");
-                };
-                let field_type = fields
-                    .get(&field)
-                    .expect(&format!("Attempted to access nonexistent field: {:?}", field))
-                    .clone();
-                HIRExpression {
-                    typ: field_type,
-                    expr: HIRExpressionKind::FieldAccess{
-                        expr: Box::new(hir_expr), 
-                        field
-                    }
-                }
-            }
+            TASTStatement::Print(expr) => HIRStatement::Print(expr),    // Subtler later
         }
     }
 
+    fn lower_block(&mut self, stmts: Vec<TASTStatement>) -> Vec<HIRStatement> {
+        self.scope_stack.push(self.scope_stack.last().unwrap().copy_blank());
+        let hir_block: Vec<HIRStatement> = stmts 
+            .into_iter()
+            .map(|stmt| self.lower_statement(stmt))
+            .collect();
+        self.scope_stack.pop();
+        hir_block 
+    }
 
-
-    // HELPERS
-
-    fn add_var_in_scope(&mut self, var: HIRVariable) -> VarId {
+    fn add_variable_in_active_scope(&mut self, var: TypedVariable) -> VarId {
         let var_id = VarId(self.variables.len());
         self.variables.insert(var_id, var.clone());
-        self.scope_var_stack.last_mut().unwrap().insert(var.name, var_id);
+        self.scope_stack.last_mut().unwrap().scope_vars.insert(var.name, var_id);
         var_id
     }
+    
+    fn get_var_from_scope(&self, varname: String) -> VarId {
+        // TODO: do it like a normal person
+          // union the scopestacks' scopevars, get varname, return from variables
 
-    fn get_var_in_scope(&self, varname: &String) -> VarId {
-        // TODO: some typecheck
-            // ? ??? 
-        let scope_vars: HashMap<String, VarId> = self.scope_var_stack.clone().into_iter().flatten().collect();
-        scope_vars.get(varname).expect("Variable name not found in scope").clone()
+        for scope in self.scope_stack.iter() {
+            if let Some(var_id) = scope.scope_vars.get(&varname) {
+                return var_id.clone();
+            }
+        }
+        panic!("Variable name not found in scope");
     }
 
+    fn infer_expression_type(&self, expr: ASTExpression) -> Type {
+        match expr {
+            ASTExpression::IntLiteral(_) => Type::Primitive(PrimitiveType::Integer),            // This solution sucks btw, with the type type syntax
+            ASTExpression::Variable(varname) => {
+                let var_id = self.get_var_from_scope(varname);
+                self.variables[&var_id].typ.clone()
+            },
+            ASTExpression::BinOp{op, left, right} => binop_typecheck(&op, self.infer_expression_type(*left), self.infer_expression_type(*right)),
+            ASTExpression::FuncCall { funcname, args } => {
+                unimplemented!();
+            },
+            ASTExpression::BoolTrue => Type::Primitive(PrimitiveType::Bool),
+            ASTExpression::BoolFalse => Type::Primitive(PrimitiveType::Bool),
+            ASTExpression::FieldAccess { expr, field } => {
+                let Type::NewType(NewType::Struct {fields}) = self.infer_expression_type(*expr) else {
+                    panic!("Attempted field access on non-struct value");
+                };
+                fields[&field]
+            }
+            ASTExpression::StructLiteral { fields } => {
+                unimplemented!();
+            }
+        }
+    }
 }
-
-
-

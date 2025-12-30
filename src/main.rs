@@ -1,7 +1,8 @@
 use std::fs;
 use std::env;
 
-mod common;
+mod shared;
+
 mod ast;
 
 mod lex;

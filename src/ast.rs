@@ -1,4 +1,6 @@
-use crate::common::*;
+use crate::shared::typing::*;
+use crate::shared::binops::*;
+
 use std::collections::HashMap;
 
 
@@ -14,16 +16,31 @@ pub type TASTStatement = ASTStatement<Type>;
 #[derive(Debug, Clone)]
 pub struct ASTProgram<T> {
     pub new_types: HashMap<TypeIdentifier, NewType<T>>,
-    pub functions: Vec<ASTFunction<T>>,
+    pub functions: HashMap<FuncSignature<T>, ASTFunction<T>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ASTFunction<T> {
     pub name: String,
-    pub args: Vec<Variable<T>>,             // TODO: could be a name:type HMAP instead?
+    pub args: HashMap<String, T>,
     pub body: Vec<ASTStatement<T>>,
     pub ret_type: T,
 }
+
+impl<T: Clone> ASTFunction<T> {
+   
+    pub fn get_signature(&self) -> FuncSignature<T> {
+        FuncSignature { 
+            name: self.name.clone(), 
+            argtypes: self.args
+                .iter()
+                .map(|(_, argt)| argt.clone())
+                .collect()
+        }
+    }
+}
+
+
 
 #[derive(Debug, Clone)]
 pub enum ASTStatement<T> {
@@ -83,14 +100,4 @@ pub enum ASTExpression {
 }
 
 
-/*
-impl TASTFunction {
-   
-    pub fn get_signature(&self) -> FuncSignature {
-        FuncSignature { 
-            name: self.name.clone(), 
-            argtypes: self.args.iter().map(|x| x.typ.clone()).collect(), 
-} 
-    }
-}
-*/
+
