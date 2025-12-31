@@ -92,15 +92,18 @@ impl ASTConverter {
             UASTStatement::Let { var, value } => {
                 TASTStatement::Let { 
                     var: self.convert_var(var), 
-                    value 
+                    value: self.convert_expression(value), 
                 }
             }
             UASTStatement::Assign { target, value } => {
-                TASTStatement::Assign { target, value }
+                TASTStatement::Assign {
+                    target: self.convert_expression(target), 
+                    value: self.convert_expression(value) 
+                }
             }
             UASTStatement::If { condition, if_body, else_body } => {
                 TASTStatement::If { 
-                    condition, 
+                    condition: self.convert_expression(condition),
                     if_body: if_body.into_iter().map(|stmt| self.convert_statement(stmt)).collect(),
                     else_body: match else_body {
                         None => None,
@@ -110,17 +113,51 @@ impl ASTConverter {
             }
             UASTStatement::While { condition, body } => {
                 TASTStatement::While { 
-                    condition, 
+                    condition: self.convert_expression(condition), 
                     body: body.into_iter().map(|stmt| self.convert_statement(stmt)).collect(),
                 } 
             }
             UASTStatement::Break => TASTStatement::Break,
             UASTStatement::Continue => TASTStatement::Continue,
-            UASTStatement::Return(expr) => TASTStatement::Return(expr),
-            UASTStatement::Print(expr) => TASTStatement::Print(expr),
+            UASTStatement::Return(expr) => TASTStatement::Return(self.convert_expression(expr)),
+            UASTStatement::Print(expr) => TASTStatement::Print(self.convert_expression(expr)),
         }
     }
 
+    fn convert_expression(&self, expr: UASTExpression) -> TASTExpression {
+        match expr {
+            UASTExpression::IntLiteral(n) => TASTExpression::IntLiteral(n),
+            UASTExpression::Variable(name) => TASTExpression::Variable(name),
+            UASTExpression::BinOp{op, left, right} => {
+                TASTExpression::BinOp{
+                    op, 
+                    left: Box::new(self.convert_expression(*left)), 
+                    right:Box::new(self.convert_expression(*right)), 
+                }
+            },
+            UASTExpression::FuncCall{funcname, args} => {
+                TASTExpression::FuncCall{
+                    funcname, 
+                    args: args.into_iter().map(|expr| self.convert_expression(expr)).collect(),
+                }
+            }
+            UASTExpression::BoolTrue => TASTExpression::BoolTrue,
+            UASTExpression::BoolFalse => TASTExpression::BoolFalse,
+            UASTExpression::FieldAccess{ expr, field} => {
+                TASTExpression::FieldAccess{ 
+                    expr: Box::new(self.convert_expression(*expr)), 
+                    field, 
+                }
+            }
+            UASTExpression::StructLiteral { typ, fields } => {
+                TASTExpression::StructLiteral{ 
+                    typ: self.convert_type(typ), 
+                    fields: fields.into_iter().map(|(fname, fexpr)| (fname, self.convert_expression(fexpr))).collect(),
+                }
+            }
+        }
+    }
+    
     fn convert_var(&self, var: DeferredTypeVariable) -> TypedVariable {
         let DeferredTypeVariable{name, typ} = var; 
         TypedVariable {
@@ -135,9 +172,6 @@ impl ASTConverter {
             DeferredType::Symbolic(type_id) => Type::Derived(self.typetable.complete_newtypes[&type_id].clone()),
         }
     }
-
-    
-
 }
 
 /*
@@ -152,13 +186,6 @@ fn get_type_size(typ: &Type) -> usize {
     }
 }
 */
-
-
-
-
-
-// THE GOOD PLACE
-
 
 fn get_newtype_dependencies(newtype_defs: &HashMap<TypeIdentifier, DeferredDerivType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
     let mut dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = HashMap::new();

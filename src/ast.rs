@@ -7,10 +7,12 @@ use std::collections::HashMap;
 pub type UASTProgram = ASTProgram<DeferredType>;
 pub type UASTFunction = ASTFunction<DeferredType>;
 pub type UASTStatement = ASTStatement<DeferredType>;
+pub type UASTExpression = ASTExpression<DeferredType>;
 
 pub type TASTProgram = ASTProgram<Type>;
 pub type TASTFunction = ASTFunction<Type>;
 pub type TASTStatement = ASTStatement<Type>;
+pub type TASTExpression = ASTExpression<Type>;
 
 
 #[derive(Debug, Clone)]
@@ -46,56 +48,57 @@ impl<T: Clone> ASTFunction<T> {
 pub enum ASTStatement<T> {
     Let {
         var: Variable<T>,
-        value: ASTExpression,
+        value: ASTExpression<T>,
     },
     Assign {
-        target: ASTExpression,         
-        value: ASTExpression
+        target: ASTExpression<T>,         
+        value: ASTExpression<T>
     },
     If {
-        condition: ASTExpression,
+        condition: ASTExpression<T>,
         if_body: Vec<ASTStatement<T>>,
         else_body: Option<Vec<ASTStatement<T>>>,
     },
     While {
-        condition: ASTExpression,
+        condition: ASTExpression<T>,
         body: Vec<ASTStatement<T>>,
     },
     Break,
     Continue,
-    Return(ASTExpression),
-    Print(ASTExpression),
+    Return(ASTExpression<T>),
+    Print(ASTExpression<T>),
 }
 
 #[derive(Debug, Clone)]
 pub struct ASTStructLiteral<T> {
     pub typ: T,
-    pub fields: HashMap<String, ASTExpression>,
+    pub fields: HashMap<String, ASTExpression<T>>,
 }
 
 #[derive(Debug, Clone)]
-pub enum ASTExpression {
+pub enum ASTExpression<T> {
     IntLiteral(i32),
     Variable(String),
     BinOp {
        op: BinaryOperator,
-       left: Box<ASTExpression>,
-       right: Box<ASTExpression>,
+       left: Box<ASTExpression<T>>,
+       right: Box<ASTExpression<T>>,
     },
     FuncCall {
         funcname: String,
-        args: Vec<ASTExpression>,
+        args: Vec<ASTExpression<T>>,
     },
     BoolTrue,
     BoolFalse,
     
     FieldAccess {
-        expr: Box<ASTExpression>,
+        expr: Box<ASTExpression<T>>,
         field: String,
     },
 
     StructLiteral {
-        fields: HashMap<String, ASTExpression>,
+        typ: T,
+        fields: HashMap<String, ASTExpression<T>>,
     },
 }
 
