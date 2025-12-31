@@ -25,25 +25,25 @@ pub struct HIRFunction {
 pub enum HIRStatement {
     Let {
         var: Place,     
-        value: ASTExpression,
+        value: TASTExpression,
     },
     Assign {
         target: Place,  
-        value: ASTExpression,
+        value: TASTExpression,
     },
     If {
-        condition: ASTExpression, 
+        condition: TASTExpression, 
         if_body: Vec<HIRStatement>,    
         else_body: Option<Vec<HIRStatement>>,
     },
     While {
-        condition: ASTExpression, 
+        condition: TASTExpression, 
         body: Vec<HIRStatement>,
 },
     Break,
     Continue,
-    Return(ASTExpression),
-    Print(ASTExpression),
+    Return(TASTExpression),
+    Print(TASTExpression),
 }
 
 
@@ -63,12 +63,11 @@ pub struct FuncId(pub usize);
 pub struct HIRVariable {
     name: String,           // Not directly necessary, but for errors later
     typ: Type,
-    size: usize,
 }
 
 #[derive(Clone, Debug)]
 pub enum LayoutInfo {
-    Primitive,
+    Primitive(usize),               // Variable size
     Struct {
         field_offsets: HashMap<String, usize>
     }

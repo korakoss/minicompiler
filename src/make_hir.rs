@@ -49,7 +49,7 @@ impl HIRBuilder {
     pub fn lower_ast(tast: TASTProgram) -> HIRProgram {
         let TASTProgram{new_types, functions} = tast;
 
-        // TODO: nicer
+// TODO: nicer
         let entry = functions.iter().filter(|(fsgn, _)| fsgn.name == "main").last().unwrap().0.clone();
         let mut builder = HIRBuilder::new();
 
@@ -90,7 +90,7 @@ impl HIRBuilder {
                 }
             }
             TASTStatement::Assign { target, value } => {
-                let ASTExpression::Variable(var_name) = target else {
+                let TASTExpression::Variable(var_name) = target else {
                     panic!("Invalid assignment target");
                 };
                 let var_id = self.get_var_from_scope(var_name);
@@ -175,27 +175,41 @@ impl HIRBuilder {
         panic!("Variable name not found in scope");
     }
 
-    fn infer_expression_type(&self, expr: ASTExpression) -> Type {
+    fn infer_expression_type(&self, expr: TASTExpression) -> Type {
         match expr {
-            ASTExpression::IntLiteral(_) => Type::Prim(PrimitiveType::Integer),            
-            ASTExpression::Variable(varname) => {
+            TASTExpression::IntLiteral(_) => Type::Prim(PrimitiveType::Integer),            
+            TASTExpression::Variable(varname) => {
                 let var_id = self.get_var_from_scope(varname);
                 self.variables[&var_id].typ.clone()
             },
-            ASTExpression::BinOp{op, left, right} => binop_typecheck(&op, self.infer_expression_type(*left), self.infer_expression_type(*right)),
-            ASTExpression::FuncCall { funcname, args } => {
+            TASTExpression::BinOp{op, left, right} => binop_typecheck(&op, self.infer_expression_type(*left), self.infer_expression_type(*right)),
+            TASTExpression::FuncCall { funcname, args } => {
                 unimplemented!();
             },
-            ASTExpression::BoolTrue => Type::Prim(PrimitiveType::Bool),
-            ASTExpression::BoolFalse => Type::Prim(PrimitiveType::Bool),
-            ASTExpression::FieldAccess { expr, field } => {
+            TASTExpression::BoolTrue => Type::Prim(PrimitiveType::Bool),
+            TASTExpression::BoolFalse => Type::Prim(PrimitiveType::Bool),
+            TASTExpression::FieldAccess { expr, field } => {
                 let Type::Derived(DerivType::Struct {fields}) = self.infer_expression_type(*expr) else {
                     panic!("Attempted field access on non-struct value");
                 };
                 fields[&field]
             }
-            ASTExpression::StructLiteral { fields } => {
-                unimplemented!();
+            TASTExpression::StructLiteral {typ, fields} => {
+                self.typecheck_struct(typ, fields);
+                typ
+            }
+        }
+    }
+
+    fn typecheck_struct(&self, typ:Type , field_exprs: HashMap<String, TASTExpression>) {
+        let Type::Derived(TypeConstructor::Struct{fields: struct_fields}) = typ else {
+            panic!("Type annotation doesn't correspond to struct type");
+        };         
+
+        for (fname, exp_type) in struct_fields {
+            let fexpr = field_exprs.get(&fname).expect("Field not found").clone();
+            if self.infer_expression_type(fexpr) != exp_type {
+                panic!("Field type doesn't match expected type");
             }
         }
     }
