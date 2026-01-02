@@ -10,7 +10,7 @@ use crate::shared::typing::*;
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
     new_types: HashMap<TypeIdentifier, DeferredDerivType>,
-    functions: HashMap<FuncSignature<DeferredType>, UASTFunction>
+    functions: HashMap<FuncSignature<DeferredType>, UASTFunction>,
 }
 
 
@@ -64,7 +64,9 @@ impl Parser {
 
         self.expect_unparametric_token(Token::LeftParen);
         let args:HashMap<String, DeferredType> = match self.tokens.peek().unwrap() {
-            &Token::RightParen => HashMap::new(),
+            &Token::RightParen => {
+                HashMap::new()
+            }
             &Token::Identifier(_) => {
                 let name1 = self.expect_identifier();
                 self.expect_unparametric_token(Token::Colon);
@@ -73,6 +75,7 @@ impl Parser {
                 args.insert(name1, typ1);
 
                 while self.tokens.peek().unwrap() == &Token::Comma {
+                    self.tokens.next();
                     let arg_name = self.expect_identifier();
                     self.expect_unparametric_token(Token::Colon);
                     let arg_type = self.expect_deferred_type();
@@ -127,17 +130,21 @@ impl Parser {
                 self.expect_unparametric_token(Token::Semicolon);
                 UASTStatement::Let{var, value}
             }
-            Token::Identifier(_) | Token::LeftParen => {                // Assignment. NOTE: an identifier could actually mean funccalls later too
-                let expr = self.parse_expression();
+            Token::Identifier(id)  => {                // Assignment. NOTE: an identifier could actually mean funccalls later too
+                                                                         // And field access
                 self.expect_unparametric_token(Token::Assign);
                 let assign_value = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
-                UASTStatement::Assign { target: expr, value: assign_value}
+                UASTStatement::Assign { 
+                    target: UASTExpression::Variable(id), 
+                    value: assign_value
+                }
             }
             Token::If => {
                 let condition = self.parse_expression();
                 let if_body = self.parse_statement_block();
                 let else_body =  if matches!(self.tokens.peek(), Some(Token::Else)) {
+                    self.tokens.next();
                     Some(self.parse_statement_block())
                 } else {None};
                 UASTStatement::If {condition, if_body, else_body}
@@ -231,16 +238,19 @@ impl Parser {
                                 collected_args
                             }
                         };
-                        self.tokens.next();
                         self.expect_unparametric_token(Token::RightParen);
                         UASTExpression::FuncCall { funcname: name, args: args}
                     }
 
                     &Token::LeftBrace => {                                                  // StructLiteral
-                        self.tokens.next();
-                        UASTExpression::StructLiteral{
-                            typ: DeferredType::Symbolic(TypeIdentifier(name)),
-                            fields: self.parse_struct_literal_internals(),
+                        if self.new_types.contains_key(&TypeIdentifier(name.clone())) {
+                            self.tokens.next();
+                            UASTExpression::StructLiteral{
+                                typ: DeferredType::Symbolic(TypeIdentifier(name)),
+                                fields: self.parse_struct_literal_internals(),
+                            }
+                        } else {
+                            UASTExpression::Variable(name)
                         }
                     }
                     

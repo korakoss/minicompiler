@@ -1,3 +1,5 @@
 target/
 yum/
 oldyum/
+tests/*
+!tests/src

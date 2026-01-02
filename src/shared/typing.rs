@@ -9,7 +9,8 @@ pub type DeferredTypeVariable = Variable<DeferredType>;
 pub type TypedVariable = Variable<Type>;
 
 pub type DeferredDerivType = TypeConstructor<DeferredType>;
-pub type DerivType = TypeConstructor<Type>
+pub type DerivType = TypeConstructor<Type>;
+
 
 #[derive(Debug, Clone)]
 pub struct Variable<T> {
