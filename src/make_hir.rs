@@ -259,12 +259,14 @@ impl HIRBuilder {
                  }
             }
             TASTExpression::StructLiteral{typ, fields} => {
-                HIRExpression::StructLiteral{ 
-                    typ, 
-                    fields: fields 
+                let hir_fields: HashMap<String, HIRExpression> = fields 
                         .into_iter()
                         .map(|(fname, fexpr)| (fname, self.lower_expression(fexpr)))
-                        .collect()
+                        .collect();
+                self.typecheck_struct(typ.clone(), hir_fields.clone());
+                HIRExpression::StructLiteral{ 
+                    typ, 
+                    fields: hir_fields
                 }
             }
         }
@@ -290,20 +292,20 @@ impl HIRBuilder {
                 fields[&field].clone()
             }
             HIRExpression::StructLiteral{ typ, fields} => {
+                self.typecheck_struct(typ.clone(), fields.clone());
                 typ 
             }
         }
     }
 
-    fn typecheck_struct(&self, typ:Type , field_exprs: HashMap<String, TASTExpression>) {
+    fn typecheck_struct(&self, typ:Type , field_exprs: HashMap<String, HIRExpression>) {
         let Type::Derived(TypeConstructor::Struct{fields: struct_fields}) = typ else {
             panic!("Type annotation doesn't correspond to struct type");
         };         
 
         for (fname, exp_type) in struct_fields {
             let fexpr = field_exprs.get(&fname).expect("Field not found").clone();
-            let hir_fexpr = self.lower_expression(fexpr);
-            if self.get_expression_type(hir_fexpr) != exp_type {
+            if self.get_expression_type(fexpr) != exp_type {
                 panic!("Field type doesn't match expected type");
             }
         }

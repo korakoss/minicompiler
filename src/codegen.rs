@@ -8,7 +8,7 @@ pub struct HIRCompiler {
     hir_program: HIRProgram,
     jumplabel_counter: usize,
     looplabel_stack: Vec<String>,
-    layout_stack: Vec<HashMap<VarId, usize>>,
+    offset_mapping_stack: Vec<HashMap<VarId, usize>>,
     active_ret_label: Option<String>,
 }
 
@@ -20,13 +20,13 @@ impl HIRCompiler {
             hir_program: hir_program,
             jumplabel_counter: 0,
             looplabel_stack: Vec::new(),
-            layout_stack: Vec::new(),
+            offset_mapping_stack: Vec::new(),
             active_ret_label: None
         }
     }
 
     fn get_var_offset(&self, var_id: VarId) -> usize {
-        let offsets: HashMap<VarId, usize> = self.layout_stack
+        let offsets: HashMap<VarId, usize> = self.offset_mapping_stack
             .iter()
             .flat_map(|map| map.iter())
             .map(|(&k, &v)| (k, v))
@@ -68,7 +68,7 @@ impl HIRCompiler {
         let all_vars = [args.clone(), body_variables].concat();
         let (top_var_offsets, reserved_space) = self.determine_scope_var_offsets(all_vars);
 
-        self.layout_stack.push(top_var_offsets.clone());
+        self.offset_mapping_stack.push(top_var_offsets.clone());
         if args.len() > 4 {
                 panic!("Only up to 4 args supported at the moment");
         }
@@ -87,7 +87,7 @@ impl HIRCompiler {
         self.emit(&format!("{}:", retlabel));
         self.emit_epilogue(reserved_space);
         self.active_ret_label = None;
-        self.layout_stack.pop();
+        self.offset_mapping_stack.pop();
     }
     
     fn compile_block(&mut self, block: Vec<HIRStatement>) {
@@ -181,6 +181,33 @@ impl HIRCompiler {
         }
     }
 
+    fn compile_storing_statement(&mut self, lvalue: Place, expression: HIRExpression) {
+        let Place::Variable(var_id) = lvalue;
+        let place_type = self.hir_program.variables[&var_id].typ.clone();
+        let place_layout = self.hir_program.layouts.get_layout(place_type.clone());
+        let place_offset = self.get_var_offset(var_id);
+        match place_layout {
+            LayoutInfo::Primitive(size) => {
+                self.compile_expression(expression);
+                self.emit(&format!("    str r0, [fp, #-{}]", place_offset));
+            }
+
+            LayoutInfo::Struct{size, field_offsets} => {
+                let HIRExpression::StructLiteral { typ, fields } = expression else {
+                    panic!("Other struct assignment modes not yet implemented");
+                };
+                for (fname,fofs) in field_offsets {
+                    self.compile_expression(fields[&fname].clone());
+                    let offset = place_offset + fofs;
+                    self.emit(&format!("    str r0, [fp, #-{}]", offset));
+                }
+            }
+        }
+    }
+
+    fn compile_struct_storing(&mut self, curr_offset: usize, curr_expr: HIRExpression) {
+        unimplemented!();
+    }
     
     fn compile_expression(&mut self, expression: HIRExpression) {
         match expression {
