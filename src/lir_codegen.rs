@@ -137,8 +137,8 @@ self.emit_operand_load(left, frame);
                 }
 
                 for (i, arg) in args.into_iter().enumerate() {
-                    let arg_offset = frame.offsets[&arg].clone();
-                    self.emit(&format!("     ldr r{}, [fp, #-{}]", i+1, arg_offset));
+                    self.emit_operand_load(arg, frame);
+                    self.emit(&format!("     mov r{}, r0", i+1));
                 }
 
                 let LIRPlace::VReg(dest_vreg) = dest else {

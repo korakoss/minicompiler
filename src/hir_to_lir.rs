@@ -271,6 +271,9 @@ impl LIRBuilder {
                     dest: target,
                     func: id, 
                     args: arg_vregs
+                        .into_iter()
+                        .map(|vreg| Operand::Register(vreg))
+                        .collect()
                 };
                 [arg_stmts, vec![call_stmt]].concat()
             }

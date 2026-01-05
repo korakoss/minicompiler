@@ -44,7 +44,7 @@ pub enum LIRStatement {
     Call {
         dest: LIRPlace,
         func: FuncId,
-        args: Vec<VRegId>,
+        args: Vec<Operand>,
     },
     Print(Operand),
 }
