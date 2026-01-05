@@ -102,7 +102,23 @@ impl LIRBuilder {
         self.curr_collected_blocks.insert(block_id, block);
     }
 
-    
+    fn lower_place(&self, hir_place: Place) -> LIRPlace {
+        match hir_place.place {
+            PlaceKind::Variable(var_id) => {
+                LIRPlace::VReg(self.variable_map[&var_id].clone())
+            }
+            PlaceKind::StructField { of, field } => {
+                let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(of.typ.clone()) else {
+                    unreachable!();
+                };
+                let f_offset = field_offsets[&field];
+                match self.lower_place(*of) {
+                    LIRPlace::VReg(vreg_id) => LIRPlace::Deref { base: vreg_id, offset: f_offset },
+                    LIRPlace::Deref { base, offset } => LIRPlace::Deref { base, offset: offset + f_offset }
+                }
+            }
+        } 
+    }
 
     fn lower_statement(&mut self, stmt: HIRStatement) { 
         match stmt {
@@ -111,20 +127,10 @@ impl LIRBuilder {
                 let value_stmts = self.lower_expression(value, LIRPlace::VReg(var_reg));
                 self.wip_block_stmts.extend(value_stmts.into_iter());
             }
-
             HIRStatement::Assign { target, value } => {
-                match target.place {
-                    PlaceKind::Variable(var_id) => {
-                        let var_reg = self.variable_map[&var_id].clone();
-                        let value_stmts = self.lower_expression(value, LIRPlace::VReg(var_reg));
-                        self.wip_block_stmts.extend(value_stmts.into_iter());
-                    }
-                    PlaceKind::StructField { of, field } => {
-                        
-                        unimplemented!();
-                    }
-                }
-                
+                let lir_target = self.lower_place(target);
+                let value_stmts = self.lower_expression(value, lir_target);
+                self.wip_block_stmts.extend(value_stmts.into_iter());
             }
             HIRStatement::If { condition, if_body, else_body } => {
                 let branch_id = self.get_new_blockid();

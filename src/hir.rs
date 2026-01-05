@@ -88,7 +88,7 @@ pub struct Place {
 pub enum PlaceKind {
     Variable(VarId),
     StructField {
-        of: HIRExpression,
+        of: Box<Place>,
         field: String,
     }
 }
