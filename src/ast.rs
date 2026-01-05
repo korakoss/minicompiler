@@ -4,22 +4,27 @@ use crate::shared::binops::*;
 use std::collections::HashMap;
 
 
-pub type UASTProgram = ASTProgram<DeferredType>;
-pub type UASTFunction = ASTFunction<DeferredType>;
-pub type UASTStatement = ASTStatement<DeferredType>;
-pub type UASTExpression = ASTExpression<DeferredType>;
+#[derive(Debug, Clone)]
+pub struct TASTProgram {
+    pub typetable: TypeTable,
+    pub functions: HashMap<CompleteFunctionSignature, TASTFunction>,
+}
 
-pub type TASTProgram = ASTProgram<Type>;
 pub type TASTFunction = ASTFunction<Type>;
 pub type TASTStatement = ASTStatement<Type>;
 pub type TASTExpression = ASTExpression<Type>;
 
 
 #[derive(Debug, Clone)]
-pub struct ASTProgram<T> {
-    pub new_types: HashMap<TypeIdentifier, TypeConstructor<T>>,
-    pub functions: HashMap<FuncSignature<T>, ASTFunction<T>>,
+pub struct UASTProgram {
+    pub new_types: HashMap<TypeIdentifier, DeferredDerivType>,
+    pub functions: HashMap<DeferredFunctionSignature, UASTFunction>,
 }
+
+pub type UASTFunction = ASTFunction<DeferredType>;
+pub type UASTStatement = ASTStatement<DeferredType>;
+pub type UASTExpression = ASTExpression<DeferredType>;
+
 
 #[derive(Debug, Clone)]
 pub struct ASTFunction<T> {

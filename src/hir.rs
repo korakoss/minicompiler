@@ -5,7 +5,7 @@ use crate::shared::binops::*;
 
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
-    pub new_types: HashMap<TypeIdentifier,DerivType>,
+    pub typetable: TypeTable, 
     pub functions: HashMap<FuncId, HIRFunction>,
     pub entry: FuncId,
 }

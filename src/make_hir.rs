@@ -42,7 +42,7 @@ pub struct HIRBuilder {
 
 impl HIRBuilder {
 
-    fn new(new_types: &HashMap<TypeIdentifier, DerivType>, functions: &HashMap<FuncSignature<Type>, TASTFunction>) -> HIRBuilder {
+    fn new(functions: &HashMap<FuncSignature<Type>, TASTFunction>) -> HIRBuilder {
         
         let mut function_map = HashMap::new();
         let mut ret_types = HashMap::new();
@@ -68,9 +68,9 @@ impl HIRBuilder {
     }
 
     pub fn lower_ast(tast: TASTProgram) -> HIRProgram {
-        let TASTProgram{new_types, functions} = tast;
+        let TASTProgram{typetable, functions} = tast;
 
-        let mut builder = HIRBuilder::new(&new_types, &functions);
+        let mut builder = HIRBuilder::new(&functions);
             
         let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
 
@@ -80,7 +80,7 @@ impl HIRBuilder {
         }
 
         HIRProgram {
-            new_types: new_types,
+            typetable, 
             functions: hir_functions,
             entry: builder.entry,
         }

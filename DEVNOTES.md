@@ -21,7 +21,7 @@ implement structs
     - yeah! the issue is that the parser assumes that an stmt starting with an identifier is an LValue expr
 - struct literal syntax is kinda wacky, needs trailing commas
     - change the parser
-
+- the main func deciding logic is probably wacky too
 
 ## notes
 

@@ -21,8 +21,8 @@ pub struct LIRBuilder {
 impl LIRBuilder {
     
     pub fn lower_hir(program: HIRProgram) -> LIRProgram {
-        let HIRProgram { new_types, functions, entry } = program;
-        let layouts = LayoutTable::make(new_types.into_values().collect());
+        let HIRProgram { typetable, functions, entry } = program;
+        let layouts = LayoutTable::make(typetable);
         let mut builder = LIRBuilder {
             variable_map: HashMap::new(),
             curr_vreg_coll: HashMap::new(),
@@ -374,6 +374,8 @@ impl LayoutInfo {
     }
 }
 
+
+
 #[derive(Clone, Debug)]
 pub struct LayoutTable {
     newtype_layouts: HashMap<DerivType, LayoutInfo>
@@ -381,10 +383,11 @@ pub struct LayoutTable {
 
 impl LayoutTable {
 
-    pub fn make(new_types: Vec<DerivType>) -> LayoutTable {
+    pub fn make(typetable: TypeTable) -> LayoutTable {
         let mut table = LayoutTable{newtype_layouts: HashMap::new()};
-        for tp in new_types {
-            table.newtype_layouts.insert(tp.clone(), table.make_newtype_layout(tp)); 
+        for tp_id in typetable.topo_order {
+            let tp = typetable.newtype_map[&tp_id].clone();
+            table.newtype_layouts.insert(tp.clone(), table.make_newtype_layout(tp));
         }
         table
     }   
