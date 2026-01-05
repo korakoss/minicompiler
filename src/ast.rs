@@ -70,12 +70,6 @@ pub enum ASTStatement<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ASTStructLiteral<T> {
-    pub typ: T,
-    pub fields: HashMap<String, ASTExpression<T>>,
-}
-
-#[derive(Debug, Clone)]
 pub enum ASTExpression<T> {
     IntLiteral(i32),
     Variable(String),
