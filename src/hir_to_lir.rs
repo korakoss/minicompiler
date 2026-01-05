@@ -218,7 +218,6 @@ impl LIRBuilder {
 
     
     fn lower_expression(&mut self, expr: HIRExpression, target: LIRPlace) -> Vec<LIRStatement>  {
-        // Returns the statements to compute the expr and the vreg where the result is
         
         let HIRExpression { typ, expr: expr_kind } = expr;
         
@@ -295,14 +294,38 @@ impl LIRBuilder {
                 let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(typ) else {
                     unreachable!();
                 };
+                
+                let (base, start_offset) = match target {
+                    LIRPlace::VReg(vreg_id) => (vreg_id, 0),
+                    LIRPlace::Deref { base, offset } => (base, offset),
+                };
+                let mut field_computations: Vec<LIRStatement> = Vec::new();
                 for (fname, fexpr) in fields.into_iter() {
                     let f_offset = field_offsets[&fname];
-                    
-                   unimplemented!(); 
+                    let f_target = LIRPlace::Deref {base: base.clone(), offset: start_offset + f_offset };
+                    let f_comp = self.lower_expression(fexpr, f_target);
+                    field_computations.extend(f_comp.into_iter());
                 }
-                unimplemented!();
+                field_computations
             }
-            _ => {unimplemented!();}        // Struct stuff 
+            HIRExpressionKind::FieldAccess { expr, field } => {
+                let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(expr.typ.clone()) else {
+                    unreachable!();
+                };
+
+                let expr_vreg = self.add_vreg(size);
+                let expr_stmts = self.lower_expression(*expr, LIRPlace::VReg(expr_vreg.clone()));
+                
+                let f_offset = field_offsets[&field].clone();
+                let access_stmt = LIRStatement::Store { 
+                    dest: target,
+                    value: Operand::Deref { 
+                        base: expr_vreg, 
+                        offset: f_offset
+                    }
+                };
+                [expr_stmts, vec![access_stmt]].concat()
+            }
         };
         stmts
     }

@@ -227,6 +227,10 @@ self.emit_operand_load(left, frame);
             Operand::BoolFalse => {
                 self.emit(&"    ldr r0, =0");   
             }
+            Operand::Deref { base, offset } => {
+                let base_offset = frame.offsets[&base].clone();
+                self.emit(&format!("    ldr r0, [fp, #-{}]", base_offset + offset));
+            }
         }
     }
 

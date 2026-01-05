@@ -70,6 +70,11 @@ pub enum Operand {
     IntLiteral(i32),
     BoolTrue,
     BoolFalse,
+    Deref {
+        base: VRegId,
+        offset: usize,
+    }
+
     // Needs bool literals, etc?
 }
 
