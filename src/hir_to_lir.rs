@@ -50,7 +50,10 @@ impl LIRBuilder {
             self.variable_map.insert(var_id, var_vreg_id.clone());
         }
         let entry_id = self.get_new_blockid();
-        self.lower_statement_block(func.body, entry_id.clone(), None);
+        self.wip_block_id = Some(entry_id.clone());
+        for stmt in func.body.into_iter() {
+            self.lower_statement(stmt);
+        }
         let arg_ids = func.args
             .iter()
             .map(|arg_id| self.variable_map[&arg_id].clone())
@@ -63,7 +66,7 @@ impl LIRBuilder {
         }
     }
     
-    fn lower_statement_block(&mut self, stmt_block: Vec<HIRStatement>, entry_id: BlockId, post_jump: Option<BlockId>) {
+    fn lower_statement_block(&mut self, stmt_block: Vec<HIRStatement>, entry_id: BlockId, post_jump: BlockId) {
         self.wip_block_id = Some(entry_id);
 
         for stmt in stmt_block.into_iter() {
@@ -71,14 +74,10 @@ impl LIRBuilder {
         }
         
         // Inserting the tail statements after the last terminator
-        if !self.wip_block_stmts.is_empty() {
-            println!("stmts: {:?}", self.wip_block_stmts);
-            let tail_terminator = match post_jump {
-                Some(block_id) => LIRTerminator::Goto { dest: block_id },
-                None => LIRTerminator::Return(None)
-            };
-            self.push_current_block(tail_terminator);
+        if self.wip_block_id.is_none() {
+            self.wip_block_id = Some(self.get_new_blockid());
         }
+        self.push_current_block(LIRTerminator::Goto { dest: post_jump});
     }
 
     fn push_current_block(&mut self, term: LIRTerminator) {
@@ -112,11 +111,11 @@ impl LIRBuilder {
 
                 let merge_id = self.get_new_blockid();
                 let then_id = self.get_new_blockid();
-                self.lower_statement_block(if_body, then_id.clone(), Some(merge_id.clone()));
+                self.lower_statement_block(if_body, then_id.clone(), merge_id.clone());
                 let else_id = match else_body {
                     Some(stmts) => {
                         let id = self.get_new_blockid();
-                        self.lower_statement_block(stmts, id.clone(), Some(merge_id.clone()));
+                        self.lower_statement_block(stmts, id.clone(), merge_id.clone());
                         id
                     },
                     None => merge_id.clone()
@@ -132,6 +131,7 @@ impl LIRBuilder {
                     },
                 };
                 self.curr_collected_blocks.insert(branch_id, branch_block);
+                self.wip_block_id = Some(merge_id);
             }
             HIRStatement::While { condition, body }  => {
                 let start_id = self.get_new_blockid();
@@ -154,7 +154,7 @@ impl LIRBuilder {
                 self.loop_start_stack.push(start_id.clone());
                 self.loop_end_stack.push(end_id.clone());
 
-                self.lower_statement_block(body, body_id, Some(start_id.clone()));
+                self.lower_statement_block(body, body_id, start_id.clone());
                 
                 self.wip_block_id = Some(end_id);
 
