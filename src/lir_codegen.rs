@@ -28,7 +28,7 @@ impl LIRCompiler {
 
         self.emit(".global main");
         self.emit(".extern printf");
-        self.emit(".align 4");
+        self.emit(".align 8");
         self.emit(".data");
         self.emit(r#"fmt: .asciz "%d\n""#);
         self.emit(".text");
@@ -66,9 +66,10 @@ impl LIRCompiler {
         self.emit(&format!("    b block_{}", entry.0));
 
         for (id, block) in blocks.into_iter() {
-            self.compile_block(id, block, &frame);
+            self.compile_block(id, block, &frame, func_id);
         }
-        
+
+        self.emit(&format!("ret_{}:", func_id.0));        
         self.emit(&format!("    add sp, sp, #{}", frame.size));         
         self.emit("    pop {fp, lr}");
         self.emit("    bx lr");
@@ -78,7 +79,7 @@ impl LIRCompiler {
     fn make_stack_frame(&self, vregs: &HashMap<VRegId, VRegInfo>) -> StackFrame {
         // TODO: do alignment later
         let mut offsets: HashMap<VRegId, usize> = HashMap::new();
-        let mut curr_offset = 0;
+        let mut curr_offset = 8;
         for (id, reg_info) in vregs {
             offsets.insert(id.clone(), curr_offset);
             curr_offset = curr_offset + reg_info.size;
@@ -89,13 +90,13 @@ impl LIRCompiler {
         }
     }
 
-    fn compile_block(&mut self, id: BlockId, block: LIRBlock, frame: &StackFrame) {
+    fn compile_block(&mut self, id: BlockId, block: LIRBlock, frame: &StackFrame, func: FuncId) {
         self.emit(&format!("block_{}:", id.0));
         let LIRBlock {statements, terminator} = block;
         for stmt in statements {
             self.compile_stmt(stmt, frame);
         }
-        self.compile_terminator(terminator, frame);
+        self.compile_terminator(terminator, frame, func);
     }
 
     fn compile_stmt(&mut self, stmt: LIRStatement, frame: &StackFrame) {
@@ -109,7 +110,7 @@ impl LIRCompiler {
                     .clone();
                 self.emit(&format!("    str r0, [fp, #-{}]", vreg_offset));
             }
-LIRStatement::Store { dest, value } => {
+            LIRStatement::Store { dest, value } => {
                 self.emit_operand_load(value, frame);
                 self.emit_place_store(dest, frame);
             }
@@ -174,22 +175,22 @@ self.emit_operand_load(left, frame);
         }
     }
 
-    fn compile_terminator(&mut self, term: LIRTerminator, frame: &StackFrame) {
+    fn compile_terminator(&mut self, term: LIRTerminator, frame: &StackFrame, func_id: FuncId) {
         match term {
             LIRTerminator::Goto{dest} => {
                 self.emit(&format!("    b block_{}", dest.0));
             }
             LIRTerminator::Branch { condition, then_block, else_block } => {
                 self.emit_operand_load(condition, frame);
-                self.emit("    cmp r0, #0");
+                self.emit("    cmp r0, #1");
                 self.emit(&format!("    beq block_{}", then_block.0));
                 self.emit(&format!("    b block_{}", else_block.0));
             }
             LIRTerminator::Return(operand_opt) => {
                 if let Some(operand) = operand_opt {
                     self.emit_operand_load(operand, frame);
-                    self.emit("    bx lr");
                 }
+                self.emit(&format!("    b ret_{}", func_id.0));
             }
         }
     }

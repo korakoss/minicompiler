@@ -54,6 +54,12 @@ impl LIRBuilder {
         for stmt in func.body.into_iter() {
             self.lower_statement(stmt);
         }
+        if !self.wip_block_stmts.is_empty() || self.wip_block_id.is_some() {
+            if self.wip_block_id.is_none() {
+                self.wip_block_id = Some(self.get_new_blockid());
+            }
+            self.push_current_block(LIRTerminator::Return(None));
+        }
         let arg_ids = func.args
             .iter()
             .map(|arg_id| self.variable_map[&arg_id].clone())
@@ -74,10 +80,12 @@ impl LIRBuilder {
         }
         
         // Inserting the tail statements after the last terminator
-        if self.wip_block_id.is_none() {
-            self.wip_block_id = Some(self.get_new_blockid());
+        if !self.wip_block_stmts.is_empty() || self.wip_block_id.is_some() {
+            if self.wip_block_id.is_none() {
+                self.wip_block_id = Some(self.get_new_blockid());
+            }
+            self.push_current_block(LIRTerminator::Goto { dest: post_jump});
         }
-        self.push_current_block(LIRTerminator::Goto { dest: post_jump});
     }
 
     fn push_current_block(&mut self, term: LIRTerminator) {
