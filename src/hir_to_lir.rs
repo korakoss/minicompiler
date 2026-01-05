@@ -103,7 +103,6 @@ impl LIRBuilder {
     }
 
     fn lower_statement(&mut self, stmt: HIRStatement) { 
-        println!("Lowering {:?}", stmt);
         match stmt {
             HIRStatement::Let { var, value } => {
                 let var_reg = self.variable_map[&var].clone();

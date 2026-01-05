@@ -38,9 +38,15 @@ impl LIRCompiler {
         }
         
         self.emit("main:");
-        self.emit("    push {lr}");
+        self.emit("    push {fp, lr}");
+
+        self.emit("    mov fp, sp");     
+        self.emit("    sub sp, sp, #16"); 
+        self.emit("    sub r12, fp, #8");
         self.emit(&format!("    bl func_{}", program.entry.0));
-        self.emit("    pop {lr}");
+        self.emit("    ldr r0, [r12]");
+        self.emit("    add sp, sp, #16"); 
+        self.emit("    pop {fp, lr}");
         self.emit("    bx lr");
 
         self.output.clone()
@@ -70,6 +76,7 @@ impl LIRCompiler {
         }
 
         self.emit(&format!("ret_{}:", func_id.0));        
+        self.emit("    str r0, [r12]");
         self.emit(&format!("    add sp, sp, #{}", frame.size));         
         self.emit("    pop {fp, lr}");
         self.emit("    bx lr");
@@ -133,14 +140,24 @@ self.emit_operand_load(left, frame);
                     let arg_offset = frame.offsets[&arg].clone();
                     self.emit(&format!("     ldr r{}, [fp, #-{}]", i+1, arg_offset));
                 }
+
+                let LIRPlace::VReg(dest_vreg) = dest else {
+                    panic!("Deref lvalues not supported yet!");
+                };
+
+                let dest_offset = frame.offsets[&dest_vreg];
+                self.emit("    push {r12}"); 
+                self.emit(&format!("    sub r12, fp, #{}", dest_offset));
                 self.emit(&format!("    bl func_{}", func.0));
-                self.emit_place_store(dest, frame);
+                self.emit("    pop {r12}"); 
             }
             LIRStatement::Print(operand) => {
                 self.emit_operand_load(operand, frame);
                 self.emit("    mov r1, r0");
                 self.emit("    ldr r0, =fmt");
+                self.emit("    push {r12}"); 
                 self.emit("    bl printf");
+                self.emit("    pop {r12}"); 
             }
         }
 
