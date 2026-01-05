@@ -25,8 +25,6 @@ use lir::*;
 mod hir_to_lir;
 use hir_to_lir::*;
 
-mod codegen;
-use codegen::*;
 
 mod lir_codegen;
 use lir_codegen::*;
@@ -40,6 +38,7 @@ fn main() {
     let uast_filepath = &args[4];
     let tast_filepath = &args[5];
     let hir_filepath = &args[6];
+    let lir_filepath = &args[7];
 
     let program_text = &fs::read_to_string(code_filename).unwrap();
     let tokens = lex(program_text);
@@ -56,10 +55,10 @@ fn main() {
     let hir = HIRBuilder::lower_ast(tast);
     fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
 
-        
-    let mut hircomp = HIRCompiler::new(hir);
-    let assembly = hircomp.compile();
+    let lir = LIRBuilder::lower_hir(hir);
+    fs::write(lir_filepath, format!("{:#?}", lir)).unwrap();
 
+    let assembly = LIRCompiler::compile(lir);
     fs::write(assembly_filename, assembly).unwrap();
 }
 

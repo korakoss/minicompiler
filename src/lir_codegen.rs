@@ -16,7 +16,7 @@ pub struct LIRCompiler {
 
 impl LIRCompiler {
     
-    fn compile(lir_program: LIRProgram) -> String {
+    pub fn compile(lir_program: LIRProgram) -> String {
         let mut comp = LIRCompiler {
             output: String::new(),
         };
@@ -103,7 +103,10 @@ impl LIRCompiler {
         match stmt {
             LIRStatement::Load { dest, from } => {
                 self.emit_place_load(from, frame);
-                let vreg_offset = frame.offsets[&dest].clone();
+                let vreg_offset = frame.offsets
+                    .get(&dest)
+                    .expect(&format!("Register {:?} not found", dest))
+                    .clone();
                 self.emit(&format!("    str r0, [fp, #-{}]", vreg_offset));
             }
 LIRStatement::Store { dest, value } => {
@@ -174,18 +177,17 @@ self.emit_operand_load(left, frame);
     fn compile_terminator(&mut self, term: LIRTerminator, frame: &StackFrame) {
         match term {
             LIRTerminator::Goto{dest} => {
-                self.emit(&format!("    b {}", dest.0));
+                self.emit(&format!("    b block_{}", dest.0));
             }
             LIRTerminator::Branch { condition, then_block, else_block } => {
                 self.emit_operand_load(condition, frame);
                 self.emit("    cmp r0, #0");
-                self.emit(&format!("    beq {}", then_block.0));
-                self.emit(&format!("    b {}", else_block.0));
+                self.emit(&format!("    beq block_{}", then_block.0));
+                self.emit(&format!("    b block_{}", else_block.0));
             }
             LIRTerminator::Return(operand_opt) => {
                 if let Some(operand) = operand_opt {
                     self.emit_operand_load(operand, frame);
-                    self.emit("    str r0, [r12]");
                     self.emit("    bx lr");
                 }
             }
@@ -199,7 +201,7 @@ self.emit_operand_load(left, frame);
                 self.emit(&format!("    ldr r0, [fp, #-{}]", vreg_offset));
             }
             Operand::IntLiteral(num) => {
-                self.emit(&format!("     ldr r0, #{}", num));
+                self.emit(&format!("     ldr r0, ={}", num));
             }
             Operand::BoolTrue => {
                 self.emit(&"    ldr r0, =1");   
@@ -213,7 +215,10 @@ self.emit_operand_load(left, frame);
     fn emit_place_store(&mut self, place: LIRPlace, frame: &StackFrame) {
         match place {
             LIRPlace::VReg(vreg) => {
-                let vreg_offset = frame.offsets[&vreg].clone();
+                let vreg_offset = frame.offsets
+                    .get(&vreg)
+                    .expect(&format!("Register {:?} not found", vreg))
+                    .clone();
                 self.emit(&format!("    str r0, [fp, #-{}]", vreg_offset));
             }
             LIRPlace::Deref { base, offset } => {

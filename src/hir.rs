@@ -7,8 +7,6 @@ use crate::shared::binops::*;
 pub struct HIRProgram {
     pub functions: HashMap<FuncId, HIRFunction>,
     pub entry: FuncId,
-    pub layouts: LayoutTable,
-    pub variables: HashMap<VarId, TypedVariable>,
 }
 
 
@@ -16,8 +14,7 @@ pub struct HIRProgram {
 pub struct HIRFunction {
     pub name: String,
     pub args: Vec<VarId>,
-    pub body_variables: Vec<VarId>,   // Put the info table here instead of globally in the
-                                      // program
+    pub variables: HashMap<VarId, TypedVariable>,
     pub body: Vec<HIRStatement>,
     pub ret_type: Type,
 }
@@ -88,12 +85,8 @@ pub struct VarId(pub usize);
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct FuncId(pub usize);
 
-#[derive(Clone, Debug)]
-pub struct HIRVariable {
-    name: String,           // Not directly necessary, but for errors later
-    typ: Type,
-}
 
+/*
 #[derive(Clone, Debug)]
 pub enum LayoutInfo {
     Primitive(usize),               // Variable size
@@ -161,4 +154,4 @@ impl LayoutTable {
         }
     }
 }
-
+*/

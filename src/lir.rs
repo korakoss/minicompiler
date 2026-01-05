@@ -1,11 +1,13 @@
 use std::{collections::HashMap};
 use crate::{hir::FuncId, shared::binops::*};
 
+#[derive(Clone, Debug)]
 pub struct LIRProgram {
     pub functions: HashMap<FuncId, LIRFunction>,
     pub entry: FuncId
 }
 
+#[derive(Clone, Debug)]
 pub struct LIRFunction {
     pub blocks: HashMap<BlockId, LIRBlock>,
     pub entry: BlockId,

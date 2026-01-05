@@ -33,18 +33,16 @@ impl Scope {
 pub struct HIRBuilder {
     scope_stack: Vec<Scope>,
     new_types: HashMap<TypeIdentifier, DerivType>,
-    variables: HashMap<VarId, TypedVariable>,
-    curr_variable_coll: Vec<VarId>,
-    layouts: LayoutTable,
+    curr_variable_coll: HashMap<VarId, TypedVariable>,
     function_map: HashMap<CompleteFunctionSignature, FuncId>,
     ret_types: HashMap<FuncId, Type>,
     entry: FuncId,
+    var_counter: usize,
 }
 
 impl HIRBuilder {
 
     fn new(new_types: &HashMap<TypeIdentifier, DerivType>, functions: &HashMap<FuncSignature<Type>, TASTFunction>) -> HIRBuilder {
-        let layouts = LayoutTable::make(new_types.values().cloned().collect());
         
         let mut function_map = HashMap::new();
         let mut ret_types = HashMap::new();
@@ -61,12 +59,11 @@ impl HIRBuilder {
         HIRBuilder {
             scope_stack: Vec::new(),
             new_types: HashMap::new(),
-            variables: HashMap::new(),
-            curr_variable_coll: Vec::new(),
-            layouts,
+            curr_variable_coll: HashMap::new(),
             function_map,
             ret_types,
-            entry: pot_entry.unwrap()
+            entry: pot_entry.unwrap(),
+            var_counter: 0,
         }
     }
 
@@ -85,8 +82,6 @@ impl HIRBuilder {
         HIRProgram {
             functions: hir_functions,
             entry: builder.entry,
-            variables: builder.variables,
-            layouts: builder.layouts,
         }
     }
 
@@ -95,17 +90,17 @@ impl HIRBuilder {
         self.scope_stack.push(Scope::new(ret_type.clone()));
         let arg_ids: Vec<VarId>  = args
             .into_iter()
-            .map(|arg| self.add_variable_in_active_scope(TypedVariable{name: arg.0, typ: arg.1}))
+            .map(|arg| self.register_new_var(TypedVariable{name: arg.0, typ: arg.1}))
             .collect();
         let hir_body = self.lower_block(body);
         let hir_func = HIRFunction { 
             name, 
             args: arg_ids.clone(),
-            body_variables: self.curr_variable_coll.clone(),
+            variables: self.curr_variable_coll.clone(),
             body: hir_body, 
             ret_type 
         }; 
-        self.curr_variable_coll = Vec::new();
+        self.curr_variable_coll = HashMap::new();
         self.scope_stack.pop();
         hir_func
     }
@@ -117,7 +112,7 @@ impl HIRBuilder {
                 if self.get_expression_type(hir_value.clone()) != var.typ {
                     panic!("Variable definition inconsistent with value type");
                 }
-                let var_id = self.add_variable_in_active_scope(var);
+                let var_id = self.register_new_var(var);
                 HIRStatement::Let {
                     var: Place::Variable(var_id),
                     value: hir_value,
@@ -129,7 +124,7 @@ impl HIRBuilder {
                 };
                 let var_id = self.get_var_from_scope(var_name);
                 let hir_value = self.lower_expression(value);
-                if self.get_expression_type(hir_value.clone()) != self.variables[&var_id].typ {
+                if self.get_expression_type(hir_value.clone()) != self.curr_variable_coll[&var_id].typ {
                     panic!("Type mismatch in assign statement");
                 }
                 HIRStatement::Assign { 
@@ -197,11 +192,11 @@ impl HIRBuilder {
         stmts
     }
 
-    fn add_variable_in_active_scope(&mut self, var: TypedVariable) -> VarId {
-        let var_id = VarId(self.variables.len());
-        self.variables.insert(var_id, var.clone());
+    fn register_new_var(&mut self, var: TypedVariable) -> VarId {
+        let var_id = VarId(self.var_counter);
+        self.var_counter = self.var_counter + 1;
+        self.curr_variable_coll.insert(var_id.clone(), var.clone());
         self.scope_stack.last_mut().unwrap().scope_vars.insert(var.name, var_id);
-        self.curr_variable_coll.push(var_id.clone());
         var_id
     }
     
@@ -276,12 +271,13 @@ impl HIRBuilder {
         match expr {
             HIRExpression::IntLiteral(_) => Type::Prim(PrimitiveType::Integer),
             HIRExpression::Variable(var_id) => {
-                self.variables[&var_id].typ.clone()
+                self.curr_variable_coll[&var_id].typ.clone()
             }
             HIRExpression::BinOp{op, left, right} => {
                 binop_typecheck(&op, &self.get_expression_type(*left), &self.get_expression_type(*right)).expect("Binop typecheck failed")
             }
             HIRExpression::FuncCall{id , args} => {
+                // TODO ?: typecheck? Or is that solved earlier?
                 self.ret_types[&id].clone()
             }
             HIRExpression::BoolTrue | HIRExpression::BoolFalse => Type::Prim(PrimitiveType::Bool),
