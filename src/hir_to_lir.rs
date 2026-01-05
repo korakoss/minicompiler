@@ -49,7 +49,7 @@ impl LIRBuilder {
         self.curr_collected_blocks = HashMap::new();
         for (var_id, var) in func.variables.into_iter() {
             let varsize = self.layouts.get_layout(var.typ).size();
-            let var_vreg_id = self.add_vreg();
+            let var_vreg_id = self.add_vreg(varsize);
             self.variable_map.insert(var_id, var_vreg_id.clone());
         }
         let entry_id = self.get_new_blockid();
@@ -201,7 +201,8 @@ impl LIRBuilder {
         // Returns the statements to compute the expr and the vreg where the result is
         
         let HIRExpression { typ, expr: expr_kind } = expr;
-        let result_vreg_id = self.add_vreg();
+        let size = self.layouts.get_layout(typ).size();
+        let result_vreg_id = self.add_vreg(size);
         
         let stmts = match expr_kind {
             HIRExpressionKind::IntLiteral(num) => {
@@ -264,11 +265,11 @@ impl LIRBuilder {
         (stmts, result_vreg_id)
     }
 
-    fn add_vreg(&mut self) -> VRegId {
+    fn add_vreg(&mut self, size: usize) -> VRegId {
         // TODO: later add Vreginfo stuff
         let new_id = VRegId(self.vreg_counter);
         self.vreg_counter = self.vreg_counter + 1;
-        self.curr_vreg_coll.insert(new_id.clone(), VRegInfo { size: 8, align: 8});
+        self.curr_vreg_coll.insert(new_id.clone(), VRegInfo { size, align: 8});
         new_id
     }
     
