@@ -80,10 +80,7 @@ impl HIRBuilder {
         }
 
         HIRProgram {
-            new_types: new_types
-                .iter()
-                .map(|(id, constr)| Type::Derived(constr.clone()))
-                .collect(),
+            new_types: new_types,
             functions: hir_functions,
             entry: builder.entry,
         }

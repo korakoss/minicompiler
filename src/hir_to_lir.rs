@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::hir::*;
 use crate::lir::*;
+use crate::shared::typing::*;
+
 
 pub struct LIRBuilder {
     variable_map: HashMap<VarId, VRegId>,
@@ -13,11 +15,14 @@ pub struct LIRBuilder {
     curr_collected_blocks: HashMap<BlockId, LIRBlock>,
     wip_block_stmts: Vec<LIRStatement>, 
     wip_block_id: Option<BlockId>, 
+    layouts: LayoutTable,
 }
 
 impl LIRBuilder {
     
     pub fn lower_hir(program: HIRProgram) -> LIRProgram {
+        let HIRProgram { new_types, functions, entry } = program;
+        let layouts = LayoutTable::make(new_types.into_values().collect());
         let mut builder = LIRBuilder {
             variable_map: HashMap::new(),
             curr_vreg_coll: HashMap::new(),
@@ -28,17 +33,14 @@ impl LIRBuilder {
             curr_collected_blocks: HashMap::new(),
             wip_block_stmts: Vec::new(),
             wip_block_id: None, 
+            layouts
         };
-        builder.lower_hir_program(program)
-    }
-
-    fn lower_hir_program(&mut self, program: HIRProgram) -> LIRProgram {
         LIRProgram {
-            functions: program.functions
+            functions: functions
                 .into_iter()
-                .map(|(id, func)| (id, self.lower_function(func)))
+                .map(|(id, func)| (id, builder.lower_function(func)))
                 .collect(),
-            entry: program.entry
+            entry: entry
         }
     }
 
@@ -46,6 +48,7 @@ impl LIRBuilder {
         self.curr_vreg_coll = HashMap::new();
         self.curr_collected_blocks = HashMap::new();
         for (var_id, var) in func.variables.into_iter() {
+            let varsize = self.layouts.get_layout(var.typ).size();
             let var_vreg_id = self.add_vreg();
             self.variable_map.insert(var_id, var_vreg_id.clone());
         }
@@ -272,6 +275,77 @@ impl LIRBuilder {
         let block_id = BlockId(self.block_counter); 
         self.block_counter = self.block_counter + 1;
         block_id 
+    }
+}
+
+
+
+
+#[derive(Clone, Debug)]
+pub enum LayoutInfo {
+    Primitive(usize),               // Variable size
+    Struct {
+        size: usize,
+        field_offsets: HashMap<String, usize>
+    }
+}
+
+impl LayoutInfo {
+    pub fn size(&self) -> usize {
+        match self {
+            &LayoutInfo::Primitive(size) => size,
+            &LayoutInfo::Struct{size, ..} => size,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LayoutTable {
+    newtype_layouts: HashMap<DerivType, LayoutInfo>
+}
+
+impl LayoutTable {
+
+    pub fn make(new_types: Vec<DerivType>) -> LayoutTable {
+        let mut table = LayoutTable{newtype_layouts: HashMap::new()};
+        for tp in new_types {
+            table.newtype_layouts.insert(tp.clone(), table.make_newtype_layout(tp)); 
+        }
+        table
+    }   
+
+    pub fn get_layout(&self, typ: Type) -> LayoutInfo {
+        match typ {
+            Type::Prim(prim_tp) => self.get_primitive_layout(prim_tp),
+            Type::Derived(tp_constr) => self.newtype_layouts[&tp_constr].clone(),
+        }
+    }
+
+    fn get_primitive_layout(&self, prim_tp: PrimitiveType) -> LayoutInfo {
+        LayoutInfo::Primitive(8)        // Temporarily so; update later
+    }
+    
+    fn make_newtype_layout(&self, deriv_typ: DerivType) -> LayoutInfo {
+
+        // TODO: we have to process in topo order !!!!!!!
+        // Currently, I think it spills down in that order here
+        // But we should make it cleaner
+        
+        let TypeConstructor::Struct{fields} = deriv_typ;
+
+        let mut f_offsets: HashMap<String, usize> = HashMap::new();
+
+        let mut curr_offset = 0;
+        for (fname, ftype) in fields {
+            f_offsets.insert(fname, curr_offset);
+            let fsize = self.get_layout(ftype).size(); 
+            curr_offset = curr_offset + fsize;
+        }
+
+        LayoutInfo::Struct { 
+            size: curr_offset, 
+            field_offsets: f_offsets 
+        }
     }
 }
 
