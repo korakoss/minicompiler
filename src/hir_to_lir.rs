@@ -107,26 +107,16 @@ impl LIRBuilder {
         match stmt {
             HIRStatement::Let { var, value } => {
                 let var_reg = self.variable_map[&var].clone();
-                let (value_stmts, value_reg) = self.lower_expression(value);
+                let value_stmts = self.lower_expression(value, var_reg);
                 self.wip_block_stmts.extend(value_stmts.into_iter());
-                let assign_stmt = LIRStatement::Load{ 
-                    dest: var_reg, 
-                    from: LIRPlace::VReg(value_reg), 
-                };
-                self.wip_block_stmts.push(assign_stmt);
             }
 
             HIRStatement::Assign { target, value } => {
                 match target {
                     Place::Variable(var_id) => {
                         let var_reg = self.variable_map[&var_id].clone();
-                        let (value_stmts, value_reg) = self.lower_expression(value);
+                        let value_stmts = self.lower_expression(value, var_reg);
                         self.wip_block_stmts.extend(value_stmts.into_iter());
-                        let assign_stmt = LIRStatement::Load{ 
-                            dest: var_reg, 
-                            from: LIRPlace::VReg(value_reg), 
-                        };
-                        self.wip_block_stmts.push(assign_stmt);
                     }
                     Place::StructField { of, field } => {
                         unimplemented!();
@@ -149,8 +139,8 @@ impl LIRBuilder {
                     },
                     None => merge_id.clone()
                 };
-
-                let (cond_stmts, cond_reg) = self.lower_expression(condition);
+                let cond_reg = self.add_vreg(8);
+                let cond_stmts = self.lower_expression(condition, cond_reg.clone());
                 let branch_block = LIRBlock {
                     statements: cond_stmts,
                     terminator: LIRTerminator::Branch { 
@@ -169,7 +159,8 @@ impl LIRBuilder {
 
                 self.push_current_block(LIRTerminator::Goto { dest: start_id.clone() });
 
-                let (cond_stmts, cond_reg) = self.lower_expression(condition);
+                let cond_reg = self.add_vreg(8);
+                let cond_stmts = self.lower_expression(condition, cond_reg.clone());
                 let loop_header_block = LIRBlock {
                     statements: cond_stmts,
                     terminator: LIRTerminator::Branch { 
@@ -199,13 +190,24 @@ impl LIRBuilder {
                 self.push_current_block(cont_terminator);
             }
             HIRStatement::Return(retval_expr) => {
-                let (retval_stmts, retval_reg) = self.lower_expression(retval_expr);
+
+                // TODO: careful later with larger types !!
+                let retval_reg = self.add_vreg(
+                    self.layouts.get_layout(retval_expr.typ.clone()).size()
+                );
+
+                let retval_stmts = self.lower_expression(retval_expr, retval_reg.clone());
                 self.wip_block_stmts.extend(retval_stmts.into_iter());
                 let ret_terminator = LIRTerminator::Return(Some(Operand::Register(retval_reg)));
                 self.push_current_block(ret_terminator);
             }
             HIRStatement::Print(expr) => {
-                let (expr_stmts, expr_reg) = self.lower_expression(expr);
+                
+                let expr_reg = self.add_vreg(
+                    self.layouts.get_layout(expr.typ.clone()).size()
+                );
+
+                let expr_stmts = self.lower_expression(expr, expr_reg.clone());
                 self.wip_block_stmts.extend(expr_stmts.into_iter());
                 let print_stmt = LIRStatement::Print(Operand::Register(expr_reg));
                 self.wip_block_stmts.push(print_stmt);
@@ -215,17 +217,15 @@ impl LIRBuilder {
 
 
     
-    fn lower_expression(&mut self, expr: HIRExpression) -> (Vec<LIRStatement>, VRegId) {
+    fn lower_expression(&mut self, expr: HIRExpression, target: VRegId) -> Vec<LIRStatement>  {
         // Returns the statements to compute the expr and the vreg where the result is
         
         let HIRExpression { typ, expr: expr_kind } = expr;
-        let size = self.layouts.get_layout(typ).size();
-        let result_vreg_id = self.add_vreg(size);
         
         let stmts = match expr_kind {
             HIRExpressionKind::IntLiteral(num) => {
                 let stmt = LIRStatement::Store { 
-                    dest: LIRPlace::VReg(result_vreg_id.clone()), 
+                    dest: LIRPlace::VReg(target), 
                     value: Operand::IntLiteral(num), 
             };
                 vec![stmt] 
@@ -233,54 +233,64 @@ impl LIRBuilder {
             HIRExpressionKind::Variable(var_id) => {
                 let var_slot = self.variable_map[&var_id].clone();
                 let stmt = LIRStatement::Load {
-                    dest: result_vreg_id.clone(), 
+                    dest: target,
                     from: LIRPlace::VReg(var_slot)
                 }; 
                 vec![stmt]
             }
             HIRExpressionKind::BinOp { op, left, right } => {
-                let (left_stmts, left_reg) = self.lower_expression(*left);
-                let (right_stmts, right_reg) = self.lower_expression(*right);
+                let ltemp = self.add_vreg(
+                    self.layouts.get_layout(left.typ.clone()).size()
+                );
+                let rtemp = self.add_vreg(
+                    self.layouts.get_layout(right.typ.clone()).size()
+                );
+
+                let left_stmts = self.lower_expression(*left, ltemp.clone());
+                let right_stmts = self.lower_expression(*right, rtemp.clone());
                 let binop_stmt = LIRStatement::BinOp { 
-                    dest: LIRPlace::VReg(result_vreg_id.clone()), 
+                    dest: LIRPlace::VReg(target),
                     op, 
-                    left: Operand::Register(left_reg), 
-                    right:Operand::Register(right_reg), 
+                    left: Operand::Register(ltemp), 
+                    right:Operand::Register(rtemp), 
                 };
                 [left_stmts, right_stmts, vec![binop_stmt]].concat()
             }
             HIRExpressionKind::FuncCall { id, args } => {
                 let mut arg_vregs: Vec<VRegId> = Vec::new();
-                let mut arg_stmts: Vec<Vec<LIRStatement>> = Vec::new();
+                let mut arg_stmts: Vec<LIRStatement> = Vec::new();
                 for arg in args {
-                    let (s, r) = self.lower_expression(arg);
-                    arg_vregs.push(r);
-                    arg_stmts.push(s);
+                    let argtemp = self.add_vreg(
+                        self.layouts.get_layout(arg.typ.clone()).size()
+                    );
+                    arg_vregs.push(argtemp.clone());
+                    let arg_comp = self.lower_expression(arg, argtemp);
+                    arg_stmts.extend(arg_comp.into_iter());
                 }
                 let call_stmt = LIRStatement::Call { 
-                    dest: LIRPlace::VReg(result_vreg_id.clone()),                      
+                    dest: LIRPlace::VReg(target),
                     func: id, 
                     args: arg_vregs
                 };
-                [arg_stmts.into_iter().flatten().collect(), vec![call_stmt]].concat()
+                [arg_stmts, vec![call_stmt]].concat()
             }
             HIRExpressionKind::BoolTrue => {
                 let true_stmt = LIRStatement::Store { 
-                    dest: LIRPlace::VReg(result_vreg_id.clone()), 
+                    dest: LIRPlace::VReg(target),
                     value: Operand::BoolTrue
                 };
                 vec![true_stmt]
             }
             HIRExpressionKind::BoolFalse => {
                 let false_stmt = LIRStatement::Store {
-                    dest: LIRPlace::VReg(result_vreg_id.clone()), 
+                    dest: LIRPlace::VReg(target),
                     value: Operand::BoolFalse
                 };
                 vec![false_stmt]
             }
             _ => {unimplemented!();}        // Struct stuff 
         };
-        (stmts, result_vreg_id)
+        stmts
     }
 
     fn add_vreg(&mut self, size: usize) -> VRegId {
