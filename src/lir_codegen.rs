@@ -245,7 +245,7 @@ self.emit_operand_load(left, frame);
             }
             LIRPlace::Deref { base, offset } => {
                 let base_reg_offset = frame.offsets.clone()[&base];
-                self.emit(&format!("    str r0, [fp, #-{}]", base_reg_offset-offset));    
+                self.emit(&format!("    str r0, [fp, #-{}]", base_reg_offset+offset));    
             }
         }
     }
@@ -258,7 +258,7 @@ self.emit_operand_load(left, frame);
             }
             LIRPlace::Deref { base, offset } => {
                 let base_reg_offset = frame.offsets[&base].clone();
-                self.emit(&format!("    ldr r0, [fp, #-{}]", base_reg_offset-offset));    
+                self.emit(&format!("    ldr r0, [fp, #-{}]", base_reg_offset+offset));    
             }
         }
     }
