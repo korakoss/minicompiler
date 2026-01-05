@@ -110,7 +110,7 @@ impl HIRBuilder {
         match statement {
             TASTStatement::Let {var, value} => {
                 let hir_value = self.lower_expression(value);
-                if self.get_expression_type(hir_value.clone()) != var.typ {
+                if hir_value.typ != var.typ {
                     panic!("Variable definition inconsistent with value type");
                 }
                 let var_id = self.register_new_var(var);
@@ -124,7 +124,7 @@ impl HIRBuilder {
                     TASTExpression::Variable(var_name) => {
                         let var_id = self.get_var_from_scope(var_name);
                         let hir_value = self.lower_expression(value);
-                        if self.get_expression_type(hir_value.clone()) != self.curr_variable_coll[&var_id].typ {
+                        if hir_value.typ != self.curr_variable_coll[&var_id].typ {
                             panic!("Type mismatch in assign statement");
                         }
                         HIRStatement::Assign { 
@@ -134,14 +134,12 @@ impl HIRBuilder {
                     }
                     TASTExpression::FieldAccess { expr, field } => {
                         let hir_expr = self.lower_expression(*expr);
-                        let expr_type = self.get_expression_type(hir_expr.clone());
-                        let Type::Derived(TypeConstructor::Struct{fields }) = expr_type else {
+                        let Type::Derived(TypeConstructor::Struct{fields }) = hir_expr.typ.clone() else {
                             panic!("Expression in field access isn't struct");
                         };
                         let field_type = fields.get(&field).expect("Field not found in struct").clone();
                         let hir_value = self.lower_expression(value);
-                        let value_type = self.get_expression_type(hir_value.clone());
-                        if value_type != field_type {
+                        if hir_value.typ != field_type {
                             panic!("Non-matching types in assignment to struct field");
                         }
                         HIRStatement::Assign { 
@@ -159,7 +157,7 @@ impl HIRBuilder {
             }
             TASTStatement::If { condition, if_body, else_body } => {
                 let hir_condition = self.lower_expression(condition);
-                if self.get_expression_type(hir_condition.clone()) != Type::Prim(PrimitiveType::Bool) {
+                if hir_condition.typ != Type::Prim(PrimitiveType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::If {
@@ -173,7 +171,7 @@ impl HIRBuilder {
             }
             TASTStatement::While { condition, body } => {
                 let hir_condition = self.lower_expression(condition);
-                if self.get_expression_type(hir_condition.clone()) != Type::Prim(PrimitiveType::Bool) {
+                if hir_condition.typ != Type::Prim(PrimitiveType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::While { 
@@ -195,7 +193,7 @@ impl HIRBuilder {
             }
             TASTStatement::Return(expr) => {
                 let hir_expr = self.lower_expression(expr);
-                if self.get_expression_type(hir_expr.clone()) != self.scope_stack.last().unwrap().ambient_ret_type {
+                if hir_expr.typ != self.scope_stack.last().unwrap().ambient_ret_type {
                     panic!("Return statement has unexpected type");
                 }
                 HIRStatement::Return(hir_expr)
@@ -239,16 +237,30 @@ impl HIRBuilder {
 
     fn lower_expression(&self, expr: TASTExpression) -> HIRExpression {
         match expr {
-            TASTExpression::IntLiteral(num) => HIRExpression::IntLiteral(num),
+            TASTExpression::IntLiteral(num) => HIRExpression {
+                typ: Type::Prim(PrimitiveType::Integer),
+                expr: HIRExpressionKind::IntLiteral(num),
+            },
             TASTExpression::Variable(varname) => {
                 let var_id = self.get_var_from_scope(varname);
-                HIRExpression::Variable(var_id)
+                let vartype = self.curr_variable_coll[&var_id].typ.clone();
+                HIRExpression {
+                    typ: vartype,
+                    expr: HIRExpressionKind::Variable(var_id)
+                }
             }
             TASTExpression::BinOp{ op, left, right} => {
-                HIRExpression::BinOp{ 
-                    op, 
-                    left: Box::new(self.lower_expression(*left)), 
-                    right: Box::new(self.lower_expression(*right)),  
+                let left_hir = self.lower_expression(*left);
+                let right_hir = self.lower_expression(*right);
+                let result_type = binop_typecheck(&op, &left_hir.typ, &right_hir.typ)
+                    .expect("Binop typecheck failed");
+                HIRExpression {
+                    typ: result_type,
+                    expr: HIRExpressionKind::BinOp{ 
+                        op, 
+                        left: Box::new(left_hir),
+                        right: Box::new(right_hir),
+                    }
                 }
             }
             TASTExpression::FuncCall { funcname, args } => {
@@ -261,22 +273,42 @@ impl HIRBuilder {
                     name: funcname,
                     argtypes: hir_args
                         .iter()
-                        .map(|arg| self.get_expression_type(arg.clone()).clone())
+                        .map(|arg| arg.typ.clone())
                         .collect()
                 };
                 let func_id = self.function_map[&func_sgn].clone();
-                HIRExpression::FuncCall{ 
-                    id: func_id, 
-                    args: hir_args 
+                let ret_typ = self.ret_types[&func_id].clone();
+                HIRExpression {
+                    typ: ret_typ,
+                    expr: HIRExpressionKind::FuncCall{ 
+                        id: func_id, 
+                        args: hir_args
+                    }
                 } 
             }
-            TASTExpression::BoolTrue => HIRExpression::BoolTrue,
-            TASTExpression::BoolFalse => HIRExpression::BoolFalse,
+            TASTExpression::BoolTrue => HIRExpression {
+                typ: Type::Prim(PrimitiveType::Bool),
+                expr: HIRExpressionKind::BoolTrue,
+            },
+            TASTExpression::BoolFalse => HIRExpression {
+                typ: Type::Prim(PrimitiveType::Bool),
+                expr: HIRExpressionKind::BoolFalse,
+            },
             TASTExpression::FieldAccess{expr, field} => {
-                 HIRExpression::FieldAccess{  
-                     expr: Box::new(self.lower_expression(*expr)), 
-                     field 
-                 }
+                let hir_expr = self.lower_expression(*expr);
+                let Type::Derived(TypeConstructor::Struct { fields }) = hir_expr.typ.clone() else {
+                    panic!("Expression in field access is not a struct");
+                };
+                let field_type = fields.get(&field)
+                    .expect("Struct in field access doesn't have the requested field")
+                    .clone();
+                HIRExpression {
+                    typ: field_type,
+                    expr: HIRExpressionKind::FieldAccess{  
+                        expr: Box::new(hir_expr),
+                        field 
+                     }
+                }
             }
             TASTExpression::StructLiteral{typ, fields} => {
                 let hir_fields: HashMap<String, HIRExpression> = fields 
@@ -284,37 +316,12 @@ impl HIRBuilder {
                         .map(|(fname, fexpr)| (fname, self.lower_expression(fexpr)))
                         .collect();
                 self.typecheck_struct(typ.clone(), hir_fields.clone());
-                HIRExpression::StructLiteral{ 
-                    typ, 
-                    fields: hir_fields
+                HIRExpression {
+                    typ,
+                    expr: HIRExpressionKind::StructLiteral { 
+                        fields: hir_fields
+                    }
                 }
-            }
-        }
-    }
-
-    fn get_expression_type(&self, expr: HIRExpression) -> Type {
-        match expr {
-            HIRExpression::IntLiteral(_) => Type::Prim(PrimitiveType::Integer),
-            HIRExpression::Variable(var_id) => {
-                self.curr_variable_coll[&var_id].typ.clone()
-            }
-            HIRExpression::BinOp{op, left, right} => {
-                binop_typecheck(&op, &self.get_expression_type(*left), &self.get_expression_type(*right)).expect("Binop typecheck failed")
-            }
-            HIRExpression::FuncCall{id , args} => {
-                // TODO ?: typecheck? Or is that solved earlier?
-                self.ret_types[&id].clone()
-            }
-            HIRExpression::BoolTrue | HIRExpression::BoolFalse => Type::Prim(PrimitiveType::Bool),
-            HIRExpression::FieldAccess{expr, field} => {
-                let Type::Derived(DerivType::Struct{fields}) = self.get_expression_type(*expr) else {
-                    panic!("Attempted field access on non-struct value");
-                };
-                fields[&field].clone()
-            }
-            HIRExpression::StructLiteral{ typ, fields} => {
-                self.typecheck_struct(typ.clone(), fields.clone());
-                typ 
             }
         }
     }
@@ -326,7 +333,7 @@ impl HIRBuilder {
 
         for (fname, exp_type) in struct_fields {
             let fexpr = field_exprs.get(&fname).expect("Field not found").clone();
-            if self.get_expression_type(fexpr) != exp_type {
+            if fexpr.typ != exp_type {
                 panic!("Field type doesn't match expected type");
             }
         }

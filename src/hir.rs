@@ -46,9 +46,14 @@ pub enum HIRStatement {
     Print(HIRExpression),
 }
 
+#[derive(Debug, Clone)]
+pub struct HIRExpression {
+    pub typ: Type,
+    pub expr: HIRExpressionKind,
+}
 
 #[derive(Debug, Clone)]
-pub enum HIRExpression {
+pub enum HIRExpressionKind {
     IntLiteral(i32),
     Variable(VarId),
     BinOp {
@@ -69,7 +74,6 @@ pub enum HIRExpression {
     },
 
     StructLiteral {
-        typ: Type,
         fields: HashMap<String, HIRExpression>,
     },
 }

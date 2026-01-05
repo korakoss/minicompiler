@@ -200,17 +200,18 @@ impl LIRBuilder {
     fn lower_expression(&mut self, expr: HIRExpression) -> (Vec<LIRStatement>, VRegId) {
         // Returns the statements to compute the expr and the vreg where the result is
         
+        let HIRExpression { typ, expr: expr_kind } = expr;
         let result_vreg_id = self.add_vreg();
-
-        let stmts = match expr {
-            HIRExpression::IntLiteral(num) => {
+        
+        let stmts = match expr_kind {
+            HIRExpressionKind::IntLiteral(num) => {
                 let stmt = LIRStatement::Store { 
                     dest: LIRPlace::VReg(result_vreg_id.clone()), 
                     value: Operand::IntLiteral(num), 
             };
                 vec![stmt] 
             },
-            HIRExpression::Variable(var_id) => {
+            HIRExpressionKind::Variable(var_id) => {
                 let var_slot = self.variable_map[&var_id].clone();
                 let stmt = LIRStatement::Load {
                     dest: result_vreg_id.clone(), 
@@ -218,7 +219,7 @@ impl LIRBuilder {
                 }; 
                 vec![stmt]
             }
-            HIRExpression::BinOp { op, left, right } => {
+            HIRExpressionKind::BinOp { op, left, right } => {
                 let (left_stmts, left_reg) = self.lower_expression(*left);
                 let (right_stmts, right_reg) = self.lower_expression(*right);
                 let binop_stmt = LIRStatement::BinOp { 
@@ -229,7 +230,7 @@ impl LIRBuilder {
                 };
                 [left_stmts, right_stmts, vec![binop_stmt]].concat()
             }
-            HIRExpression::FuncCall { id, args } => {
+            HIRExpressionKind::FuncCall { id, args } => {
                 let mut arg_vregs: Vec<VRegId> = Vec::new();
                 let mut arg_stmts: Vec<Vec<LIRStatement>> = Vec::new();
                 for arg in args {
@@ -244,14 +245,14 @@ impl LIRBuilder {
                 };
                 [arg_stmts.into_iter().flatten().collect(), vec![call_stmt]].concat()
             }
-            HIRExpression::BoolTrue => {
+            HIRExpressionKind::BoolTrue => {
                 let true_stmt = LIRStatement::Store { 
                     dest: LIRPlace::VReg(result_vreg_id.clone()), 
                     value: Operand::BoolTrue
                 };
                 vec![true_stmt]
             }
-            HIRExpression::BoolFalse => {
+            HIRExpressionKind::BoolFalse => {
                 let false_stmt = LIRStatement::Store {
                     dest: LIRPlace::VReg(result_vreg_id.clone()), 
                     value: Operand::BoolFalse
