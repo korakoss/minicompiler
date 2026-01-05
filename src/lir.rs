@@ -1,5 +1,7 @@
 use std::{collections::HashMap};
 use crate::{hir::FuncId, shared::binops::*};
+use crate::shared::typing::*;
+
 
 #[derive(Clone, Debug)]
 pub struct LIRProgram {
@@ -92,5 +94,6 @@ pub struct VRegId(pub usize);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct BlockId(pub usize);
+
 
 

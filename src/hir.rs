@@ -5,6 +5,7 @@ use crate::shared::binops::*;
 
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
+    pub new_types: Vec<Type>,
     pub functions: HashMap<FuncId, HIRFunction>,
     pub entry: FuncId,
 }
@@ -23,7 +24,7 @@ pub struct HIRFunction {
 #[derive(Clone, Debug)]
 pub enum HIRStatement {
     Let {
-        var: Place,     
+        var: Place,                 // TODO: Maybe change to VarId for clarity 
         value: HIRExpression,
     },
     Assign {
@@ -76,7 +77,10 @@ pub enum HIRExpression {
 #[derive(Clone, Debug)]
 pub enum Place {
     Variable(VarId),
-    // TODO: StructField
+    StructField {
+        of: HIRExpression,
+        field: String,
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
@@ -87,6 +91,7 @@ pub struct FuncId(pub usize);
 
 
 /*
+
 #[derive(Clone, Debug)]
 pub enum LayoutInfo {
     Primitive(usize),               // Variable size

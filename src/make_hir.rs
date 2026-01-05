@@ -80,6 +80,10 @@ impl HIRBuilder {
         }
 
         HIRProgram {
+            new_types: new_types
+                .iter()
+                .map(|(id, constr)| Type::Derived(constr.clone()))
+                .collect(),
             functions: hir_functions,
             entry: builder.entry,
         }
@@ -119,17 +123,41 @@ impl HIRBuilder {
                 }
             }
             TASTStatement::Assign { target, value } => {
-                let TASTExpression::Variable(var_name) = target else {
-                    panic!("Invalid assignment target");
-                };
-                let var_id = self.get_var_from_scope(var_name);
-                let hir_value = self.lower_expression(value);
-                if self.get_expression_type(hir_value.clone()) != self.curr_variable_coll[&var_id].typ {
-                    panic!("Type mismatch in assign statement");
-                }
-                HIRStatement::Assign { 
-                    target: Place::Variable(var_id), 
-                    value: hir_value
+                match target {
+                    TASTExpression::Variable(var_name) => {
+                        let var_id = self.get_var_from_scope(var_name);
+                        let hir_value = self.lower_expression(value);
+                        if self.get_expression_type(hir_value.clone()) != self.curr_variable_coll[&var_id].typ {
+                            panic!("Type mismatch in assign statement");
+                        }
+                        HIRStatement::Assign { 
+                            target: Place::Variable(var_id), 
+                            value: hir_value
+                        }
+                    }
+                    TASTExpression::FieldAccess { expr, field } => {
+                        let hir_expr = self.lower_expression(*expr);
+                        let expr_type = self.get_expression_type(hir_expr.clone());
+                        let Type::Derived(TypeConstructor::Struct{fields }) = expr_type else {
+                            panic!("Expression in field access isn't struct");
+                        };
+                        let field_type = fields.get(&field).expect("Field not found in struct").clone();
+                        let hir_value = self.lower_expression(value);
+                        let value_type = self.get_expression_type(hir_value.clone());
+                        if value_type != field_type {
+                            panic!("Non-matching types in assignment to struct field");
+                        }
+                        HIRStatement::Assign { 
+                            target: Place::StructField { 
+                                of: hir_expr, 
+                                field 
+                            }, 
+                            value: hir_value 
+                        }
+                    }
+                    _ => {
+                        panic!("Invalid assignment target");
+                    }
                 }
             }
             TASTStatement::If { condition, if_body, else_body } => {

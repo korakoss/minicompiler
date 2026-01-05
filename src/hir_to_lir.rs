@@ -103,7 +103,7 @@ impl LIRBuilder {
         println!("Lowering {:?}", stmt);
         match stmt {
             HIRStatement::Let {var:target, value} | HIRStatement::Assign { target, value } => {
-                let Place::Variable(var_id) = target;
+                let Place::Variable(var_id) = target else {unreachable!()};
                 let slot = self.variable_map[&var_id].clone();
                 let (value_stmts, value_reg) = self.lower_expression(value);
                 self.wip_block_stmts.extend(value_stmts.into_iter());
