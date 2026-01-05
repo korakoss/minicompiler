@@ -6,43 +6,6 @@ use crate::ast::*;
 use crate::shared::typing::*;
 
 
-struct TypeTable {
-    complete_newtypes: HashMap<TypeIdentifier, DerivType>,
-    old_to_new: HashMap<DeferredDerivType, DerivType>,
-}
-
-impl TypeTable {
-
-    fn make(newtype_defs: HashMap<TypeIdentifier, DeferredDerivType>) -> TypeTable { 
-
-        let dep_graph = get_newtype_dependencies(&newtype_defs); 
-        let topo_order = toposort_depgraph(&dep_graph);
-
-        let mut complete_newtypes: HashMap<TypeIdentifier, DerivType> = HashMap::new();
-        let mut old_to_new = HashMap::new();
-
-        for type_id in topo_order { 
-            let deferred_newtype = newtype_defs[&type_id].clone();
-            let TypeConstructor::Struct { fields } = deferred_newtype.clone();
-            let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
-            for (fname, ftype) in fields {
-                let actual_type = match ftype {
-                    DeferredType::Prim(prim_typ) => Type::Prim(prim_typ),
-                    DeferredType::Symbolic(type_id) => Type::Derived(complete_newtypes[&type_id].clone()),
-                };
-                tfields.insert(fname, actual_type);
-            }
-            let complete_newtype = TypeConstructor::Struct { fields: tfields};
-            complete_newtypes.insert(type_id, complete_newtype.clone());
-            old_to_new.insert(deferred_newtype, complete_newtype);
-        }
-        TypeTable { complete_newtypes, old_to_new } 
-    }
-    
-    fn map(&self, deferred_type: &DeferredDerivType) -> DerivType {
-        self.old_to_new[deferred_type].clone()        
-    }
-}
 
 pub struct ASTConverter {
     typetable: TypeTable, 
@@ -60,7 +23,7 @@ impl ASTConverter {
             .map( |(sgn, func)| (converter.convert_function_signature(sgn), converter.convert_function(func)))
             .collect();
         TASTProgram { 
-            new_types: converter.typetable.complete_newtypes, 
+            new_types: converter.typetable.newtype_map, 
             functions: t_functions 
         }
     }
@@ -69,7 +32,7 @@ impl ASTConverter {
         let DeferredFunctionSignature{name, argtypes} = fsgn;
         CompleteFunctionSignature {
             name,
-            argtypes: argtypes.into_iter().map( |ftyp| (self.convert_type(ftyp))).collect()
+            argtypes: argtypes.into_iter().map( |ftyp| (self.typetable.convert(ftyp))).collect()
         }
     }
 
@@ -80,10 +43,10 @@ impl ASTConverter {
             name,
             args: args
                 .into_iter()
-                .map(|(name, deftyp)| (name, self.convert_type(deftyp)))
+                .map(|(name, deftyp)| (name, self.typetable.convert(deftyp)))
                 .collect(),
             body: body.into_iter().map(|stmt| self.convert_statement(stmt)).collect(),
-            ret_type: self.convert_type(ret_type)
+            ret_type: self.typetable.convert(ret_type)
         }
     }
     
@@ -151,7 +114,7 @@ impl ASTConverter {
             }
             UASTExpression::StructLiteral { typ, fields } => {
                 TASTExpression::StructLiteral{ 
-                    typ: self.convert_type(typ), 
+                    typ: self.typetable.convert(typ), 
                     fields: fields.into_iter().map(|(fname, fexpr)| (fname, self.convert_expression(fexpr))).collect(),
                 }
             }
@@ -162,30 +125,68 @@ impl ASTConverter {
         let DeferredTypeVariable{name, typ} = var; 
         TypedVariable {
             name,
-            typ: self.convert_type(typ)       
+            typ: self.typetable.convert(typ)
         }
     }
+}
 
-    fn convert_type(&self, typ: DeferredType) -> Type {
-        match typ {
+
+
+
+
+
+
+
+pub struct TypeTable {
+    topo_order: Vec<TypeIdentifier>,
+    newtype_map: HashMap<TypeIdentifier, DerivType>,
+}
+
+impl TypeTable {
+
+    pub fn make(newtype_defs: HashMap<TypeIdentifier, DeferredDerivType>) -> TypeTable { 
+
+        let dep_graph = get_newtype_dependencies(&newtype_defs); 
+        let topo_order = toposort_depgraph(&dep_graph);
+
+        let mut complete_newtypes: HashMap<TypeIdentifier, DerivType> = HashMap::new();
+        let mut old_to_new = HashMap::new();
+
+        for type_id in topo_order.iter() { 
+            let deferred_newtype = newtype_defs[type_id].clone();
+            let TypeConstructor::Struct { fields } = deferred_newtype.clone();
+            let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
+            for (fname, ftype) in fields {
+                let actual_type = match ftype {
+                    DeferredType::Prim(prim_typ) => Type::Prim(prim_typ),
+                    DeferredType::Symbolic(type_id) => Type::Derived(complete_newtypes[&type_id].clone()),
+                };
+                tfields.insert(fname, actual_type);
+            }
+            let complete_newtype = TypeConstructor::Struct { fields: tfields};
+            complete_newtypes.insert(type_id.clone(), complete_newtype.clone());
+            old_to_new.insert(deferred_newtype, complete_newtype);
+        }
+        TypeTable {topo_order, newtype_map: complete_newtypes} 
+    }
+
+    pub fn convert(&self, t: DeferredType) -> Type {
+        match t {
             DeferredType::Prim(prim) => Type::Prim(prim),
-            DeferredType::Symbolic(type_id) => Type::Derived(self.typetable.complete_newtypes[&type_id].clone()),
+            DeferredType::Symbolic(type_id) => {
+                let resolved = self.newtype_map
+                    .get(&type_id)
+                    .expect("Type symbol cannot be resolved").clone();
+                Type::Derived(resolved)
+            }
         }
     }
 }
 
-/*
-fn get_type_size(typ: &Type) -> usize {
-    match typ {
-        Type::Integer => 8,
-        Type::Bool => 8,
-        Type::None => 0,
-        Type::DerivType(DerivType::Struct { fields }) => {
-            fields.into_iter().map(|(f_name, f_type)| get_type_size(f_type)).sum()            
-        }
-    }
-}
-*/
+
+
+
+
 
 fn get_newtype_dependencies(newtype_defs: &HashMap<TypeIdentifier, DeferredDerivType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
     let mut dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = HashMap::new();
