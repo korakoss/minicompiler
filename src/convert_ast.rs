@@ -97,7 +97,7 @@ impl ASTConverter {
             }
             UASTStatement::Assign { target, value } => {
                 TASTStatement::Assign {
-                    target: self.convert_expression(target), 
+                    target,
                     value: self.convert_expression(value) 
                 }
             }

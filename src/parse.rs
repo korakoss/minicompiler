@@ -115,9 +115,9 @@ impl Parser {
     }
     
     fn parse_statement(&mut self) -> UASTStatement {
-        let token = self.tokens.next().unwrap();  
-        match token {           
-            Token::Let => {
+        match self.tokens.peek().unwrap() {           
+            &Token::Let => {
+                self.tokens.next();
                 let var_name = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
                 let var_type = self.expect_deferred_type();
@@ -130,17 +130,20 @@ impl Parser {
                 self.expect_unparametric_token(Token::Semicolon);
                 UASTStatement::Let{var, value}
             }
-            Token::Identifier(id)  => {                // Assignment. NOTE: an identifier could actually mean funccalls later too
-                                                                         // And field access
+            &Token::Identifier(_)  => {                
+                // Assignment 
+                // TODO: an identifier could actually mean funccalls too
+                let target = self.parse_lvalue();
                 self.expect_unparametric_token(Token::Assign);
                 let assign_value = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
                 UASTStatement::Assign { 
-                    target: UASTExpression::Variable(id), 
+                    target,
                     value: assign_value
                 }
             }
-            Token::If => {
+            &Token::If => {
+                self.tokens.next();
                 let condition = self.parse_expression();
                 let if_body = self.parse_statement_block();
                 let else_body =  if matches!(self.tokens.peek(), Some(Token::Else)) {
@@ -149,7 +152,8 @@ impl Parser {
                 } else {None};
                 UASTStatement::If {condition, if_body, else_body}
             }
-            Token::While => {
+            &Token::While => {
+                self.tokens.next();
                 let cond = self.parse_expression();
                 let body = self.parse_statement_block();
                 UASTStatement::While { 
@@ -157,20 +161,24 @@ impl Parser {
                     body: body,
                 }
             }
-            Token::Break => {         
+            &Token::Break => {         
+                self.tokens.next();
                 self.expect_unparametric_token(Token::Semicolon);
                 UASTStatement::Break
             }
-            Token::Continue => {         
+            &Token::Continue => {         
+                self.tokens.next();
                 self.expect_unparametric_token(Token::Semicolon);
                 UASTStatement::Continue
             }
-            Token::Return => {
+            &Token::Return => {
+                self.tokens.next();
                 let return_expr = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
                 UASTStatement::Return(return_expr)
             }
-            Token::Print => {
+            &Token::Print => {
+                self.tokens.next();
                 self.expect_unparametric_token(Token::LeftParen);
                 let expr = self.parse_expression();
                 self.expect_unparametric_token(Token::RightParen);
@@ -178,10 +186,24 @@ impl Parser {
                 UASTStatement::Print(expr)
             },
             _ => {                                      
-                panic!("Cannot recognize valid statement starting with token {:?}", token);              
+                panic!("Cannot recognize valid statement starting with token {:?}", self.tokens.next());              
             }
         }
     } 
+
+    fn parse_lvalue(&mut self) -> ASTLValue {
+        let root = self.expect_identifier();
+        let mut curr_lvalue = ASTLValue::Variable(root);
+        while self.tokens.peek().unwrap() == &Token::Dot {
+            self.tokens.next();
+            let curr_field = self.expect_identifier();
+            curr_lvalue = ASTLValue::FieldAccess { 
+                of: Box::new(curr_lvalue), 
+                field: curr_field 
+            };
+        }
+        curr_lvalue
+    }
         
     fn parse_expression(&mut self) -> UASTExpression {
         self.parse_expression_with_precedence(0)

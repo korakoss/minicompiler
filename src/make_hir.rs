@@ -106,6 +106,33 @@ impl HIRBuilder {
         hir_func
     }
 
+    fn lower_lvalue(&self, lvalue: ASTLValue) -> Place {
+        match lvalue {
+            ASTLValue::Variable(var_name) => {
+                let var_id = self.get_var_from_scope(var_name);
+                let typ = self.curr_variable_coll[&var_id].typ.clone(); 
+                Place {
+                    typ,
+                    place: PlaceKind::Variable(var_id),
+                }
+            }
+            ASTLValue::FieldAccess { of, field } => {
+                let hir_of = self.lower_lvalue(*of);
+                let Type::Derived(TypeConstructor::Struct{fields }) = hir_of.typ.clone() else {
+                    panic!("Expression in field access isn't struct");
+                };
+                let field_type = fields.get(&field).expect("Field not found in struct").clone();
+                Place {
+                    typ: field_type,
+                    place: PlaceKind::StructField { 
+                        of: Box::new(hir_of), 
+                        field 
+                    }
+                }
+            }
+        }
+    }
+
     fn lower_statement(&mut self, statement: TASTStatement) -> HIRStatement {
         match statement {
             TASTStatement::Let {var, value} => {
@@ -120,46 +147,12 @@ impl HIRBuilder {
                 }
             }
             TASTStatement::Assign { target, value } => {
-                match target {
-                    TASTExpression::Variable(var_name) => {
-                        let var_id = self.get_var_from_scope(var_name);
-                        let hir_value = self.lower_expression(value);
-                        if hir_value.typ != self.curr_variable_coll[&var_id].typ {
-                            panic!("Type mismatch in assign statement");
-                        }
-                        HIRStatement::Assign { 
-                            target: Place {
-                                typ: hir_value.typ.clone(),
-                                place: PlaceKind::Variable(var_id), 
-                            },
-                            value: hir_value
-                        }
-                    }
-                    TASTExpression::FieldAccess { expr, field } => {
-                        let hir_expr = self.lower_expression(*expr);
-                        let Type::Derived(TypeConstructor::Struct{fields }) = hir_expr.typ.clone() else {
-                            panic!("Expression in field access isn't struct");
-                        };
-                        let field_type = fields.get(&field).expect("Field not found in struct").clone();
-                        let hir_value = self.lower_expression(value);
-                        if hir_value.typ != field_type {
-                            panic!("Non-matching types in assignment to struct field");
-                        }
-                        HIRStatement::Assign { 
-                            target: Place {
-                                typ: field_type,
-                                place: PlaceKind::StructField { 
-                                    of: hir_expr, 
-                                    field
-                                }
-                            }, 
-                            value: hir_value 
-                        }
-                    }
-                    _ => {
-                        panic!("Invalid assignment target");
-                    }
+                let hir_target = self.lower_lvalue(target);
+                let hir_value = self.lower_expression(value);
+                if hir_target.typ != hir_value.typ {
+                    panic!("Non-matching types in assignment to struct field");
                 }
+                HIRStatement::Assign { target: hir_target, value: hir_value}
             }
             TASTStatement::If { condition, if_body, else_body } => {
                 let hir_condition = self.lower_expression(condition);

@@ -51,7 +51,7 @@ pub enum ASTStatement<T> {
         value: ASTExpression<T>,
     },
     Assign {
-        target: ASTExpression<T>,         
+        target: ASTLValue,
         value: ASTExpression<T>
     },
     If {
@@ -67,6 +67,15 @@ pub enum ASTStatement<T> {
     Continue,
     Return(ASTExpression<T>),
     Print(ASTExpression<T>),
+}
+
+#[derive(Debug, Clone)]
+pub enum ASTLValue {
+   Variable(String),
+   FieldAccess {
+       of: Box<ASTLValue>,
+       field: String,
+    },
 }
 
 #[derive(Debug, Clone)]

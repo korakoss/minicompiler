@@ -18,7 +18,7 @@ implement structs
 
 - (i think) the parser currently allows arbitrary expressions as assignment lvalues, which is wrong, it should only be vars and chained field accesses
 - none rettype functions are probably handled in a retarded way I think
-
+    - yeah! the issue is that the parser assumes that an stmt starting with an identifier is an LValue expr
 
 ## notes
 
