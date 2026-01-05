@@ -115,7 +115,7 @@ impl HIRBuilder {
                 }
                 let var_id = self.register_new_var(var);
                 HIRStatement::Let {
-                    var: Place::Variable(var_id),
+                    var: var_id,
                     value: hir_value,
                 }
             }

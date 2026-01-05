@@ -24,7 +24,7 @@ pub struct HIRFunction {
 #[derive(Clone, Debug)]
 pub enum HIRStatement {
     Let {
-        var: Place,                 // TODO: Maybe change to VarId for clarity 
+        var: VarId,
         value: HIRExpression,
     },
     Assign {

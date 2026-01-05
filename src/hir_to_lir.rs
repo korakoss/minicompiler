@@ -105,16 +105,34 @@ impl LIRBuilder {
     fn lower_statement(&mut self, stmt: HIRStatement) { 
         println!("Lowering {:?}", stmt);
         match stmt {
-            HIRStatement::Let {var:target, value} | HIRStatement::Assign { target, value } => {
-                let Place::Variable(var_id) = target else {unreachable!()};
-                let slot = self.variable_map[&var_id].clone();
+            HIRStatement::Let { var, value } => {
+                let var_reg = self.variable_map[&var].clone();
                 let (value_stmts, value_reg) = self.lower_expression(value);
                 self.wip_block_stmts.extend(value_stmts.into_iter());
                 let assign_stmt = LIRStatement::Load{ 
-                    dest: slot, 
+                    dest: var_reg, 
                     from: LIRPlace::VReg(value_reg), 
                 };
                 self.wip_block_stmts.push(assign_stmt);
+            }
+
+            HIRStatement::Assign { target, value } => {
+                match target {
+                    Place::Variable(var_id) => {
+                        let var_reg = self.variable_map[&var_id].clone();
+                        let (value_stmts, value_reg) = self.lower_expression(value);
+                        self.wip_block_stmts.extend(value_stmts.into_iter());
+                        let assign_stmt = LIRStatement::Load{ 
+                            dest: var_reg, 
+                            from: LIRPlace::VReg(value_reg), 
+                        };
+                        self.wip_block_stmts.push(assign_stmt);
+                    }
+                    Place::StructField { of, field } => {
+                        unimplemented!();
+                    }
+                }
+                
             }
             HIRStatement::If { condition, if_body, else_body } => {
                 let branch_id = self.get_new_blockid();
