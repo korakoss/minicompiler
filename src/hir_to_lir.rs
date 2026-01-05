@@ -81,7 +81,7 @@ impl LIRBuilder {
         for stmt in stmt_block.into_iter() {
             self.lower_statement(stmt);
         }
-        
+
         // Inserting the tail statements after the last terminator
         if !self.wip_block_stmts.is_empty() || self.wip_block_id.is_some() {
             if self.wip_block_id.is_none() {
@@ -102,6 +102,8 @@ impl LIRBuilder {
         self.curr_collected_blocks.insert(block_id, block);
     }
 
+    
+
     fn lower_statement(&mut self, stmt: HIRStatement) { 
         match stmt {
             HIRStatement::Let { var, value } => {
@@ -111,13 +113,13 @@ impl LIRBuilder {
             }
 
             HIRStatement::Assign { target, value } => {
-                match target {
-                    Place::Variable(var_id) => {
+                match target.place {
+                    PlaceKind::Variable(var_id) => {
                         let var_reg = self.variable_map[&var_id].clone();
                         let value_stmts = self.lower_expression(value, LIRPlace::VReg(var_reg));
                         self.wip_block_stmts.extend(value_stmts.into_iter());
                     }
-                    Place::StructField { of, field } => {
+                    PlaceKind::StructField { of, field } => {
                         
                         unimplemented!();
                     }

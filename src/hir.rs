@@ -79,7 +79,13 @@ pub enum HIRExpressionKind {
 }
 
 #[derive(Clone, Debug)]
-pub enum Place {
+pub struct Place {
+    pub typ: Type,
+    pub place: PlaceKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum PlaceKind {
     Variable(VarId),
     StructField {
         of: HIRExpression,

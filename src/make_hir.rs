@@ -128,7 +128,10 @@ impl HIRBuilder {
                             panic!("Type mismatch in assign statement");
                         }
                         HIRStatement::Assign { 
-                            target: Place::Variable(var_id), 
+                            target: Place {
+                                typ: hir_value.typ.clone(),
+                                place: PlaceKind::Variable(var_id), 
+                            },
                             value: hir_value
                         }
                     }
@@ -143,9 +146,12 @@ impl HIRBuilder {
                             panic!("Non-matching types in assignment to struct field");
                         }
                         HIRStatement::Assign { 
-                            target: Place::StructField { 
-                                of: hir_expr, 
-                                field 
+                            target: Place {
+                                typ: field_type,
+                                place: PlaceKind::StructField { 
+                                    of: hir_expr, 
+                                    field
+                                }
                             }, 
                             value: hir_value 
                         }
