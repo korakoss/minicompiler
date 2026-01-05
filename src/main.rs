@@ -19,9 +19,17 @@ mod hir;
 mod make_hir;
 use make_hir::*;
 
+mod lir;
+use lir::*;
+
+mod hir_to_lir;
+use hir_to_lir::*;
 
 mod codegen;
 use codegen::*;
+
+mod lir_codegen;
+use lir_codegen::*;
 
 fn main() {
     

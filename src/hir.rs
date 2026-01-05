@@ -16,7 +16,8 @@ pub struct HIRProgram {
 pub struct HIRFunction {
     pub name: String,
     pub args: Vec<VarId>,
-    pub body_variables: Vec<VarId>,
+    pub body_variables: Vec<VarId>,   // Put the info table here instead of globally in the
+                                      // program
     pub body: Vec<HIRStatement>,
     pub ret_type: Type,
 }
