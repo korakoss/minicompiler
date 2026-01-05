@@ -244,7 +244,6 @@ impl Parser {
 
                     &Token::LeftBrace => {                                                  // StructLiteral
                         if self.new_types.contains_key(&TypeIdentifier(name.clone())) {
-                            self.tokens.next();
                             UASTExpression::StructLiteral{
                                 typ: DeferredType::Symbolic(TypeIdentifier(name)),
                                 fields: self.parse_struct_literal_internals(),
