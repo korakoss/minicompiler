@@ -383,7 +383,9 @@ impl LayoutTable {
         // Currently, I think it spills down in that order here
         // But we should make it cleaner
         
-        let TypeConstructor::Struct{fields} = deriv_typ;
+        let TypeConstructor::Struct{fields} = deriv_typ else {
+            unimplemented!();
+        };
 
         let mut f_offsets: HashMap<String, usize> = HashMap::new();
 
