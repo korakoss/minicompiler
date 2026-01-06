@@ -22,6 +22,7 @@ implement structs
 - struct literal syntax is kinda wacky, needs trailing commas
     - change the parser
 - the main func deciding logic is probably wacky too
+- we cannot move >8 values
 
 ## notes
 
