@@ -124,12 +124,12 @@ impl LIRBuilder {
         match stmt {
             HIRStatement::Let { var, value } => {
                 let var_reg = self.variable_map[&var].clone();
-                let value_stmts = self.lower_expression(value, LIRPlace::VReg(var_reg));
+                let value_stmts = self.lower_expr_into_target(value, LIRPlace::VReg(var_reg));
                 self.wip_block_stmts.extend(value_stmts.into_iter());
             }
             HIRStatement::Assign { target, value } => {
                 let lir_target = self.lower_place(target);
-                let value_stmts = self.lower_expression(value, lir_target);
+                let value_stmts = self.lower_expr_into_target(value, lir_target);
                 self.wip_block_stmts.extend(value_stmts.into_iter());
             }
             HIRStatement::If { condition, if_body, else_body } => {
@@ -148,7 +148,7 @@ impl LIRBuilder {
                     None => merge_id.clone()
                 };
                 let cond_reg = self.add_vreg(8);
-                let cond_stmts = self.lower_expression(condition, LIRPlace::VReg(cond_reg.clone()));
+                let cond_stmts = self.lower_expr_into_target(condition, LIRPlace::VReg(cond_reg.clone()));
                 let branch_block = LIRBlock {
                     statements: cond_stmts,
                     terminator: LIRTerminator::Branch { 
@@ -168,7 +168,7 @@ impl LIRBuilder {
                 self.push_current_block(LIRTerminator::Goto { dest: start_id.clone() });
 
                 let cond_reg = self.add_vreg(8);
-                let cond_stmts = self.lower_expression(condition, LIRPlace::VReg(cond_reg.clone()));
+                let cond_stmts = self.lower_expr_into_target(condition, LIRPlace::VReg(cond_reg.clone()));
                 let loop_header_block = LIRBlock {
                     statements: cond_stmts,
                     terminator: LIRTerminator::Branch { 
@@ -204,7 +204,7 @@ impl LIRBuilder {
                     self.layouts.get_layout(retval_expr.typ.clone()).size()
                 );
 
-                let retval_stmts = self.lower_expression(retval_expr, LIRPlace::VReg(retval_reg.clone()));
+                let retval_stmts = self.lower_expr_into_target(retval_expr, LIRPlace::VReg(retval_reg.clone()));
                 self.wip_block_stmts.extend(retval_stmts.into_iter());
                 let ret_terminator = LIRTerminator::Return(Some(Operand::Register(retval_reg)));
                 self.push_current_block(ret_terminator);
@@ -215,129 +215,96 @@ impl LIRBuilder {
                     self.layouts.get_layout(expr.typ.clone()).size()
                 );
 
-                let expr_stmts = self.lower_expression(expr, LIRPlace::VReg(expr_reg.clone()));
+                let expr_stmts = self.lower_expr_into_target(expr, LIRPlace::VReg(expr_reg.clone()));
                 self.wip_block_stmts.extend(expr_stmts.into_iter());
                 let print_stmt = LIRStatement::Print(Operand::Register(expr_reg));
                 self.wip_block_stmts.push(print_stmt);
             }
         }
     }
-
-
-    
-    fn lower_expression(&mut self, expr: HIRExpression, target: LIRPlace) -> Vec<LIRStatement>  {
-        
-        let HIRExpression { typ, expr: expr_kind } = expr;
-        
-        let stmts = match expr_kind {
-            HIRExpressionKind::IntLiteral(num) => {
-                let stmt = LIRStatement::Store { 
-                    dest: target,
-                    value: Operand::IntLiteral(num), 
-            };
-                vec![stmt] 
-            },
-            HIRExpressionKind::Variable(var_id) => {
-                let var_slot = self.variable_map[&var_id].clone();
-                let stmt = LIRStatement::Store{
-                    dest: target,
-                    value: Operand::Register(var_slot)
-                }; 
-                vec![stmt]
-            }
-            HIRExpressionKind::BinOp { op, left, right } => {
-                let ltemp = self.add_vreg(
-                    self.layouts.get_layout(left.typ.clone()).size()
-                );
-                let rtemp = self.add_vreg(
-                    self.layouts.get_layout(right.typ.clone()).size()
-                );
-
-                let left_stmts = self.lower_expression(*left, LIRPlace::VReg(ltemp.clone()));
-                let right_stmts = self.lower_expression(*right, LIRPlace::VReg(rtemp.clone()));
-                let binop_stmt = LIRStatement::BinOp { 
-                    dest: target,
-                    op, 
-                    left: Operand::Register(ltemp), 
-                    right:Operand::Register(rtemp), 
-                };
-                [left_stmts, right_stmts, vec![binop_stmt]].concat()
-            }
-            HIRExpressionKind::FuncCall { id, args } => {
-                let mut arg_vregs: Vec<VRegId> = Vec::new();
-                let mut arg_stmts: Vec<LIRStatement> = Vec::new();
-                for arg in args {
-                    let argtemp = self.add_vreg(
-                        self.layouts.get_layout(arg.typ.clone()).size()
-                    );
-                    arg_vregs.push(argtemp.clone());
-                    let arg_comp = self.lower_expression(arg, LIRPlace::VReg(argtemp));
-                    arg_stmts.extend(arg_comp.into_iter());
-                }
-                let call_stmt = LIRStatement::Call { 
-                    dest: target,
-                    func: id, 
-                    args: arg_vregs
-                        .into_iter()
-                        .map(|vreg| Operand::Register(vreg))
-                        .collect()
-                };
-                [arg_stmts, vec![call_stmt]].concat()
-            }
-            HIRExpressionKind::BoolTrue => {
-                let true_stmt = LIRStatement::Store { 
-                    dest: target,
-                    value: Operand::BoolTrue
-                };
-                vec![true_stmt]
-            }
-            HIRExpressionKind::BoolFalse => {
-                let false_stmt = LIRStatement::Store {
-                    dest: target,
-                    value: Operand::BoolFalse
-                };
-                vec![false_stmt]
-            }
+    fn lower_expr_into_target(&mut self, expr: HIRExpression, target: LIRPlace) -> Vec<LIRStatement> {
+        match expr.expr {
             HIRExpressionKind::StructLiteral { fields } => {
-                let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(typ) else {
+                let LayoutInfo::Struct { field_offsets, .. } = self.layouts.get_layout(expr.typ) else {
                     unreachable!();
                 };
-                
-                let (base, start_offset) = match target {
-                    LIRPlace::VReg(vreg_id) => (vreg_id, 0),
-                    LIRPlace::Deref { base, offset } => (base, offset),
+                let base = match &target {
+                    LIRPlace::VReg(vreg) => vreg.clone(),
+                    LIRPlace::Deref { base, .. } => base.clone(),
                 };
-                let mut field_computations: Vec<LIRStatement> = Vec::new();
-                for (fname, fexpr) in fields.into_iter() {
-                    let f_offset = field_offsets[&fname];
-                    let f_target = LIRPlace::Deref {base: base.clone(), offset: start_offset + f_offset };
-                    let f_comp = self.lower_expression(fexpr, f_target);
-                    field_computations.extend(f_comp.into_iter());
+                let base_offset = match &target {
+                    LIRPlace::VReg(_) => 0,
+                    LIRPlace::Deref { offset, .. } => *offset,
+                };
+                let mut stmts = Vec::new();
+                for (fname, fexpr) in fields {
+                    let f_target = LIRPlace::Deref { 
+                        base: base.clone(), 
+                        offset: base_offset + field_offsets[&fname] 
+                    };
+                    stmts.extend(self.lower_expr_into_target(fexpr, f_target));
                 }
-                field_computations
+                stmts
+            }
+            _ => {
+                let (opnd, stmts) = self.lower_expr_into_opnd(expr);
+                [stmts, vec![LIRStatement::Store { dest: target, value: opnd }]].concat()
+            }
+        }
+    }
+    
+    fn lower_expr_into_opnd(&mut self, expr: HIRExpression) -> (Operand, Vec<LIRStatement>) {
+        match expr.expr {
+            HIRExpressionKind::IntLiteral(num) => (Operand::IntLiteral(num), Vec::new()),
+            HIRExpressionKind::Variable(var_id) => {
+                let var_reg = self.variable_map[&var_id].clone();
+                (Operand::Register(var_reg), Vec::new())
+            }
+            HIRExpressionKind::BinOp { op, left, right } => {
+                let (left_opnd, left_stmts) = self.lower_expr_into_opnd(*left);
+                let (right_opnd, right_stmts) = self.lower_expr_into_opnd(*right);
+                let res_vreg = self.add_vreg(self.layouts.get_layout(expr.typ.clone()).size());
+                let bin_stmt = LIRStatement::BinOp { dest: LIRPlace::VReg(res_vreg.clone()), op, left: left_opnd, right: right_opnd };
+                (Operand::Register(res_vreg), [left_stmts, right_stmts, vec![bin_stmt]].concat())
+            }
+            HIRExpressionKind::FuncCall { id, args } => {
+                let (arg_opnds, arg_stmt_coll): (Vec<Operand>, Vec<Vec<LIRStatement>>) = args
+                    .into_iter()
+                    .map(|arg| self.lower_expr_into_opnd(arg))
+                    .unzip();
+                let res_vreg = self.add_vreg(self.layouts.get_layout(expr.typ.clone()).size());              
+                let call_stmt = LIRStatement::Call { dest: LIRPlace::VReg(res_vreg.clone()), func: id, args: arg_opnds};
+                (Operand::Register(res_vreg), [arg_stmt_coll.into_iter().flatten().collect(), vec![call_stmt]].concat())
+            }
+            HIRExpressionKind::BoolTrue => {
+                (Operand::BoolTrue, Vec::new())                 
+            }
+            HIRExpressionKind::BoolFalse => {
+                (Operand::BoolFalse, Vec::new())                 
             }
             HIRExpressionKind::FieldAccess { expr, field } => {
                 let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(expr.typ.clone()) else {
                     unreachable!();
                 };
-
-                let expr_vreg = self.add_vreg(size);
-                let expr_stmts = self.lower_expression(*expr, LIRPlace::VReg(expr_vreg.clone()));
-                
                 let f_offset = field_offsets[&field].clone();
-                let access_stmt = LIRStatement::Store { 
-                    dest: target,
-                    value: Operand::Deref { 
-                        base: expr_vreg, 
-                        offset: f_offset
-                    }
-                };
-                [expr_stmts, vec![access_stmt]].concat()
-            }
-        };
-        stmts
-    }
 
+                let (expr_opnd, expr_stmts) = self.lower_expr_into_opnd(*expr); 
+                
+                let (expr_base, expr_offset) = match expr_opnd {
+                    Operand::Register(expr_vreg) => (expr_vreg,0),
+                    Operand::Deref { base, offset } => (base, offset),
+                    _ => {unreachable!();},
+                };
+                (Operand::Deref { base: expr_base, offset: expr_offset + f_offset}, expr_stmts)
+            }
+            HIRExpressionKind::StructLiteral {..} => {
+                let res_vreg = self.add_vreg(self.layouts.get_layout(expr.typ.clone()).size());              
+                let stmts = self.lower_expr_into_target(expr, LIRPlace::VReg(res_vreg.clone())); 
+                (Operand::Register(res_vreg), stmts)
+            }
+        }
+    }
+    
     fn add_vreg(&mut self, size: usize) -> VRegId {
         // TODO: later add Vreginfo stuff
         let new_id = VRegId(self.vreg_counter);
@@ -352,6 +319,13 @@ impl LIRBuilder {
         block_id 
     }
 }
+
+
+
+
+
+
+
 
 
 
