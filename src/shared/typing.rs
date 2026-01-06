@@ -41,7 +41,12 @@ pub enum PrimitiveType {
 pub enum TypeConstructor<T>{
     Struct {
         fields: BTreeMap<String, T>
+    },
+    /*
+    Enum {
+        variants: Vec<T>
     }
+    */
 }
 
 
@@ -69,25 +74,26 @@ impl TypeTable {
         let dep_graph = get_newtype_dependencies(&newtype_defs); 
         let topo_order = toposort_depgraph(&dep_graph);
 
-        let mut complete_newtypes: HashMap<TypeIdentifier, DerivType> = HashMap::new();
-        let mut old_to_new = HashMap::new();
-
-        for type_id in topo_order.iter() { 
-            let deferred_newtype = newtype_defs[type_id].clone();
+        let mut table = TypeTable{topo_order: topo_order.clone(), newtype_map: HashMap::new()}; 
+        for type_id in topo_order { 
+            let deferred_newtype = newtype_defs[&type_id].clone();
             let TypeConstructor::Struct { fields } = deferred_newtype.clone();
-            let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
-            for (fname, ftype) in fields {
-                let actual_type = match ftype {
-                    DeferredType::Prim(prim_typ) => Type::Prim(prim_typ),
-                    DeferredType::Symbolic(type_id) => Type::Derived(complete_newtypes[&type_id].clone()),
-                };
-                tfields.insert(fname, actual_type);
-            }
-            let complete_newtype = TypeConstructor::Struct { fields: tfields};
-            complete_newtypes.insert(type_id.clone(), complete_newtype.clone());
-            old_to_new.insert(deferred_newtype, complete_newtype);
+            table.add_struct_def(type_id, fields);
         }
-        TypeTable {topo_order, newtype_map: complete_newtypes} 
+        table 
+    }
+
+    fn add_struct_def(&mut self, type_id: TypeIdentifier, struct_fields: BTreeMap<String, DeferredType>) {
+        let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
+        for (fname, ftype) in struct_fields {
+            let actual_type = match ftype {
+                DeferredType::Prim(prim_typ) => Type::Prim(prim_typ),
+                DeferredType::Symbolic(type_id) => Type::Derived(self.newtype_map[&type_id].clone()),
+            };
+            tfields.insert(fname, actual_type);
+        }
+        let complete_newtype = TypeConstructor::Struct { fields: tfields};
+        self.newtype_map.insert(type_id.clone(), complete_newtype.clone());
     }
 
     pub fn convert(&self, t: DeferredType) -> Type {

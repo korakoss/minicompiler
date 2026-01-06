@@ -22,8 +22,41 @@ implement structs
 - struct literal syntax is kinda wacky, needs trailing commas
     - change the parser
 - the main func deciding logic is probably wacky too
-- we cannot move >8 values
+- we cannot move >8 size values
 
 ## notes
 
 - we may unify the LIRPlace into a single struct (where Vreg subtype is just a spec case with 0 offset) 
+
+- when we implement scope dispatch, we could have a scope pointer register
+
+## Other TODOs
+
+- rethink function calling 
+    - returns are r12 pointers, okay
+    - but we might also want to use pointers for args
+- eventually get rid of all the cloning
+
+## Next big step
+
+enums
+
+
+
+## Enum syntax
+
+```
+enum T {
+    S,
+    R,
+}
+
+let t:T = T::new(); //eg
+
+match t {
+    S => {...}  // t implicitly typecast to t:S
+    R => {...}
+}
+```
+
+
