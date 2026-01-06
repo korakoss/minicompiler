@@ -42,11 +42,9 @@ pub enum TypeConstructor<T>{
     Struct {
         fields: BTreeMap<String, T>
     },
-    /*
     Enum {
         variants: Vec<T>
     }
-    */
 }
 
 
@@ -77,23 +75,23 @@ impl TypeTable {
         let mut table = TypeTable{topo_order: topo_order.clone(), newtype_map: HashMap::new()}; 
         for type_id in topo_order { 
             let deferred_newtype = newtype_defs[&type_id].clone();
-            let TypeConstructor::Struct { fields } = deferred_newtype.clone();
-            table.add_struct_def(type_id, fields);
+            let newtype = match deferred_newtype {
+                TypeConstructor::Struct { fields } => TypeConstructor::Struct { 
+                    fields: fields
+                        .into_iter()
+                        .map(|(nam, typ)| (nam, table.convert(typ)))
+                        .collect()
+                },         
+                TypeConstructor::Enum { variants } => TypeConstructor::Enum { 
+                    variants: variants 
+                        .into_iter()
+                        .map(|typ| table.convert(typ))
+                        .collect()
+                }
+            };
+            table.newtype_map.insert(type_id, newtype);
         }
         table 
-    }
-
-    fn add_struct_def(&mut self, type_id: TypeIdentifier, struct_fields: BTreeMap<String, DeferredType>) {
-        let mut tfields : BTreeMap<String, Type> = BTreeMap::new();
-        for (fname, ftype) in struct_fields {
-            let actual_type = match ftype {
-                DeferredType::Prim(prim_typ) => Type::Prim(prim_typ),
-                DeferredType::Symbolic(type_id) => Type::Derived(self.newtype_map[&type_id].clone()),
-            };
-            tfields.insert(fname, actual_type);
-        }
-        let complete_newtype = TypeConstructor::Struct { fields: tfields};
-        self.newtype_map.insert(type_id.clone(), complete_newtype.clone());
     }
 
     pub fn convert(&self, t: DeferredType) -> Type {
@@ -113,13 +111,22 @@ impl TypeTable {
 fn get_newtype_dependencies(newtype_defs: &HashMap<TypeIdentifier, DeferredDerivType>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
     let mut dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = HashMap::new();
     for (type_id, newtype) in newtype_defs {
-        let mut deps: Vec<TypeIdentifier> = Vec::new();
-        let DeferredDerivType::Struct {fields} = newtype; 
-        for (_, field_type) in fields {
-            if let DeferredType::Symbolic(dep_id) = field_type {
-                deps.push(dep_id.clone());
-            }
-        }
+        let deps: Vec<TypeIdentifier> = match newtype {
+            DeferredDerivType::Struct {fields} => fields
+                .values()
+                .filter_map(|ftyp| match ftyp {
+                    DeferredType::Symbolic(id) => Some(id.clone()),
+                    _ => None,
+                })
+                .collect(),
+            DeferredDerivType::Enum { variants } => variants
+                .iter()
+                .filter_map(|vtyp| match vtyp {
+                    DeferredType::Symbolic(id) => Some(id.clone()),
+                    _ => None,
+                })
+                .collect()
+        };
         dep_graph.insert(type_id.clone(), deps);
     }
     dep_graph
