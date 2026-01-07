@@ -65,6 +65,7 @@ pub enum MIRValue {
     BoolTrue,
     BoolFalse,
     StructLiteral {
+        typ: Type,
         fields: HashMap<String, MIRValue>,
     }
 }

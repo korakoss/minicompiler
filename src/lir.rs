@@ -1,6 +1,5 @@
 use std::{collections::HashMap};
 use crate::{hir::FuncId, shared::binops::*};
-use crate::shared::typing::*;
 
 
 #[derive(Clone, Debug)]
@@ -26,10 +25,6 @@ pub struct LIRBlock {
 
 #[derive(Clone, Debug)]
 pub enum LIRStatement {
-    Load {
-        dest: VRegId,
-        from: LIRPlace,
-    },
     Store {
         dest: LIRPlace,
         value: Operand,
@@ -66,25 +61,16 @@ pub enum LIRTerminator {
 
 #[derive(Clone, Debug)]
 pub enum Operand {
-    Register(VRegId),
+    Place(LIRPlace), 
     IntLiteral(i32),
     BoolTrue,
     BoolFalse,
-    Deref {
-        base: VRegId,
-        offset: usize,
-    }
-
-    // Needs bool literals, etc?
 }
 
 #[derive(Clone, Debug)]
-pub enum LIRPlace {
-    VReg(VRegId),
-    Deref {
-        base: VRegId,
-        offset: usize,
-    }
+pub struct LIRPlace {
+    pub base: VRegId,
+    pub offset: usize,
 }
 
 #[derive(Clone, Debug)]

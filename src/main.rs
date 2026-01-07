@@ -22,7 +22,7 @@ use make_hir::*;
 mod mir;
 
 mod hir_to_mir;
-
+mod mir_to_lir;
 mod lir;
 use lir::*;
 
