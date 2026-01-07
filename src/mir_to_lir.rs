@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::hir::*;
 use crate::lir::*;
 use crate::mir::*;
 
@@ -10,7 +9,7 @@ use crate::shared::typing::*;
 pub struct LIRBuilder {
     curr_cell_map: HashMap<CellId, VRegId>,
     layouts: LayoutTable,
-    vreg_table: HashMap<VRegId, VRegInfo>,
+    curr_vreg_table: HashMap<VRegId, VRegInfo>,
     vreg_counter: usize,
 }
 
@@ -21,7 +20,7 @@ impl LIRBuilder {
         let mut builder = LIRBuilder {
             curr_cell_map: HashMap::new(),
             layouts,
-            vreg_table: HashMap::new(),
+            curr_vreg_table: HashMap::new(),
             vreg_counter: 0
         };
         LIRProgram {
@@ -34,28 +33,96 @@ impl LIRBuilder {
     }
 
     fn lower_function(&mut self, func: MIRFunction) -> LIRFunction {
+        self.curr_cell_map = HashMap::new();
+        self.curr_vreg_table = HashMap::new();
         for (id, cell) in func.cells {
             self.lower_cell(id, cell);
         }
-        unimplemented!();
+        LIRFunction {
+            blocks: func.blocks
+                .into_iter()
+                .map(|(id, block)| (id, self.lower_block(block)))
+                .collect(),
+            entry: func.entry,
+            vregs: self.curr_vreg_table.clone(),
+            args: func.args
+                .into_iter()
+                .map(|cell_id| self.curr_cell_map[&cell_id].clone())
+                .collect()
+        }
     }
 
-    fn lower_block(&self, block: MIRBlock) -> LIRBlock {
-        unimplemented!();
+    fn lower_block(&mut self, block: MIRBlock) -> LIRBlock {
+        let mut statements: Vec<LIRStatement> = Vec::new();
+        for stmt in block.statements {
+            let lowered = self.lower_stmt(stmt);
+            statements.extend(lowered.into_iter());
+        }
+        let (terminator, term_stmts) = self.lower_terminator(block.terminator);
+        statements.extend(term_stmts.into_iter());
+        LIRBlock { statements, terminator }
     }
 
-    fn lower_stmt(&self, stmt: MIRStatement) -> Vec<LIRStatement> {
+    fn lower_stmt(&mut self, stmt: MIRStatement) -> Vec<LIRStatement> {
         match stmt {
             MIRStatement::Assign { target, value } => {
                 let lir_target = self.lower_place(target);
                 self.lower_value_into_place(value, lir_target)
             }
-            _ => {unimplemented!();}
+            MIRStatement::BinOp { target, op, left, right } => {
+                let lir_target = self.lower_place(target);
+                let (left_opnd, left_stmts) = self.lower_value_into_operand(left);
+                let (right_opnd, right_stmts) = self.lower_value_into_operand(right);
+                let bin_stmt = LIRStatement::BinOp { 
+                    dest: lir_target, 
+                    op: op, 
+                    left: left_opnd, 
+                    right: right_opnd 
+                };
+                [left_stmts, right_stmts, vec![bin_stmt]].concat()
+            }
+            MIRStatement::Call { target, func, args } => {
+                let lir_target = self.lower_place(target);
+                let (arg_opnds, arg_stmt_coll): (Vec<Operand>, Vec<Vec<LIRStatement>>) = args
+                    .into_iter()
+                    .map(|arg| self.lower_value_into_operand(arg))
+                    .unzip();
+                let lir_call = LIRStatement::Call { 
+                    dest: lir_target, 
+                    func, 
+                    args: arg_opnds 
+                };
+                [arg_stmt_coll.into_iter().flatten().collect(), vec![lir_call]].concat()
+            }
+            MIRStatement::Print(value) => {
+                let (opnd, stmts) = self.lower_value_into_operand(value);
+                [stmts, vec![LIRStatement::Print(opnd)]].concat()
+            }
         }
     }
 
-    fn lower_terminator(&self, term: MIRTerminator) -> LIRTerminator {
-        unimplemented!();
+    fn lower_terminator(&mut self, term: MIRTerminator) -> (LIRTerminator, Vec<LIRStatement>) {
+        match term {
+            MIRTerminator::Goto(block_id) => (LIRTerminator::Goto { dest: block_id }, Vec::new()),
+            MIRTerminator::Branch { condition, then_, else_ } => {
+                let (cond_op, cond_stmts) = self.lower_value_into_operand(condition);
+                let term = LIRTerminator::Branch { 
+                    condition: cond_op, 
+                    then_block: then_, 
+                    else_block: else_ 
+                };
+                (term, cond_stmts)
+            }
+            MIRTerminator::Return(ret_val) => {
+                match ret_val {
+                    None => (LIRTerminator::Return(None), Vec::new()),
+                    Some(value) => {
+                        let (retval_op, retval_stmts) = self.lower_value_into_operand(value);
+                        (LIRTerminator::Return(Some(retval_op)), retval_stmts)
+                    }
+                }
+            }
+        }
     }
 
     fn lower_value_into_operand(&mut self, value: MIRValue) -> (Operand, Vec<LIRStatement>) {
@@ -141,19 +208,19 @@ impl LIRBuilder {
         LIRPlace{base, offset: curr_offs}
     }
     
-    fn lower_cell(&mut self, id: CellId, cell: Cell) -> VRegId {
+    fn lower_cell(&mut self, id: CellId, cell: Cell) {
         let cell_vreg_info = VRegInfo { 
             size: self.layouts.get_layout(cell.typ).size(),
             align: 8
         };
         let vreg_id = self.add_vreg(cell_vreg_info);
-        self.curr_cell_map.insert(id, vreg_id.clone());
+        self.curr_cell_map.insert(id, vreg_id);
     }
 
     fn add_vreg(&mut self, info: VRegInfo) -> VRegId {
         let vreg_id = VRegId(self.vreg_counter);
         self.vreg_counter = self.vreg_counter + 1;
-        self.vreg_table.insert(vreg_id.clone(), cell_vreg_info);
+        self.curr_vreg_table.insert(vreg_id.clone(), info);
         vreg_id
     }
 }
