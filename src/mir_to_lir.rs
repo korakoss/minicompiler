@@ -7,7 +7,8 @@ use crate::shared::typing::*;
 
 
 pub struct LIRBuilder {
-    curr_cell_map: HashMap<CellId, VRegId>,
+    curr_cell_vreg_map: HashMap<CellId, VRegId>,
+    curr_cells: HashMap<CellId, Cell>,
     layouts: LayoutTable,
     curr_vreg_table: HashMap<VRegId, VRegInfo>,
     vreg_counter: usize,
@@ -18,7 +19,8 @@ impl LIRBuilder {
     pub fn lower_mir(program: MIRProgram) -> LIRProgram {
         let layouts = LayoutTable::make(program.typetable);
         let mut builder = LIRBuilder {
-            curr_cell_map: HashMap::new(),
+            curr_cell_vreg_map: HashMap::new(),
+            curr_cells: HashMap::new(),
             layouts,
             curr_vreg_table: HashMap::new(),
             vreg_counter: 0
@@ -33,7 +35,7 @@ impl LIRBuilder {
     }
 
     fn lower_function(&mut self, func: MIRFunction) -> LIRFunction {
-        self.curr_cell_map = HashMap::new();
+        self.curr_cell_vreg_map = HashMap::new();
         self.curr_vreg_table = HashMap::new();
         for (id, cell) in func.cells {
             self.lower_cell(id, cell);
@@ -47,7 +49,7 @@ impl LIRBuilder {
             vregs: self.curr_vreg_table.clone(),
             args: func.args
                 .into_iter()
-                .map(|cell_id| self.curr_cell_map[&cell_id].clone())
+                .map(|cell_id| self.curr_cell_vreg_map[&cell_id].clone())
                 .collect()
         }
     }
@@ -64,6 +66,7 @@ impl LIRBuilder {
     }
 
     fn lower_stmt(&mut self, stmt: MIRStatement) -> Vec<LIRStatement> {
+        println!("STMT: {:?}", stmt);
         match stmt {
             MIRStatement::Assign { target, value } => {
                 let lir_target = self.lower_place(target);
@@ -126,6 +129,7 @@ impl LIRBuilder {
     }
 
     fn lower_value_into_operand(&mut self, value: MIRValue) -> (Operand, Vec<LIRStatement>) {
+        println!("VALUE: {:?}", value);
         match value {
             MIRValue::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
@@ -191,15 +195,17 @@ impl LIRBuilder {
     fn lower_place(&self, place: MIRPlace) -> LIRPlace {
         // TODO: weird solution, change it
 
-        let base = self.curr_cell_map[&place.base].clone();
+        let base = self.curr_cell_vreg_map[&place.base].clone();
 
-        println!("{:?}", place.clone());
+        println!("PLACE: {:?}", place.clone());
 
 
-        let mut curr_typ = place.typ;
+        let mut curr_typ = self.curr_cells[&place.base].typ.clone();
         let mut curr_offs = 0;
         
         for field in place.fieldchain {
+            println!("TYPE: {:?}", curr_typ);
+            println!("QUERY: {:?}", field);
             let curr_typ_layout = self.layouts.get_layout(curr_typ.clone());
 
             match curr_typ_layout {
@@ -211,20 +217,23 @@ impl LIRBuilder {
                     curr_offs = curr_offs + field_offsets[&field];
                 } 
                 LayoutInfo::Primitive(..) => {
+                    panic!("This is primitive, shouldn't have a field");
                     break;
                 }
             }
         }
+        println!("{:?}", curr_offs);
         LIRPlace{base, offset: curr_offs}
     }
     
     fn lower_cell(&mut self, id: CellId, cell: Cell) {
+        self.curr_cells.insert(id.clone(), cell.clone());
         let cell_vreg_info = VRegInfo { 
             size: self.layouts.get_layout(cell.typ).size(),
             align: 8
         };
         let vreg_id = self.add_vreg(cell_vreg_info);
-        self.curr_cell_map.insert(id, vreg_id);
+        self.curr_cell_vreg_map.insert(id, vreg_id);
     }
 
     fn add_vreg(&mut self, info: VRegInfo) -> VRegId {

@@ -245,9 +245,9 @@ impl MIRBuilder {
             },
             HIRExpressionKind::BoolTrue => (MIRValue::BoolTrue, Vec::new()),
             HIRExpressionKind::BoolFalse => (MIRValue::BoolFalse, Vec::new()),
-            HIRExpressionKind::FieldAccess { expr, field } => { 
+            HIRExpressionKind::FieldAccess { expr: base_expr, field } => { 
                 let typ = expr.typ.clone();
-                let (expr_val, expr_stmts) = self.lower_expr(*expr);
+                let (expr_val, expr_stmts) = self.lower_expr(*base_expr);
                 let access_val = self.lower_field_access(expr_val, field, typ);
                 (access_val, expr_stmts)
             },
