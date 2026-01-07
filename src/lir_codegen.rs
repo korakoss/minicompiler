@@ -109,14 +109,6 @@ impl LIRCompiler {
     fn compile_stmt(&mut self, stmt: LIRStatement, frame: &StackFrame) {
         
         match stmt {
-            LIRStatement::Load { dest, from } => {
-                self.emit_place_load(from, frame);
-                let vreg_offset = frame.offsets
-                    .get(&dest)
-                    .expect(&format!("Register {:?} not found", dest))
-                    .clone();
-                self.emit(&format!("    str r0, [fp, #-{}]", vreg_offset));
-            }
             LIRStatement::Store { dest, value } => {
                 self.emit_operand_load(value, frame);
                 self.emit_place_store(dest, frame);
@@ -140,14 +132,11 @@ self.emit_operand_load(left, frame);
                     self.emit_operand_load(arg, frame);
                     self.emit(&format!("     mov r{}, r0", i+1));
                 }
+                
+                let target_offs = self.compute_place_offset(dest, frame);
 
-                let LIRPlace::VReg(dest_vreg) = dest else {
-                    panic!("Deref lvalues not supported yet!");
-                };
-
-                let dest_offset = frame.offsets[&dest_vreg];
                 self.emit("    push {r12}"); 
-                self.emit(&format!("    sub r12, fp, #{}", dest_offset));
+                self.emit(&format!("    sub r12, fp, #{}", target_offs));
                 self.emit(&format!("    bl func_{}", func.0));
                 self.emit("    pop {r12}"); 
             }
@@ -214,9 +203,9 @@ self.emit_operand_load(left, frame);
 
     fn emit_operand_load(&mut self, operand: Operand, frame: &StackFrame) {
         match operand {
-            Operand::Register(vreg) => {
-                let vreg_offset = frame.offsets[&vreg].clone();
-                self.emit(&format!("    ldr r0, [fp, #-{}]", vreg_offset));
+            Operand::Place(place) => {
+                let place_offset = self.compute_place_offset(place, frame);
+                self.emit(&format!("    ldr r0, [fp, #-{}]", place_offset));
             }
             Operand::IntLiteral(num) => {
                 self.emit(&format!("     ldr r0, ={}", num));
@@ -227,42 +216,18 @@ self.emit_operand_load(left, frame);
             Operand::BoolFalse => {
                 self.emit(&"    ldr r0, =0");   
             }
-            Operand::Deref { base, offset } => {
-                let base_offset = frame.offsets[&base].clone();
-                self.emit(&format!("    ldr r0, [fp, #-{}]", base_offset + offset));
-            }
         }
     }
 
     fn emit_place_store(&mut self, place: LIRPlace, frame: &StackFrame) {
-        match place {
-            LIRPlace::VReg(vreg) => {
-                let vreg_offset = frame.offsets
-                    .get(&vreg)
-                    .expect(&format!("Register {:?} not found", vreg))
-                    .clone();
-                self.emit(&format!("    str r0, [fp, #-{}]", vreg_offset));
-            }
-            LIRPlace::Deref { base, offset } => {
-                let base_reg_offset = frame.offsets.clone()[&base];
-                self.emit(&format!("    str r0, [fp, #-{}]", base_reg_offset+offset));    
-            }
-        }
-    }
-    
-    fn emit_place_load(&mut self, place: LIRPlace, frame: &StackFrame) {
-        match place {
-            LIRPlace::VReg(vreg) => {
-                let vreg_offset = frame.offsets[&vreg].clone();
-                self.emit(&format!("    ldr r0, [fp, #-{}]", vreg_offset));
-            }
-            LIRPlace::Deref { base, offset } => {
-                let base_reg_offset = frame.offsets[&base].clone();
-                self.emit(&format!("    ldr r0, [fp, #-{}]", base_reg_offset+offset));    
-            }
-        }
+        self.emit(&format!("    str r0, [fp, #-{}]", self.compute_place_offset(place, frame)));
     }
 
+    fn compute_place_offset(&self, place: LIRPlace, frame: &StackFrame) -> usize {
+        let base_offs = frame.offsets[&place.base];
+        base_offs + place.offset
+    }
+    
     fn emit(&mut self, line: &str) {        
         self.output.push_str(line);
         self.output.push('\n');
