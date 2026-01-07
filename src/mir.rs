@@ -4,25 +4,27 @@ use std::{collections::HashMap};
 use crate::hir::*;                  //for FuncID; TODO: put that somewhere shared
 use crate::lir::*;                  // for blockID; likewise
 
-
-struct MIRProgram {
-    typetable: TypeTable,
-    functions: HashMap<FuncId, MIRFunction>,
-    entry: FuncId,
+#[derive(Clone, Debug)]
+pub struct MIRProgram {
+    pub typetable: TypeTable,
+    pub functions: HashMap<FuncId, MIRFunction>,
+    pub entry: FuncId,
 }
 
-struct MIRFunction {
-    name: String,
-    args: Vec<VarId>,
-    cells: HashMap<CellId, Cell>,
-    blocks: HashMap<BlockId, MIRBlock>,
-    entry: BlockId,
-    ret_type: Type,
+#[derive(Clone, Debug)]
+pub struct MIRFunction {
+    pub name: String,
+    pub args: Vec<CellId>,
+    pub cells: HashMap<CellId, Cell>,
+    pub blocks: HashMap<BlockId, MIRBlock>,
+    pub entry: BlockId,
+    pub ret_type: Type,
 }
 
-struct MIRBlock {
-    statements: Vec<MIRStatement>,
-    terminator: MIRTerminator,
+#[derive(Clone, Debug)]
+pub struct MIRBlock {
+    pub statements: Vec<MIRStatement>,
+    pub terminator: MIRTerminator,
 }
 
 #[derive(Clone, Debug)]
@@ -46,14 +48,14 @@ pub enum MIRStatement {
 }
 
 #[derive(Clone, Debug)]
-enum MIRTerminator {
+pub enum MIRTerminator {
     Goto(BlockId),
     Branch {
         condition: MIRValue,
         then_: BlockId,
         else_: BlockId,
     },
-    Return(Option<MIRValue>),
+    Return(Option<MIRValue>),       // TODO: modify to option in HIR? and above?
 }
 
 #[derive(Clone, Debug)]

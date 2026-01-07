@@ -1,31 +1,30 @@
 use std::collections::HashMap;
 
 use crate::hir::*;
-use crate::hir_to_lir;
-use crate::mir::Cell;
 use crate::mir::*;
 use crate::lir::*;
 use crate::shared::typing::*;
 
-pub struct LIRBuilder {
+
+pub struct MIRBuilder {
     var_map: HashMap<VarId, CellId>,
     current_cells: HashMap<CellId, Cell>,
     cell_counter: usize,
     block_counter: usize,
     loop_start_stack: Vec<BlockId>,
     loop_end_stack: Vec<BlockId>,
-    curr_collected_blocks: HashMap<BlockId, LIRBlock>,
-    wip_block_stmts: Vec<LIRStatement>, 
-    wip_block_id: Option<BlockId>, 
+    curr_collected_blocks: HashMap<BlockId, MIRBlock>,
+    wip_block_stmts: Vec<MIRStatement>, 
+    wip_block_id: BlockId, 
     typetable: TypeTable,
 }
 
 
-impl LIRBuilder {
+impl MIRBuilder {
     
-    pub fn lower_hir(program: HIRProgram) -> LIRProgram {
+    pub fn lower_hir(program: HIRProgram) -> MIRProgram {
         let HIRProgram { typetable, functions, entry } = program;
-        let mut builder = LIRBuilder {
+        let mut builder = MIRBuilder {
             var_map: HashMap::new(),
             current_cells: HashMap::new(),
             cell_counter: 0,
@@ -34,191 +33,94 @@ impl LIRBuilder {
             loop_end_stack: Vec::new(),
             curr_collected_blocks: HashMap::new(),
             wip_block_stmts: Vec::new(),
-            wip_block_id: None, 
+            wip_block_id: BlockId(0), 
+            typetable: typetable,
         };
-        LIRProgram {
+        MIRProgram {
             functions: functions
                 .into_iter()
                 .map(|(id, func)| (id, builder.lower_function(func)))
                 .collect(),
-            entry: entry
+            entry: entry,
+            typetable: builder.typetable
         }
     }
 
-    fn lower_function(&mut self, func: HIRFunction) -> LIRFunction {
-        self.curr_vreg_coll = HashMap::new();
+    fn lower_function(&mut self, func: HIRFunction) -> MIRFunction {
+        
         self.curr_collected_blocks = HashMap::new();
+
+        self.current_cells = HashMap::new();
         for (var_id, var) in func.variables.into_iter() {
-            let varsize = self.layouts.get_layout(var.typ).size();
-            let var_vreg_id = self.add_vreg(varsize);
-            self.variable_map.insert(var_id, var_vreg_id.clone());
+            let cell_id = self.add_cell(Cell { typ: var.typ, kind: CellKind::Var { name: var.name}});
+            self.var_map.insert(var_id, cell_id);
         }
-        let entry_id = self.get_new_blockid();
-        self.wip_block_id = Some(entry_id.clone());
-        for stmt in func.body.into_iter() {
-            self.lower_statement(stmt);
-        }
-        if !self.wip_block_stmts.is_empty() || self.wip_block_id.is_some() {
-            if self.wip_block_id.is_none() {
-                self.wip_block_id = Some(self.get_new_blockid());
-            }
-            self.push_current_block(LIRTerminator::Return(None));
-        }
-        let arg_ids = func.args
+        
+        let entry_id = self.wip_block_id.clone();
+        self.lower_stmt_block(func.body, MIRTerminator::Return(None));  // TODO: maybe do this nicer somehow
+        
+        let arg_cells: Vec<CellId> = func.args
             .iter()
-            .map(|arg_id| self.variable_map[&arg_id].clone())
+            .map(|arg_id| self.var_map[&arg_id].clone())
             .collect();
-        LIRFunction { 
-            blocks: self.curr_collected_blocks.clone(), 
-            entry: entry_id, 
-            vregs: self.curr_vreg_coll.clone(), 
-            args: arg_ids 
-        }
+        let func = MIRFunction {
+            name: func.name,
+            args: arg_cells,
+            cells: self.current_cells.clone(),
+            blocks: self.curr_collected_blocks.clone(),
+            entry: entry_id,
+            ret_type: func.ret_type
+        };
+        self.current_cells = HashMap::new();
+        self.curr_collected_blocks = HashMap::new();
+        func
     }
     
-    fn lower_statement_block(&mut self, stmt_block: Vec<HIRStatement>, entry_id: BlockId, post_jump: BlockId) {
-        self.wip_block_id = Some(entry_id);
-
-        for stmt in stmt_block.into_iter() {
-            self.lower_statement(stmt);
-        }
-
-        // Inserting the tail statements after the last terminator
-        if !self.wip_block_stmts.is_empty() || self.wip_block_id.is_some() {
-            if self.wip_block_id.is_none() {
-                self.wip_block_id = Some(self.get_new_blockid());
-            }
-            self.push_current_block(LIRTerminator::Goto { dest: post_jump});
-        }
+    fn push_wip(&mut self, terminator: MIRTerminator) {
+        let id = self.get_wip_id();
+        let statements = self.get_wip_stmts();
+        let block = MIRBlock {statements, terminator};
+        self.curr_collected_blocks.insert(id, block);
     }
 
-    fn push_current_block(&mut self, term: LIRTerminator) {
-        let block = LIRBlock {
-            statements: self.wip_block_stmts.clone(),
-            terminator: term,
-        };
+    fn get_wip_id(&mut self) -> BlockId {
+        let id = self.wip_block_id.clone();
+        self.wip_block_id = self.get_new_blockid();
+        id
+    }
+
+    fn get_wip_stmts(&mut self) -> Vec<MIRStatement> {
+        let stmts = self.wip_block_stmts.clone();
         self.wip_block_stmts = Vec::new();
-        let block_id = self.wip_block_id.clone().unwrap();
-        self.wip_block_id = None;
-        self.curr_collected_blocks.insert(block_id, block);
+        stmts
     }
 
-    fn lower_statement(&mut self, stmt: HIRStatement) { 
-        match stmt {
-            HIRStatement::Let { var, value } => {
-                let var_reg = self.variable_map[&var].clone();
-                let value_stmts = self.lower_expr_into_target(value, LIRPlace::VReg(var_reg));
-                self.wip_block_stmts.extend(value_stmts.into_iter());
-            }
-            HIRStatement::Assign { target, value } => {
-                let lir_target = self.lower_place(target);
-                let value_stmts = self.lower_expr_into_target(value, lir_target);
-                self.wip_block_stmts.extend(value_stmts.into_iter());
-            }
-            HIRStatement::If { condition, if_body, else_body } => {
-                let branch_id = self.get_new_blockid();
-                self.push_current_block(LIRTerminator::Goto { dest: branch_id.clone() });
 
-                let merge_id = self.get_new_blockid();
-                let then_id = self.get_new_blockid();
-                self.lower_statement_block(if_body, then_id.clone(), merge_id.clone());
-                let else_id = match else_body {
-                    Some(stmts) => {
-                        let id = self.get_new_blockid();
-                        self.lower_statement_block(stmts, id.clone(), merge_id.clone());
-                        id
-                    },
-                    None => merge_id.clone()
-                };
-                let cond_reg = self.add_vreg(8);
-                let cond_stmts = self.lower_expr_into_target(condition, LIRPlace::VReg(cond_reg.clone()));
-                let branch_block = LIRBlock {
-                    statements: cond_stmts,
-                    terminator: LIRTerminator::Branch { 
-                        condition: Operand::Register(cond_reg), 
-                        then_block: then_id, 
-                        else_block: else_id,
-                    },
-                };
-                self.curr_collected_blocks.insert(branch_id, branch_block);
-                self.wip_block_id = Some(merge_id);
-            }
-            HIRStatement::While { condition, body }  => {
-                let start_id = self.get_new_blockid();
-                let body_id = self.get_new_blockid();
-                let end_id = self.get_new_blockid();
+    fn lower_stmt_block(&mut self, stmts: Vec<HIRStatement>, tail_termr: MIRTerminator) -> BlockId {
+        let entry_id = self.wip_block_id.clone();
 
-                self.push_current_block(LIRTerminator::Goto { dest: start_id.clone() });
-
-                let cond_reg = self.add_vreg(8);
-                let cond_stmts = self.lower_expr_into_target(condition, LIRPlace::VReg(cond_reg.clone()));
-                let loop_header_block = LIRBlock {
-                    statements: cond_stmts,
-                    terminator: LIRTerminator::Branch { 
-                        condition: Operand::Register(cond_reg), 
-                        then_block: body_id.clone(), 
-                        else_block: end_id.clone() 
-                    }
-                };
-                self.curr_collected_blocks.insert(start_id.clone(), loop_header_block);
-
-                self.loop_start_stack.push(start_id.clone());
-                self.loop_end_stack.push(end_id.clone());
-
-                self.lower_statement_block(body, body_id, start_id.clone());
-                
-                self.wip_block_id = Some(end_id);
-
-                self.loop_start_stack.pop();
-                self.loop_end_stack.pop();
-            }
-            HIRStatement::Break => {
-                let break_terminator = LIRTerminator::Goto { dest: self.loop_end_stack.last().unwrap().clone()}; 
-                self.push_current_block(break_terminator);
-            }
-            HIRStatement::Continue => {
-                let cont_terminator = LIRTerminator::Goto { dest: self.loop_start_stack.last().unwrap().clone() };
-                self.push_current_block(cont_terminator);
-            }
-            HIRStatement::Return(retval_expr) => {
-
-                // TODO: careful later with larger types !!
-                let retval_reg = self.add_vreg(
-                    self.layouts.get_layout(retval_expr.typ.clone()).size()
-                );
-
-                let retval_stmts = self.lower_expr_into_target(retval_expr, LIRPlace::VReg(retval_reg.clone()));
-                self.wip_block_stmts.extend(retval_stmts.into_iter());
-                let ret_terminator = LIRTerminator::Return(Some(Operand::Register(retval_reg)));
-                self.push_current_block(ret_terminator);
-            }
-            HIRStatement::Print(expr) => {
-                
-                let expr_reg = self.add_vreg(
-                    self.layouts.get_layout(expr.typ.clone()).size()
-                );
-
-                let expr_stmts = self.lower_expr_into_target(expr, LIRPlace::VReg(expr_reg.clone()));
-                self.wip_block_stmts.extend(expr_stmts.into_iter());
-                let print_stmt = LIRStatement::Print(Operand::Register(expr_reg));
-                self.wip_block_stmts.push(print_stmt);
-            }
+        for stmt in stmts.into_iter() {
+            self.lower_stmt(stmt);
         }
-    }
 
-    //-----------------------
+        if !self.wip_block_stmts.is_empty() {
+            self.push_wip(tail_termr);
+        }
+        entry_id
+    }
      
     fn lower_stmt(&mut self, stmt: HIRStatement) {
         match stmt {
             HIRStatement::Let { var, value } => {
                 let cell_id = &self.var_map[&var];
                 let target = MIRPlace {
-                    typ: self.current_cells[&cell_id].typ,
+                    typ: self.current_cells[&cell_id].typ.clone(),
                     base: cell_id.clone(),
                     fieldchain: Vec::new()
                 };
-                let stmt = MIRStatement::Assign { target, value: self.lower_expr(value)};
-                self.wip_block_stmts.push(stmt);
+                let (mir_val, val_stmts) = self.lower_expr(value);
+                self.wip_block_stmts.extend(val_stmts.into_iter());
+                self.wip_block_stmts.push(MIRStatement::Assign { target, value: mir_val});
             },
             HIRStatement::Assign { target, value } => {
                 let (mir_val, val_stmts) = self.lower_expr(value);
@@ -229,8 +131,59 @@ impl LIRBuilder {
                 self.wip_block_stmts.extend(val_stmts.into_iter());
                 self.wip_block_stmts.push(mir_assign);
             }
+            HIRStatement::If { condition, if_body, else_body } => {
+                let (cond_val, cond_stmts) = self.lower_expr(condition);
+                self.wip_block_stmts.extend(cond_stmts.into_iter());
+                let curr_stmts = self.get_wip_stmts();
+                let curr_id = self.get_wip_id();
+
+                let merge_id = self.get_new_blockid();
+                let then_block_id = self.lower_stmt_block(if_body, MIRTerminator::Goto(merge_id.clone()));
+                let else_block_id = match else_body {
+                    Some(else_stmts) => self.lower_stmt_block(else_stmts, MIRTerminator::Goto(merge_id.clone())),
+                    None => merge_id.clone()
+                };
+                let block = MIRBlock{statements: curr_stmts, terminator: MIRTerminator::Branch { condition: cond_val, then_: then_block_id, else_: else_block_id}};
+                self.curr_collected_blocks.insert(curr_id, block);
+                self.wip_block_id = merge_id;
+            }
+            HIRStatement::While { condition, body } => {
+                let head_id = self.get_new_blockid();
+                self.push_wip(MIRTerminator::Goto(head_id.clone()));
+                
+                let (cond_val, cond_stmts) = self.lower_expr(condition);
+                let body_id = self.lower_stmt_block(body, MIRTerminator::Goto(head_id.clone()));
+                let after_id = self.wip_block_id.clone();
+                let head_block = MIRBlock {
+                    statements: cond_stmts,
+                    terminator: MIRTerminator::Branch { 
+                        condition: cond_val, 
+                        then_: body_id, 
+                        else_: after_id
+                    }
+                };
+                self.curr_collected_blocks.insert(head_id, head_block);
+            },
+            HIRStatement::Break => {
+                let break_terminator = MIRTerminator::Goto(self.loop_end_stack.last().unwrap().clone()); 
+                self.push_wip(break_terminator);
+            }
+            HIRStatement::Continue => {
+                let cont_terminator = MIRTerminator::Goto(self.loop_start_stack.last().unwrap().clone()); 
+                self.push_wip(cont_terminator);
+            }
+            HIRStatement::Return(ret_val) => { 
+                let (mir_retval, ret_stmts) = self.lower_expr(ret_val);
+                self.wip_block_stmts.extend(ret_stmts.into_iter());
+                let ret_terminator = MIRTerminator::Return(Some(mir_retval));
+                self.push_wip(ret_terminator);
+            }
+            HIRStatement::Print(expr) => {
+                let (expr_val, expr_stmts) = self.lower_expr(expr);
+                self.wip_block_stmts.extend(expr_stmts.into_iter());
+                self.wip_block_stmts.push(MIRStatement::Print(expr_val));
+            }
         }
-        unimplemented!();
     }
     
 
