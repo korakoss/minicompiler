@@ -109,10 +109,6 @@ impl MIRBuilder {
     }
      
     fn lower_stmt(&mut self, stmt: HIRStatement) {
-        println!("WIP: {:?}", self.wip_block_stmts);
-        println!();
-        println!("BLOCKS: {:?}", self.curr_collected_blocks);
-        println!("\n \n");
 
         match stmt {
             HIRStatement::Let { var, value } => {

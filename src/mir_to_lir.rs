@@ -66,7 +66,6 @@ impl LIRBuilder {
     }
 
     fn lower_stmt(&mut self, stmt: MIRStatement) -> Vec<LIRStatement> {
-        println!("STMT: {:?}", stmt);
         match stmt {
             MIRStatement::Assign { target, value } => {
                 let lir_target = self.lower_place(target);
@@ -129,7 +128,6 @@ impl LIRBuilder {
     }
 
     fn lower_value_into_operand(&mut self, value: MIRValue) -> (Operand, Vec<LIRStatement>) {
-        println!("VALUE: {:?}", value);
         match value {
             MIRValue::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
@@ -197,15 +195,10 @@ impl LIRBuilder {
 
         let base = self.curr_cell_vreg_map[&place.base].clone();
 
-        println!("PLACE: {:?}", place.clone());
-
-
         let mut curr_typ = self.curr_cells[&place.base].typ.clone();
         let mut curr_offs = 0;
         
         for field in place.fieldchain {
-            println!("TYPE: {:?}", curr_typ);
-            println!("QUERY: {:?}", field);
             let curr_typ_layout = self.layouts.get_layout(curr_typ.clone());
 
             match curr_typ_layout {
@@ -218,11 +211,9 @@ impl LIRBuilder {
                 } 
                 LayoutInfo::Primitive(..) => {
                     panic!("This is primitive, shouldn't have a field");
-                    break;
                 }
             }
         }
-        println!("{:?}", curr_offs);
         LIRPlace{base, offset: curr_offs}
     }
     
