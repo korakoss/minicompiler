@@ -189,21 +189,31 @@ impl LIRBuilder {
     }
 
     fn lower_place(&self, place: MIRPlace) -> LIRPlace {
+        // TODO: weird solution, change it
+
         let base = self.curr_cell_map[&place.base].clone();
+
+        println!("{:?}", place.clone());
+
 
         let mut curr_typ = place.typ;
         let mut curr_offs = 0;
-
+        
         for field in place.fieldchain {
             let curr_typ_layout = self.layouts.get_layout(curr_typ.clone());
-            let LayoutInfo::Struct { size, field_offsets } = curr_typ_layout else {
-                unreachable!();
-            };
-            let Type::Derived(TypeConstructor::Struct { fields }) = curr_typ else {
-                unreachable!();
-            };
-            curr_typ = fields[&field].clone();
-            curr_offs = curr_offs + field_offsets[&field];
+
+            match curr_typ_layout {
+                LayoutInfo::Struct { size, field_offsets } => {
+                    let Type::Derived(TypeConstructor::Struct { fields }) = curr_typ else {
+                        unreachable!();
+                    };
+                    curr_typ = fields[&field].clone();
+                    curr_offs = curr_offs + field_offsets[&field];
+                } 
+                LayoutInfo::Primitive(..) => {
+                    break;
+                }
+            }
         }
         LIRPlace{base, offset: curr_offs}
     }

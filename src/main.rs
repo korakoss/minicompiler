@@ -22,16 +22,16 @@ use make_hir::*;
 mod mir;
 
 mod hir_to_mir;
+use hir_to_mir::*;
+
 mod mir_to_lir;
+use mir_to_lir::*;
+
 mod lir;
-use lir::*;
-
-mod hir_to_lir;
-use hir_to_lir::*;
-
 
 mod lir_codegen;
 use lir_codegen::*;
+
 
 fn main() {
     
@@ -42,7 +42,8 @@ fn main() {
     let uast_filepath = &args[4];
     let tast_filepath = &args[5];
     let hir_filepath = &args[6];
-    let lir_filepath = &args[7];
+    let mir_filepath = &args[7];
+    let lir_filepath = &args[8];
 
     let program_text = &fs::read_to_string(code_filename).unwrap();
     let tokens = lex(program_text);
@@ -59,7 +60,10 @@ fn main() {
     let hir = HIRBuilder::lower_ast(tast);
     fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
 
-    let lir = LIRBuilder::lower_hir(hir);
+    let mir = MIRBuilder::lower_hir(hir);
+    fs::write(mir_filepath, format!("{:#?}", mir)).unwrap();
+
+    let lir = LIRBuilder::lower_mir(mir);
     fs::write(lir_filepath, format!("{:#?}", lir)).unwrap();
 
     let assembly = LIRCompiler::compile(lir);

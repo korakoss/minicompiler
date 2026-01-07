@@ -28,7 +28,7 @@ impl MIRBuilder {
             var_map: HashMap::new(),
             current_cells: HashMap::new(),
             cell_counter: 0,
-            block_counter: 0,
+            block_counter: 1,
             loop_start_stack: Vec::new(),
             loop_end_stack: Vec::new(),
             curr_collected_blocks: HashMap::new(),
@@ -103,13 +103,17 @@ impl MIRBuilder {
             self.lower_stmt(stmt);
         }
 
-        if !self.wip_block_stmts.is_empty() {
-            self.push_wip(tail_termr);
-        }
+        // MEH! TODO: think abt this
+        self.push_wip(tail_termr);
         entry_id
     }
      
     fn lower_stmt(&mut self, stmt: HIRStatement) {
+        println!("WIP: {:?}", self.wip_block_stmts);
+        println!();
+        println!("BLOCKS: {:?}", self.curr_collected_blocks);
+        println!("\n \n");
+
         match stmt {
             HIRStatement::Let { var, value } => {
                 let cell_id = &self.var_map[&var];
@@ -255,7 +259,7 @@ impl MIRBuilder {
                     stmts.extend(f_stmts.into_iter());
                     mir_fields.insert(fname, f_val);
                 }
-                (MIRValue::StructLiteral{fields: mir_fields}, stmts)
+                (MIRValue::StructLiteral{ typ: expr.typ,fields: mir_fields}, stmts)
             },
         }
     }
