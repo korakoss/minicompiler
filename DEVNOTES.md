@@ -36,6 +36,7 @@ implement structs
     - returns are r12 pointers, okay
     - but we might also want to use pointers for args
 - eventually get rid of all the cloning
+- eventually we want more informative errors
 
 ## Next big step
 
@@ -59,4 +60,8 @@ match t {
 }
 ```
 
+## MIR
 
+we build a mir for ownership checking
+
+sneak in the calculation in temps?

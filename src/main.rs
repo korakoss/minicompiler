@@ -19,6 +19,10 @@ mod hir;
 mod make_hir;
 use make_hir::*;
 
+mod mir;
+
+mod hir_to_mir;
+
 mod lir;
 use lir::*;
 
