@@ -84,7 +84,7 @@ impl LIRBuilder {
             }
             MIRStatement::Call { target, func, args } => {
                 let lir_target = self.lower_place(target);
-                let (arg_opnds, arg_stmt_coll): (Vec<Operand>, Vec<Vec<LIRStatement>>) = args
+                let (arg_opnds, arg_stmt_coll): (Vec<LIRValue>, Vec<Vec<LIRStatement>>) = args
                     .into_iter()
                     .map(|arg| self.lower_value_into_operand(arg))
                     .unzip();
@@ -126,20 +126,20 @@ impl LIRBuilder {
         }
     }
 
-    fn lower_value_into_operand(&mut self, value: MIRValue) -> (Operand, Vec<LIRStatement>) {
+    fn lower_value_into_operand(&mut self, value: MIRValue) -> (LIRValue, Vec<LIRStatement>) {
         match value {
             MIRValue::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                (Operand::Place(lir_val_place), Vec::new())
+                (LIRValue::Place(lir_val_place), Vec::new())
             },
             MIRValue::IntLiteral(num) => {
-                (Operand::IntLiteral(num), Vec::new())
+                (LIRValue::IntLiteral(num), Vec::new())
             },
             MIRValue::BoolTrue => {
-                (Operand::BoolTrue, Vec::new())
+                (LIRValue::BoolTrue, Vec::new())
             }
             MIRValue::BoolFalse => {
-                (Operand::BoolFalse, Vec::new())
+                (LIRValue::BoolFalse, Vec::new())
             }
             MIRValue::StructLiteral { typ, fields } => {
                 let temp_vreg_info = VRegInfo {
@@ -151,7 +151,7 @@ impl LIRBuilder {
 
                 // Mehh. Maybe add type info back to MIRV?
                 let stmts = self.lower_value_into_place(MIRValue::StructLiteral{typ, fields}, temp_place.clone());
-                (Operand::Place(temp_place), stmts)
+                (LIRValue::Place(temp_place), stmts)
             }
         }
     }
@@ -160,16 +160,16 @@ impl LIRBuilder {
         match value {
             MIRValue::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                vec![LIRStatement::Store{dest: target, value: Operand::Place(lir_val_place)}] 
+                vec![LIRStatement::Store{dest: target, value: LIRValue::Place(lir_val_place)}] 
             },
             MIRValue::IntLiteral(num) => {
-                vec![LIRStatement::Store{dest: target, value: Operand::IntLiteral(num)}]
+                vec![LIRStatement::Store{dest: target, value: LIRValue::IntLiteral(num)}]
             },
             MIRValue::BoolTrue => {
-                vec![LIRStatement::Store{dest: target, value: Operand::BoolTrue}]
+                vec![LIRStatement::Store{dest: target, value: LIRValue::BoolTrue}]
             }
             MIRValue::BoolFalse => {
-                vec![LIRStatement::Store{dest: target, value: Operand::BoolFalse}]
+                vec![LIRStatement::Store{dest: target, value: LIRValue::BoolFalse}]
             }
             MIRValue::StructLiteral { typ, fields } => {
                 let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(typ) else {

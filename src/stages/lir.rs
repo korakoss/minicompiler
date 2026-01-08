@@ -29,21 +29,21 @@ pub struct LIRBlock {
 pub enum LIRStatement {
     Store {
         dest: LIRPlace,
-        value: Operand,
+        value: LIRValue,
     },
 
     BinOp {
         dest: LIRPlace,
         op: BinaryOperator,
-        left: Operand,
-        right: Operand,
+        left: LIRValue,
+        right: LIRValue,
     },
     Call {
         dest: LIRPlace,
         func: FuncId,
-        args: Vec<Operand>,
+        args: Vec<LIRValue>,
     },
-    Print(Operand),
+    Print(LIRValue),
 }
 
 
@@ -53,16 +53,16 @@ pub enum LIRTerminator {
         dest: BlockId,
     },
     Branch {
-        condition: Operand,
+        condition: LIRValue,
         then_block: BlockId,
         else_block: BlockId
     },
-    Return(Option<Operand>)
+    Return(Option<LIRValue>)
 }
 
 
 #[derive(Clone, Debug)]
-pub enum Operand {
+pub enum LIRValue {
     Place(LIRPlace), 
     IntLiteral(i32),
     BoolTrue,

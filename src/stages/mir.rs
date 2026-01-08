@@ -56,7 +56,7 @@ pub enum MIRTerminator {
         then_: BlockId,
         else_: BlockId,
     },
-    Return(Option<MIRValue>),       // TODO: modify to option in HIR? and above?
+    Return(Option<MIRValue>),      
 }
 
 #[derive(Clone, Debug)]

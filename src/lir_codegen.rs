@@ -201,19 +201,19 @@ self.emit_operand_load(left, frame);
         }
     }
 
-    fn emit_operand_load(&mut self, operand: Operand, frame: &StackFrame) {
+    fn emit_operand_load(&mut self, operand: LIRValue, frame: &StackFrame) {
         match operand {
-            Operand::Place(place) => {
+            LIRValue::Place(place) => {
                 let place_offset = self.compute_place_offset(place, frame);
                 self.emit(&format!("    ldr r0, [fp, #-{}]", place_offset));
             }
-            Operand::IntLiteral(num) => {
+            LIRValue::IntLiteral(num) => {
                 self.emit(&format!("     ldr r0, ={}", num));
             }
-            Operand::BoolTrue => {
+            LIRValue::BoolTrue => {
                 self.emit(&"    ldr r0, =1");   
             }
-            Operand::BoolFalse => {
+            LIRValue::BoolFalse => {
                 self.emit(&"    ldr r0, =0");   
             }
         }
