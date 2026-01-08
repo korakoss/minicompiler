@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::stages::common::*;
 use crate::stages::lir::*;
 use crate::stages::mir::*;
 use crate::shared::typing::*;
@@ -186,7 +185,6 @@ impl LIRBuilder {
                 }
                 stmts
             }
-            _ => {unimplemented!();}
         }
     }
 
@@ -285,10 +283,6 @@ table
     }
     
     fn make_newtype_layout(&self, deriv_typ: DerivType) -> LayoutInfo {
-
-        // TODO: we have to process in topo order !!!!!!!
-        // Currently, I think it spills down in that order here
-        // But we should make it cleaner
         
         let TypeConstructor::Struct{fields} = deriv_typ else {
             unimplemented!();
