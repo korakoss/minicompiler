@@ -1,8 +1,8 @@
-
 use std::collections::HashMap;
 
-use crate::{lir::*, shared::binops::BinaryOperator};
-use crate::{hir::FuncId}; 
+use crate::stages::common::*;
+use crate::stages::lir::*;
+use crate::shared::binops::BinaryOperator;
 
 
 struct StackFrame {

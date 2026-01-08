@@ -16,6 +16,8 @@ Struct literals currently needs a trailing comma after the last field, change th
 ## Print sloppinesses
 The printf call assumes that it's printing an int. This fails on structs and prints booleans as ints. Not too urgent to fix, or make print smarter, but maybe we could typecheck.
 
+## Break/continue
+Loop start and end stacks are apparently not pushed to now. Readd that.
 
 # Could be done nicer
 

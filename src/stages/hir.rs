@@ -1,7 +1,8 @@
 use crate::shared::typing::*;
-use std::{collections::HashMap};
 use crate::shared::binops::*;
+use crate::stages::common::FuncId;
 
+use std::{collections::HashMap};
 
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
@@ -96,5 +97,4 @@ pub enum PlaceKind {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct VarId(pub usize);
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub struct FuncId(pub usize);
+

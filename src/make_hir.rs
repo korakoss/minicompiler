@@ -1,8 +1,10 @@
-use crate::ast::*;
-use crate::hir::*;
-use crate::shared::binops::binop_typecheck;
-use std::{collections::HashMap};
 use crate::shared::typing::*;
+use crate::stages::common::*;
+use crate::stages::ast::*;
+use crate::stages::hir::*;
+use crate::shared::binops::binop_typecheck;
+
+use std::{collections::HashMap};
 
 
 struct Scope {

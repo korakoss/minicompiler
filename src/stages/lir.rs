@@ -1,5 +1,7 @@
+use crate::shared::binops::*;
+use crate::stages::common::*;
+
 use std::{collections::HashMap};
-use crate::{hir::FuncId, shared::binops::*};
 
 
 #[derive(Clone, Debug)]
@@ -82,9 +84,3 @@ pub struct VRegInfo{
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct VRegId(pub usize);
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct BlockId(pub usize);
-
-
-

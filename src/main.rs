@@ -2,8 +2,7 @@ use std::fs;
 use std::env;
 
 mod shared;
-
-mod ast;
+mod stages;
 
 mod lex;
 use lex::*;
@@ -14,20 +13,14 @@ use parse::*;
 mod convert_ast;
 use convert_ast::*;
 
-mod hir;
-
 mod make_hir;
 use make_hir::*;
-
-mod mir;
 
 mod hir_to_mir;
 use hir_to_mir::*;
 
 mod mir_to_lir;
 use mir_to_lir::*;
-
-mod lir;
 
 mod lir_codegen;
 use lir_codegen::*;

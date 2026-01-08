@@ -1,8 +1,9 @@
 use crate::shared::binops::BinaryOperator;
 use crate::shared::typing::*;
+use crate::stages::common::*;
+
 use std::{collections::HashMap};
-use crate::hir::*;                  //for FuncID; TODO: put that somewhere shared
-use crate::lir::*;                  // for blockID; likewise
+
 
 #[derive(Clone, Debug)]
 pub struct MIRProgram {

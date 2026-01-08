@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use std::iter::Peekable;
 
 use crate::shared::tokens::*;
-use crate::ast::*;
 use crate::shared::typing::*;
-
+use crate::stages::ast::*;
 
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 

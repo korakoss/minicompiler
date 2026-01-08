@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::lir::*;
-use crate::mir::*;
-
+use crate::stages::common::*;
+use crate::stages::lir::*;
+use crate::stages::mir::*;
 use crate::shared::typing::*;
 
 
