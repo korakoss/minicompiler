@@ -18,7 +18,7 @@ pub struct Variable<T> {
     // TODO: mutable, etc
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]            // Rename to ConcreteType
 pub enum Type {
     Prim(PrimitiveType),
     Derived(TypeConstructor<Type>),

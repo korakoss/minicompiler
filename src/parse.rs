@@ -221,7 +221,7 @@ impl Parser {
                 break;
             }
             let conn_token = self.tokens.next().unwrap();  
-            current_expr = match conn_token.clone() {
+            current_expr = match conn_token {
                 Token::Dot => {
                     let field = self.expect_identifier();
                     UASTExpression::FieldAccess { 
