@@ -43,7 +43,7 @@ pub enum HIRStatement {
 },
     Break,
     Continue,
-    Return(HIRExpression),
+    Return(Option<HIRExpression>),
     Print(HIRExpression),
 }
 

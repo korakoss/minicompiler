@@ -14,16 +14,14 @@ pub struct MIRBuilder {
     loop_start_stack: Vec<BlockId>,
     loop_end_stack: Vec<BlockId>,
     curr_collected_blocks: HashMap<BlockId, MIRBlock>,
-    wip_block_stmts: Vec<MIRStatement>, 
-    wip_block_id: BlockId, 
-    typetable: TypeTable,
+    wip_blocks: HashMap<BlockId, Vec<MIRStatement>>,
+    processing_stack: Vec<BlockId>,
 }
 
 
 impl MIRBuilder {
     
     pub fn lower_hir(program: HIRProgram) -> MIRProgram {
-        let HIRProgram { typetable, functions, entry } = program;
         let mut builder = MIRBuilder {
             var_map: HashMap::new(),
             current_cells: HashMap::new(),
@@ -32,156 +30,152 @@ impl MIRBuilder {
             loop_start_stack: Vec::new(),
             loop_end_stack: Vec::new(),
             curr_collected_blocks: HashMap::new(),
-            wip_block_stmts: Vec::new(),
-            wip_block_id: BlockId(0), 
-            typetable: typetable,
+            wip_blocks: HashMap::new(),
+            processing_stack: Vec::new()
         };
         MIRProgram {
-            functions: functions
+            functions: program.functions
                 .into_iter()
                 .map(|(id, func)| (id, builder.lower_function(func)))
                 .collect(),
-            entry: entry,
-            typetable: builder.typetable
+            entry: program.entry,
+            typetable: program.typetable
         }
     }
 
     fn lower_function(&mut self, func: HIRFunction) -> MIRFunction {
         
         self.curr_collected_blocks = HashMap::new();
-
         self.current_cells = HashMap::new();
+
         for (var_id, var) in func.variables.into_iter() {
             let cell_id = self.add_cell(Cell { typ: var.typ, kind: CellKind::Var { name: var.name}});
             self.var_map.insert(var_id, cell_id);
         }
         
-        let entry_id = self.wip_block_id.clone();
-        self.lower_stmt_block(func.body, MIRTerminator::Return(None));  // TODO: maybe do this nicer somehow
+        let entry_id = self.lower_stmt_block(func.body, MIRTerminator::Return(None));  // TODO: maybe do this nicer somehow (the return part)
         
         let arg_cells: Vec<CellId> = func.args
             .iter()
             .map(|arg_id| self.var_map[&arg_id].clone())
             .collect();
-        let func = MIRFunction {
+        MIRFunction {
             name: func.name,
             args: arg_cells,
             cells: self.current_cells.clone(),
             blocks: self.curr_collected_blocks.clone(),
             entry: entry_id,
             ret_type: func.ret_type
-        };
-        self.current_cells = HashMap::new();
-        self.curr_collected_blocks = HashMap::new();
-        func
+        }
     }
-    
-    fn push_wip(&mut self, terminator: MIRTerminator) {
-        let id = self.get_wip_id();
-        let statements = self.get_wip_stmts();
-        let block = MIRBlock {statements, terminator};
-        self.curr_collected_blocks.insert(id, block);
-    }
-
-    fn get_wip_id(&mut self) -> BlockId {
-        let id = self.wip_block_id.clone();
-        self.wip_block_id = self.get_new_blockid();
-        id
-    }
-
-    fn get_wip_stmts(&mut self) -> Vec<MIRStatement> {
-        let stmts = self.wip_block_stmts.clone();
-        self.wip_block_stmts = Vec::new();
-        stmts
-    }
-
 
     fn lower_stmt_block(&mut self, stmts: Vec<HIRStatement>, tail_termr: MIRTerminator) -> BlockId {
-        let entry_id = self.wip_block_id.clone();
+        let entry_id = self.add_new_block();
 
-        for stmt in stmts.into_iter() {
-            self.lower_stmt(stmt);
+        let mut curr_top_id = entry_id;
+        self.switch_to_block(entry_id);
+
+        let mut has_unterminated = false;
+
+        for stmt in stmts {
+            self.switch_to_block(curr_top_id);                 // TODO: this is only for safety, sort it out properly
+            match self.lower_stmt(stmt) {
+                LoweredStatement::Statements(low_stmts) => {
+                    self.push_to_current_block(low_stmts);
+                    has_unterminated = true;
+                }
+                LoweredStatement::Termination(low_stmts, term) => {
+                    self.push_to_current_block(low_stmts);
+                    self.terminate_current_block(term);
+                    return entry_id;
+                }
+                LoweredStatement::TabulaRasa(next_id) => {
+                    curr_top_id = next_id;
+                    has_unterminated = false;
+                }
+            }
         }
-
-        // MEH! TODO: think abt this
-        self.push_wip(tail_termr);
+        
+        if has_unterminated {
+            self.switch_to_block(curr_top_id);
+            self.terminate_current_block(tail_termr);
+        }
         entry_id
     }
-     
-    fn lower_stmt(&mut self, stmt: HIRStatement) {
 
+    
+     
+    fn lower_stmt(&mut self, stmt: HIRStatement) -> LoweredStatement {
         match stmt {
             HIRStatement::Let { var, value } => {
                 let cell_id = &self.var_map[&var];
                 let target = MIRPlace {
                     typ: self.current_cells[&cell_id].typ.clone(),
-                    base: cell_id.clone(),
+                    base: *cell_id,
                     fieldchain: Vec::new()
                 };
                 let (mir_val, val_stmts) = self.lower_expr(value);
-                self.wip_block_stmts.extend(val_stmts.into_iter());
-                self.wip_block_stmts.push(MIRStatement::Assign { target, value: mir_val});
+                LoweredStatement::Statements([val_stmts, vec![MIRStatement::Assign { target, value: mir_val}]].concat())
             },
             HIRStatement::Assign { target, value } => {
                 let (mir_val, val_stmts) = self.lower_expr(value);
-                let mir_assign = MIRStatement::Assign { 
-                    target: self.lower_place(target), 
-                    value: mir_val,
-                };
-                self.wip_block_stmts.extend(val_stmts.into_iter());
-                self.wip_block_stmts.push(mir_assign);
+                LoweredStatement::Statements([val_stmts, vec![MIRStatement::Assign { target: self.lower_place(target), value: mir_val}]].concat())
             }
             HIRStatement::If { condition, if_body, else_body } => {
                 let (cond_val, cond_stmts) = self.lower_expr(condition);
-                self.wip_block_stmts.extend(cond_stmts.into_iter());
-                let curr_stmts = self.get_wip_stmts();
-                let curr_id = self.get_wip_id();
+                self.push_to_current_block(cond_stmts);
+                let curr_id = self.get_current_wip_id().unwrap();
 
-                let merge_id = self.get_new_blockid();
-                let then_block_id = self.lower_stmt_block(if_body, MIRTerminator::Goto(merge_id.clone()));
-                let else_block_id = match else_body {
-                    Some(else_stmts) => self.lower_stmt_block(else_stmts, MIRTerminator::Goto(merge_id.clone())),
-                    None => merge_id.clone()
+                let merge_id = self.add_new_block();
+                let then_id = self.lower_stmt_block(if_body, MIRTerminator::Goto(merge_id));   // This is where it happens
+                let else_id = match else_body {
+                    Some(else_stmts) => self.lower_stmt_block(else_stmts, MIRTerminator::Goto(merge_id)),
+                    None => merge_id,
                 };
-                let block = MIRBlock{statements: curr_stmts, terminator: MIRTerminator::Branch { condition: cond_val, then_: then_block_id, else_: else_block_id}};
-                self.curr_collected_blocks.insert(curr_id, block);
-                self.wip_block_id = merge_id;
+
+                self.switch_to_block(curr_id);
+                self.terminate_current_block(MIRTerminator::Branch { condition: cond_val, then_: then_id, else_: else_id});
+                LoweredStatement::TabulaRasa(merge_id)
             }
             HIRStatement::While { condition, body } => {
-                let head_id = self.get_new_blockid();
-                self.push_wip(MIRTerminator::Goto(head_id.clone()));
-                
+                let head_id = self.add_new_block();
+                self.loop_start_stack.push(head_id);
+                self.terminate_current_block(MIRTerminator::Goto(head_id));
+               
+                let body_id = self.lower_stmt_block(body, MIRTerminator::Goto(head_id));
+
+                let after_id = self.add_new_block();
+                self.loop_end_stack.push(after_id);
+
+                self.switch_to_block(head_id);
                 let (cond_val, cond_stmts) = self.lower_expr(condition);
-                let body_id = self.lower_stmt_block(body, MIRTerminator::Goto(head_id.clone()));
-                let after_id = self.wip_block_id.clone();
-                let head_block = MIRBlock {
-                    statements: cond_stmts,
-                    terminator: MIRTerminator::Branch { 
-                        condition: cond_val, 
-                        then_: body_id, 
-                        else_: after_id
-                    }
-                };
-                self.curr_collected_blocks.insert(head_id, head_block);
+                self.push_to_current_block(cond_stmts);
+                self.terminate_current_block(MIRTerminator::Branch { condition: cond_val, then_: body_id, else_: after_id});
+                
+                self.loop_start_stack.pop();
+                self.loop_end_stack.pop();
+                LoweredStatement::TabulaRasa(after_id)
             },
             HIRStatement::Break => {
-                let break_terminator = MIRTerminator::Goto(self.loop_end_stack.last().unwrap().clone()); 
-                self.push_wip(break_terminator);
+                // TODO: add a "WIP block processing stack", jump back in it here
+                LoweredStatement::Termination(vec![], MIRTerminator::Goto(*self.loop_end_stack.last().unwrap())) 
             }
             HIRStatement::Continue => {
-                let cont_terminator = MIRTerminator::Goto(self.loop_start_stack.last().unwrap().clone()); 
-                self.push_wip(cont_terminator);
+                LoweredStatement::Termination(vec![], MIRTerminator::Goto(*self.loop_start_stack.last().unwrap())) 
             }
             HIRStatement::Return(ret_val) => { 
-                let (mir_retval, ret_stmts) = self.lower_expr(ret_val);
-                self.wip_block_stmts.extend(ret_stmts.into_iter());
-                let ret_terminator = MIRTerminator::Return(Some(mir_retval));
-                self.push_wip(ret_terminator);
+                let (mir_retval, ret_stmts) = match ret_val {
+                    Some(value) => {
+                        let (mir_val, val_stmts) = self.lower_expr(value);
+                        (Some(mir_val), val_stmts)
+                    },
+                    None => (None, vec![])
+                };
+                LoweredStatement::Termination(ret_stmts, MIRTerminator::Return(mir_retval))
             }
             HIRStatement::Print(expr) => {
                 let (expr_val, expr_stmts) = self.lower_expr(expr);
-                self.wip_block_stmts.extend(expr_stmts.into_iter());
-                self.wip_block_stmts.push(MIRStatement::Print(expr_val));
+                LoweredStatement::Statements([expr_stmts, vec![MIRStatement::Print(expr_val)]].concat())
             }
         }
     }
@@ -273,6 +267,40 @@ impl MIRBuilder {
         };
         MIRValue::Place(access_place)
     }
+    
+    fn push_to_current_block(&mut self, stmts: Vec<MIRStatement>) {
+        let curr_id = self.get_current_wip_id().unwrap();
+        self.wip_blocks.get_mut(&curr_id).unwrap().extend(stmts.into_iter());
+    }
+
+    fn add_new_block(&mut self) -> BlockId {
+        let new_id = self.get_new_blockid();
+        self.wip_blocks.insert(new_id, Vec::new());
+        new_id
+    }
+
+    fn switch_to_block(&mut self, id: BlockId) {
+        if !self.wip_blocks.contains_key(&id) {
+            panic!("Block with requested ID {:?} not found. Current WIP blocks: {:?}", id, self.wip_blocks);
+        }
+        self.processing_stack.push(id);
+    }
+
+    fn terminate_current_block(&mut self, terminator: MIRTerminator) {
+        let curr_id = self.get_current_wip_id().unwrap();
+        let statements = self.wip_blocks.remove(&curr_id).unwrap();
+        let block = MIRBlock {
+            statements,
+            terminator,
+        };
+        self.curr_collected_blocks.insert(curr_id, block);
+        self.processing_stack.pop();
+    }
+
+    fn get_current_wip_id(&mut self) -> Option<BlockId> {
+        self.processing_stack.last().copied()
+    }
+
         
     fn get_new_blockid(&mut self) -> BlockId {
         let block_id = BlockId(self.block_counter); 
@@ -286,4 +314,11 @@ impl MIRBuilder {
         self.current_cells.insert(new_id.clone(), cell);
         new_id
     }
+}
+
+
+enum LoweredStatement {
+    Statements(Vec<MIRStatement>),
+    Termination(Vec<MIRStatement>, MIRTerminator),
+    TabulaRasa(BlockId),
 }

@@ -57,7 +57,6 @@ impl HIRBuilder {
 
         let mut builder = HIRBuilder {
             scope_stack: Vec::new(),
-            new_types: HashMap::new(),
             curr_variable_coll: HashMap::new(),
             function_map,
             var_counter: 0,
@@ -84,7 +83,10 @@ impl HIRBuilder {
             .into_iter()
             .map(|arg| self.register_new_var(TypedVariable{name: arg.0, typ: arg.1}))
             .collect();
-        let hir_body = self.lower_block(body);
+        let mut hir_body = self.lower_block(body);
+        if ret_type == Type::Prim(PrimitiveType::None) {
+            hir_body.push(HIRStatement::Return(None));
+        }
         let hir_func = HIRFunction { 
             name, 
             args: arg_ids,
@@ -186,7 +188,7 @@ impl HIRBuilder {
                 if hir_expr.typ != self.scope_stack.last().unwrap().ambient_ret_type {
                     panic!("Return statement has unexpected type");
                 }
-                HIRStatement::Return(hir_expr)
+                HIRStatement::Return(Some(hir_expr))
             }
             TASTStatement::Print(expr) => {
                 let hir_expr = self.lower_expression(expr);
