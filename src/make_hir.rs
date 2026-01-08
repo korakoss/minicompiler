@@ -36,55 +36,45 @@ pub struct HIRBuilder {
     scope_stack: Vec<Scope>,
     new_types: HashMap<TypeIdentifier, DerivType>,
     curr_variable_coll: HashMap<VarId, TypedVariable>,
-    function_map: HashMap<CompleteFunctionSignature, FuncId>,
-    ret_types: HashMap<FuncId, Type>,
-    entry: FuncId,
+    function_map: HashMap<CompleteFunctionSignature, (FuncId, Type)>,
     var_counter: usize,
 }
 
 impl HIRBuilder {
+    
+    pub fn lower_ast(tast: TASTProgram) -> HIRProgram {
+        let TASTProgram{typetable, functions} = tast;
 
-    fn new(functions: &HashMap<FuncSignature<Type>, TASTFunction>) -> HIRBuilder {
-        
-        let mut function_map = HashMap::new();
-        let mut ret_types = HashMap::new();
-        let mut pot_entry: Option<FuncId> = None;
+        let function_map: HashMap<CompleteFunctionSignature, (FuncId, Type)> = functions
+            .iter()
+            .enumerate()
+            .map(|(i, (sgn, func))| (sgn.clone(), (FuncId(i), func.ret_type.clone())))
+            .collect();
+        let entry = function_map
+            .iter()
+            .find_map(|(sgn, id)| { (sgn.name == "main")
+            .then_some(id)})
+            .unwrap().0;
 
-        for (sgn,func) in functions {
-            let id = FuncId(function_map.len());
-            function_map.insert(sgn.clone(),id.clone());
-            ret_types.insert(id.clone(), func.ret_type.clone());
-            if sgn.name == "main" {
-                pot_entry = Some(id);
-            }
-        }
-        HIRBuilder {
+        let mut builder = HIRBuilder {
             scope_stack: Vec::new(),
             new_types: HashMap::new(),
             curr_variable_coll: HashMap::new(),
             function_map,
-            ret_types,
-            entry: pot_entry.unwrap(),
             var_counter: 0,
-        }
-    }
+        };
 
-    pub fn lower_ast(tast: TASTProgram) -> HIRProgram {
-        let TASTProgram{typetable, functions} = tast;
-
-        let mut builder = HIRBuilder::new(&functions);
-            
         let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
 
         for (sgn,func) in functions {
             let hir_func = builder.lower_function(func); 
-            hir_functions.insert(builder.function_map[&sgn], hir_func);
+            hir_functions.insert(builder.function_map[&sgn].0, hir_func);
         }
 
         HIRProgram {
             typetable, 
             functions: hir_functions,
-            entry: builder.entry,
+            entry, 
         }
     }
 
@@ -98,7 +88,7 @@ impl HIRBuilder {
         let hir_body = self.lower_block(body);
         let hir_func = HIRFunction { 
             name, 
-            args: arg_ids.clone(),
+            args: arg_ids,
             variables: self.curr_variable_coll.clone(),
             body: hir_body, 
             ret_type 
@@ -219,7 +209,7 @@ impl HIRBuilder {
     fn register_new_var(&mut self, var: TypedVariable) -> VarId {
         let var_id = VarId(self.var_counter);
         self.var_counter = self.var_counter + 1;
-        self.curr_variable_coll.insert(var_id.clone(), var.clone());
+        self.curr_variable_coll.insert(var_id, var.clone());
         self.scope_stack.last_mut().unwrap().scope_vars.insert(var.name, var_id);
         var_id
     }
@@ -230,7 +220,7 @@ impl HIRBuilder {
 
         for scope in self.scope_stack.iter() {
             if let Some(var_id) = scope.scope_vars.get(&varname) {
-                return var_id.clone();
+                return *var_id;
             }
         }
         panic!("Variable name not found in scope");
@@ -277,12 +267,11 @@ impl HIRBuilder {
                         .map(|arg| arg.typ.clone())
                         .collect()
                 };
-                let func_id = self.function_map[&func_sgn].clone();
-                let ret_typ = self.ret_types[&func_id].clone();
+                let (func_id, ret_typ) = &self.function_map[&func_sgn];
                 HIRExpression {
-                    typ: ret_typ,
+                    typ: ret_typ.clone(),
                     expr: HIRExpressionKind::FuncCall{ 
-                        id: func_id, 
+                        id: *func_id, 
                         args: hir_args
                     }
                 } 
@@ -333,8 +322,7 @@ impl HIRBuilder {
         };         
 
         for (fname, exp_type) in struct_fields {
-            let fexpr = field_exprs.get(&fname).expect("Field not found").clone();
-            if fexpr.typ != exp_type {
+            if exp_type != field_exprs.get(&fname).expect("Field not found").typ {
                 panic!("Field type doesn't match expected type");
             }
         }
