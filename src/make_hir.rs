@@ -34,7 +34,6 @@ impl Scope {
 
 pub struct HIRBuilder {
     scope_stack: Vec<Scope>,
-    new_types: HashMap<TypeIdentifier, DerivType>,
     curr_variable_coll: HashMap<VarId, TypedVariable>,
     function_map: HashMap<CompleteFunctionSignature, (FuncId, Type)>,
     var_counter: usize,
