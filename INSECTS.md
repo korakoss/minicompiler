@@ -13,13 +13,16 @@ It is not checked whether a function does return on any execution path. (Probabl
 ## Struct literal parsing
 Struct literals currently needs a trailing comma after the last field, change this. By the way, the other comma-related subparsers instead _don't_ allow trail commas, that could be made more liberal instead (not priority).
 
-Also, I think struct definitions have to _precede_ their uses in literal, which is also inconvenient.
+Also, I think struct definitions have to _precede_ their uses in literals, which is also inconvenient.
 
 ## Print sloppinesses
 The printf call assumes that it's printing an int. This fails on structs and prints booleans as ints. Not too urgent to fix, or make print smarter, but maybe we could typecheck.
 
 ## Binop typecheck sloppiness
 It currently typechecks any a==b expression as valid if the two types are the same, despite this not being implemented for structs.
+
+## Struct moves
+Moves on large types currently don't work.
 
 # Could be done nicer
 

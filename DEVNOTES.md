@@ -1,52 +1,57 @@
 
 # Where are we
-Structs and MIR done-ish, seems to work, but not fully clear how stably. Refactored the typing so that newtypes are kept symbolic. Did some other cleanups and polish.
-Next, the polishing should be finished, and some more tests should be added (potentially also making testing nicer -- eg. being able to test for compilation _failure_).
-After everything stabilized, probably start working on enums.
 
-Okay fuck it we are adding pointers apparently.
-Added pointers throughout the stack but no codegen yet.
-The next steps should be first adding references under the hood for funargs. Afterwards, implementing the user-facing pointer stuff too.
+Added structs and the MIR. Seems mostly functional, except passing struct args. To fix that, I started working on passing arguments as pointers. Most of the machinery is done, but not codegen yet.
+Currently contemplating some refactors in LIR and MIR->LIR. The issue is that vregs were so far handled as corresponding to MIR cells, basically, having sizes and so on. I think that's wrong, they are8-bit values (pointers or primitives). So LIRPlace should take most of its roles. I wrote some TODO notes in the two files, but not implemented yet.
+
+After that is sorted out, pointers should be added. First, only adding them under the hood for the function argument thing. Then, if those work, finish implementing user-facing pointers too.
+
+Then, once pointers are finished, there should be finalization and cleanup. 
+Also, more tests should be added (some are collected below). It'd also be nice to improve the test script. In particular, enabling "negative testing": tests for compilation _failures_.
 
 
 ## Finalizations
-- remaining naming uniformizations (especially between MIR and LIR)
-- function call ABI
-    - use pointers for args
-    - maybe stack spilling
-- implement struct moves
-- some (not all) items from INSECTS.md
-    - void funccall parsing issue
-    - struct literal issues
+- some naming cleanup/uniformization (especially between MIR and LIR, I think)
+- some items from INSECTS.md
+    - actually, doing most from the Bugs/issues section would be nice
 
 ## Tests to add
 - break and continue
 - some functions calling each other back and forth
 
-## Things to find out 
-- do struct returns and struct arguments work?
-    - struct returns do, args don't
-- do struct moves work?
-    - no
 
 
-## Possible next steps
-- add pointers
-- next, we could add generics actually, and start heaping
-    - fixed-size arrays
-    - ARGUMENT: indexing probably fucks up the current state of all the passes and it'd be good to have it stabilize
-- add enums, _match_, and some or a lot of pattern matching
-- add an ownership and move checker
+# Roadmap
 
-## Later
-- generics
-- possibly struct methods and __scoped__
-- heap handling
-- then later, provenance types, __above__, the works
+After pointers are completed, I think we should start working towards heaped things. 
+The reason for this is that I expect those to fuck up several IRs (by introducing indexing "projections"), and it'd be nice to have the IRs stabilize for the most part.
 
-## Maybe
-- some basic optimizations like dead code etc.
-    - but not focus
+For heaped stuff however, we first need to add generics. So that'll be the next big step. 
+
+After having generics, write some kind of dumb bump allocator (in C?) to use, then implement Vec<T>. 
+
+After Vec<T> is implemented, start working on enums. Implement basic matching for them.
+
+If all of these are completed, I think that's sort of the language core finished. Then, there are several, fairly orthogonal "rabbitholes" that we can start to go towards:
+- more sophisticated pattern matching
+- more sophisticated memory allocator
+- adding a borrow checker or at least an ownership/move checker
+    - and mutability?
+- adding an x86 backend
+- adding optimizations
+    - dead code elimination
+    - register allocation
+    - etc., see materials
+- cosmetic improvements on the compiler (better scripts, informative errors, etc.)
+
+The _scoped_ keyword can also be experimented with at this point (and methods in general should be added around here, with whatever implementation).
+The _above_ keyword needs the borrow checker.
+
+If I don't want to continue the project at some point, I think it'd be nice to still add an x86 backend for the existing parts, and do the "niceness" parts (errors, better pipeline). 
+And it'd be nice to get it to at least the generics+heap+enums stage. Also, it might be a good idea to do this polish anyway after those features.
+
+If still continuing after those, I think the better pattern matching could be the next step. After that, maybe move checking/mutability. Then better malloc or borrow checking, whatever seems interesting.
+
 
 # Other
 
@@ -56,3 +61,6 @@ The next steps should be first adding references under the hood for funargs. Aft
     - test script could call the compile script
 - Add informative errors
 
+
+## Someday
+- basic optimizations like dead code elimination
