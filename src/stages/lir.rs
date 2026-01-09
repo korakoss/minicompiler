@@ -1,4 +1,4 @@
-use crate::shared::binops::*;
+use crate::{shared::binops::*, stages::mir::MIRPlace};
 use crate::stages::common::*;
 use crate::shared::typing::*;
 
@@ -63,14 +63,20 @@ pub enum LIRTerminator {
 
 
 #[derive(Clone, Debug)]
-pub enum LIRValue {
-    Place{
-        typ: Type,
-        place: LIRPlace
-    }, 
+pub struct LIRValue {
+    pub typ: Type,
+    pub value: LIRValueKind,
+}
+
+
+#[derive(Clone, Debug)]
+pub enum LIRValueKind {
+    Place(LIRPlace), 
     IntLiteral(i32),
     BoolTrue,
     BoolFalse,
+    Reference(LIRPlace),
+    Dereference(VRegId),
 }
 
 #[derive(Clone, Debug)]
@@ -98,5 +104,5 @@ pub struct VRegInfo{
 }
 
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub struct VRegId(pub usize);

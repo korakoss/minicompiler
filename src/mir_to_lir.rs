@@ -149,16 +149,16 @@ impl LIRBuilder {
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                (LIRValue::Place{typ: val_typ, place: lir_val_place}, Vec::new())
+                (LIRValue {typ: val_typ.clone(), value: LIRValueKind::Place(lir_val_place)}, Vec::new())
             },
             MIRValueKind::IntLiteral(num) => {
-                (LIRValue::IntLiteral(num), Vec::new())
+                (LIRValue {typ: Type::Prim(PrimType::Integer), value: LIRValueKind::IntLiteral(num)}, Vec::new())
             },
             MIRValueKind::BoolTrue => {
-                (LIRValue::BoolTrue, Vec::new())
+                (LIRValue {typ: Type::Prim(PrimType::Bool), value: LIRValueKind::BoolTrue}, Vec::new())
             }
             MIRValueKind::BoolFalse => {
-                (LIRValue::BoolFalse, Vec::new())
+                (LIRValue {typ: Type::Prim(PrimType::Bool), value: LIRValueKind::BoolFalse}, Vec::new())
             }
             MIRValueKind::StructLiteral {..} => {
                 let temp_vreg_info = VRegInfo {
@@ -173,7 +173,17 @@ impl LIRBuilder {
 
                 // Mehh. Maybe add type info back to MIRV?
                 let stmts = self.lower_value_into_place(value, temp_place.clone());
-                (LIRValue::Place{ typ: val_typ, place: temp_place}, stmts)
+                (LIRValue{ typ: val_typ, value: LIRValueKind::Place(temp_place)}, stmts)
+            }
+            MIRValueKind::Reference(refd) => {
+                let refd_place = self.lower_place(refd);
+                (LIRValue { typ: Type::Reference(Box::new(refd_place.typ.clone())), value: LIRValueKind::Reference(refd_place)}, vec![]) 
+            }
+            MIRValueKind::Dereference(reference) => {
+                let ref_vreg = self.curr_cell_vreg_map[&reference].clone();
+                let ref_type = self.curr_cells[&reference].typ.clone();
+                let Type::Reference(deref_typ) = ref_type else {unreachable!()};
+                (LIRValue { typ: *deref_typ, value: LIRValueKind::Dereference(ref_vreg)}, vec![])
             }
         }
     }
@@ -182,16 +192,16 @@ impl LIRBuilder {
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                vec![LIRStatement::Store{dest: target, value: LIRValue::Place{typ: value.typ, place: lir_val_place}}] 
+                vec![LIRStatement::Store{dest: target, value: LIRValue { typ: value.typ, value: LIRValueKind::Place(lir_val_place)}}] 
             },
             MIRValueKind::IntLiteral(num) => {
-                vec![LIRStatement::Store{dest: target, value: LIRValue::IntLiteral(num)}]
+                vec![LIRStatement::Store{dest: target, value: LIRValue{ typ: Type::Prim(PrimType::Integer), value: LIRValueKind::IntLiteral(num)}}]
             },
             MIRValueKind::BoolTrue => {
-                vec![LIRStatement::Store{dest: target, value: LIRValue::BoolTrue}]
+                vec![LIRStatement::Store{dest: target, value: LIRValue { typ: Type::Prim(PrimType::Bool), value: LIRValueKind::BoolTrue}}]
             }
             MIRValueKind::BoolFalse => {
-                vec![LIRStatement::Store{dest: target, value: LIRValue::BoolFalse}]
+                vec![LIRStatement::Store{dest: target, value: LIRValue { typ: Type::Prim(PrimType::Bool), value: LIRValueKind::BoolFalse}}]
             }
             MIRValueKind::StructLiteral { typ, fields } => {
                 let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(typ) else {
@@ -207,15 +217,25 @@ impl LIRBuilder {
                 }
                 stmts
             }
+            MIRValueKind::Reference(refd) => {
+                let refd_place = self.lower_place(refd);
+                let stmt = LIRStatement::Store { dest: target, value: LIRValue { typ: Type::Reference(Box::new(refd_place.typ.clone())), value: LIRValueKind::Reference(refd_place)}}; 
+                vec![stmt]
+            }
+            MIRValueKind::Dereference(reference) => {
+                let ref_vreg = self.curr_cell_vreg_map[&reference].clone();
+                let ref_type = self.curr_cells[&reference].typ.clone();
+                let Type::Reference(deref_typ) = ref_type else {unreachable!()};
+                let stmt = LIRStatement::Store { dest: target, value: LIRValue { typ: *deref_typ, value: LIRValueKind::Dereference(ref_vreg)}};
+                vec![stmt]
+            }
         }
     }
 
     fn lower_place(&self, place: MIRPlace) -> LIRPlace {
         // TODO: weird solution, change it
 
-        let base = self.curr_cell_vreg_map[&place.base].clone();
-
-        let mut curr_typ = self.curr_cells[&place.base].typ.clone();
+        let mut curr_typ = place.typ.clone();
         let mut curr_offs = 0;
         
         for field in place.fieldchain {
@@ -234,7 +254,22 @@ impl LIRBuilder {
                 }
             }
         }
-        LIRPlace{typ: place.typ ,place: LIRPlaceKind::Local{base, offset: curr_offs}}
+        match place.base {
+            MIRPlaceBase::Cell(c_id) => LIRPlace{
+                typ: place.typ, 
+                place: LIRPlaceKind::Local{
+                    base: self.curr_cell_vreg_map[&c_id], 
+                    offset: curr_offs
+                }
+            },
+            MIRPlaceBase::Deref(c_id) => LIRPlace { 
+                typ: place.typ, 
+                place: LIRPlaceKind::Deref { 
+                    pointer: self.curr_cell_vreg_map[&c_id], 
+                    offset: curr_offs
+                } 
+            }
+        }
     }
     
     fn lower_cell(&mut self, id: CellId, cell: Cell) {
@@ -303,6 +338,7 @@ impl LayoutTable {
         match typ {
             Type::Prim(prim_tp) => self.get_primitive_layout(prim_tp),
             Type::NewType(tp_constr) => self.newtype_layouts[&tp_constr].clone(),
+            Type::Reference(..) => LayoutInfo::Primitive(8)
         }
     }
 

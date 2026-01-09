@@ -129,7 +129,7 @@ impl LIRCompiler {
                 }
 
                 for (i, arg) in args.into_iter().enumerate() {
-                    self.emit_operand_load(LIRValue::Place { typ: arg.typ.clone(), place: arg}, frame);
+                    self.emit_operand_load(LIRValue{ typ: arg.typ.clone(), value: LIRValueKind::Place(arg)}, frame);
                     self.emit(&format!("     mov r{}, r0", i+1));
                 }
                 
@@ -202,19 +202,25 @@ impl LIRCompiler {
     }
 
     fn emit_operand_load(&mut self, operand: LIRValue, frame: &StackFrame) {
-        match operand {
-            LIRValue::Place{typ, place} => {
+        match operand.value {
+            LIRValueKind::Place(place) => {
                 let place_offset = self.compute_place_offset(place, frame);
                 self.emit(&format!("    ldr r0, [fp, #-{}]", place_offset));
             }
-            LIRValue::IntLiteral(num) => {
+            LIRValueKind::IntLiteral(num) => {
                 self.emit(&format!("     ldr r0, ={}", num));
             }
-            LIRValue::BoolTrue => {
+            LIRValueKind::BoolTrue => {
                 self.emit(&"    ldr r0, =1");   
             }
-            LIRValue::BoolFalse => {
+            LIRValueKind::BoolFalse => {
                 self.emit(&"    ldr r0, =0");   
+            }
+            LIRValueKind::Reference(refd) => {
+                unimplemented!();
+            }
+            LIRValueKind::Dereference(reference) => {
+                unimplemented!();
             }
         }
     }

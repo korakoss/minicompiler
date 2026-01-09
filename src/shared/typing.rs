@@ -4,12 +4,14 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 pub enum Type {
     Prim(PrimType),
     NewType(TypeIdentifier),
+    Reference(Box<Type>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TypeDef {
     Prim(PrimType),
-    NewType(TypeConstructor)
+    NewType(TypeConstructor),
+    Reference(Type)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -27,7 +29,7 @@ pub enum TypeConstructor{
     },
     Enum {
         variants: Vec<Type>
-    }
+    },
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -68,7 +70,8 @@ impl TypeTable {
     pub fn get_typedef(&self, t: Type) -> TypeDef {
         match t {
             Type::Prim(prim_type) => TypeDef::Prim(prim_type),
-            Type::NewType(id) => TypeDef::NewType(self.newtype_map[&id].clone())
+            Type::NewType(id) => TypeDef::NewType(self.newtype_map[&id].clone()),
+            Type::Reference(typ) => TypeDef::Reference(*typ),
         }
     }
 }
@@ -81,23 +84,27 @@ fn get_newtype_dependencies(newtype_defs: &HashMap<TypeIdentifier, TypeConstruct
         let deps: Vec<TypeIdentifier> = match newtype {
             TypeConstructor::Struct {fields} => fields
                 .values()
-                .filter_map(|ftyp| match ftyp {
-                    Type::NewType(id) => Some(id.clone()),
-                    _ => None,
-                })
+                .filter_map(|ftyp| get_underlying_newtype(ftyp.clone()))
                 .collect(),
             TypeConstructor::Enum { variants } => variants
                 .iter()
-                .filter_map(|vtyp| match vtyp {
-                    Type::NewType(id) => Some(id.clone()),
-                    _ => None,
-                })
-                .collect()
+                .filter_map(|vtyp| get_underlying_newtype(vtyp.clone()))
+                .collect(),
         };
         dep_graph.insert(type_id.clone(), deps);
     }
     dep_graph
 }
+
+
+fn get_underlying_newtype(t: Type) -> Option<TypeIdentifier> {
+    match t {
+        Type::Prim(..) => None,
+        Type::NewType(id) => Some(id),
+        Type::Reference(typ) => get_underlying_newtype(*typ),
+    }
+}
+
 
 fn toposort_depgraph(depgraph: HashMap<TypeIdentifier, Vec<TypeIdentifier>>) -> Vec<TypeIdentifier> {
 

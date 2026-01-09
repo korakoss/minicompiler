@@ -4,6 +4,7 @@ Structs and MIR done-ish, seems to work, but not fully clear how stably. Refacto
 Next, the polishing should be finished, and some more tests should be added (potentially also making testing nicer -- eg. being able to test for compilation _failure_).
 After everything stabilized, probably start working on enums.
 
+Okay fuck it we are adding pointers apparently.
 
 ## Finalizations
 - remaining naming uniformizations (especially between MIR and LIR)

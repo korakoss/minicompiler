@@ -111,7 +111,7 @@ impl MIRBuilder {
                 let cell_id = &self.var_map[&var];
                 let target = MIRPlace {
                     typ: self.current_cells[&cell_id].typ.clone(),
-                    base: *cell_id,
+                    base: MIRPlaceBase::Cell(*cell_id),
                     fieldchain: Vec::new()
                 };
                 let (mir_val, val_stmts) = self.lower_expr(value);
@@ -119,7 +119,8 @@ impl MIRBuilder {
             },
             HIRStatement::Assign { target, value } => {
                 let (mir_val, val_stmts) = self.lower_expr(value);
-                LoweredStatement::Statements([val_stmts, vec![MIRStatement::Assign { target: self.lower_place(target), value: mir_val}]].concat())
+                let (mir_target, target_stmts) =  self.lower_place(target);
+                LoweredStatement::Statements([val_stmts, target_stmts, vec![MIRStatement::Assign { target: mir_target, value: mir_val}]].concat())
             }
             HIRStatement::If { condition, if_body, else_body } => {
                 let (cond_val, cond_stmts) = self.lower_expr(condition);
@@ -127,7 +128,7 @@ impl MIRBuilder {
                 let curr_id = self.get_current_wip_id().unwrap();
 
                 let merge_id = self.add_new_block();
-                let then_id = self.lower_stmt_block(if_body, MIRTerminator::Goto(merge_id));   // This is where it happens
+                let then_id = self.lower_stmt_block(if_body, MIRTerminator::Goto(merge_id));   
                 let else_id = match else_body {
                     Some(else_stmts) => self.lower_stmt_block(else_stmts, MIRTerminator::Goto(merge_id)),
                     None => merge_id,
@@ -181,20 +182,41 @@ impl MIRBuilder {
     }
     
 
-    fn lower_place(&self, hir_place: Place) -> MIRPlace {
+    fn lower_place(&mut self, hir_place: Place) -> (MIRPlace, Vec<MIRStatement>) {
        match hir_place.place {
-            PlaceKind::Variable(var_id) => MIRPlace { 
+            PlaceKind::Variable(var_id) => (MIRPlace { 
                typ: hir_place.typ, 
-               base: self.var_map[&var_id].clone(), 
+               base: MIRPlaceBase::Cell(self.var_map[&var_id].clone()), 
                fieldchain: Vec::new(),
-            },
+            }, vec![]),
             PlaceKind::StructField { of, field } => {
-                let MIRPlace { typ, base, fieldchain } = self.lower_place(*of);
-                MIRPlace {
+                let (MIRPlace { typ, base, fieldchain }, of_stmts) = self.lower_place(*of);
+                (MIRPlace {
                     typ: hir_place.typ,
                     base,
                     fieldchain: [fieldchain, vec![field]].concat(),
-                }
+                }, of_stmts)
+            }
+            PlaceKind::Deref(reference) => {
+                let (ref_val, ref_stmts) = self.lower_expr(reference); 
+
+                let ref_val_cell = self.add_cell(Cell { 
+                    typ:  ref_val.typ.clone(),
+                    kind: CellKind::Temp 
+                });
+                let ref_assign_stmt = MIRStatement::Assign { 
+                    target: MIRPlace { 
+                        typ: ref_val.typ.clone(), 
+                        base: MIRPlaceBase::Cell(ref_val_cell), 
+                        fieldchain: vec![], 
+                    }, 
+                    value: ref_val
+                };
+                (MIRPlace {
+                    typ: hir_place.typ,
+                    base: MIRPlaceBase::Deref(ref_val_cell),
+                    fieldchain: vec![]
+                }, [ref_stmts, vec![ref_assign_stmt]].concat())
             }
         }
     }
@@ -212,7 +234,7 @@ impl MIRBuilder {
                     typ: expr.typ.clone(),
                     value: MIRValueKind::Place(MIRPlace { 
                         typ: expr.typ, 
-                        base: self.var_map[&var_id].clone(),
+                        base: MIRPlaceBase::Cell(self.var_map[&var_id].clone()),
                         fieldchain: Vec::new(),
                     }),
                 };
@@ -222,7 +244,11 @@ impl MIRBuilder {
                 let (l_val, l_stmts) = self.lower_expr(*left);
                 let (r_val, r_stmts) = self.lower_expr(*right);
                 let resc_id = self.add_cell(Cell{typ: expr.typ.clone(), kind: CellKind::Temp});
-                let target = MIRPlace { typ: expr.typ.clone(), base: resc_id, fieldchain: Vec::new()}; 
+                let target = MIRPlace { 
+                    typ: expr.typ.clone(), 
+                    base: MIRPlaceBase::Cell(resc_id), 
+                    fieldchain: Vec::new()
+                }; 
                 let bin_stmt = MIRStatement::BinOp { 
                     target: target.clone(),
                     op, 
@@ -237,7 +263,11 @@ impl MIRBuilder {
                     .map(|arg| self.lower_expr(arg))
                     .unzip();
                 let resc_id = self.add_cell(Cell{typ: expr.typ.clone(), kind: CellKind::Temp});
-                let target = MIRPlace { typ: expr.typ.clone(), base: resc_id, fieldchain: Vec::new()}; 
+                let target = MIRPlace { 
+                    typ: expr.typ.clone(), 
+                    base: MIRPlaceBase::Cell(resc_id), 
+                    fieldchain: Vec::new()
+                }; 
                 let call_stmt = MIRStatement::Call { target: target.clone(), func: id, args: arg_vals};
                 (MIRValue{typ: expr.typ, value: MIRValueKind::Place(target)}, [arg_stmt_coll.into_iter().flatten().collect(), vec![call_stmt]].concat())
             },
@@ -259,6 +289,32 @@ impl MIRBuilder {
                 }
                 (MIRValue{typ: expr.typ.clone(), value: MIRValueKind::StructLiteral{ typ: expr.typ,fields: mir_fields}}, stmts)
             },
+            HIRExpressionKind::Reference(refd) => {
+                 let (mir_refd, refd_stmts) = self.lower_expr(*refd);
+                 let MIRValue { typ, value: MIRValueKind::Place(refd_place)} = mir_refd else {unreachable!();};
+                 (MIRValue{typ: Type::Reference(Box::new(typ)), value: MIRValueKind::Reference(refd_place)}, refd_stmts)
+            }
+            HIRExpressionKind::Dereference(reference) => {
+                let (ref_val, ref_stmts) = self.lower_expr(*reference); 
+
+                let ref_val_cell = self.add_cell(Cell { 
+                    typ:  ref_val.typ.clone(),
+                    kind: CellKind::Temp 
+                });
+                let ref_assign_stmt = MIRStatement::Assign { 
+                    target: MIRPlace { 
+                        typ: ref_val.typ.clone(), 
+                        base: MIRPlaceBase::Cell(ref_val_cell), 
+                        fieldchain: vec![], 
+                    }, 
+                    value: ref_val
+                };
+                (MIRValue {
+                    typ: expr.typ, 
+                    value: MIRValueKind::Dereference(ref_val_cell),
+                }, [ref_stmts, vec![ref_assign_stmt]].concat())
+
+            }
         }
     }
 

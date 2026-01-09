@@ -77,6 +77,8 @@ pub enum HIRExpressionKind {
     StructLiteral {
         fields: HashMap<String, HIRExpression>,
     },
+    Reference(Box<HIRExpression>),
+    Dereference(Box<HIRExpression>),
 }
 
 #[derive(Clone, Debug)]
@@ -91,7 +93,8 @@ pub enum PlaceKind {
     StructField {
         of: Box<Place>,
         field: String,
-    }
+    },
+    Deref(HIRExpression),
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]

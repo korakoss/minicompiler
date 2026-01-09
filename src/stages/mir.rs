@@ -74,15 +74,23 @@ pub enum MIRValueKind {
     StructLiteral {
         typ: Type,
         fields: HashMap<String, MIRValue>,
-    }
+    },
+    Reference(MIRPlace),
+    Dereference(CellId)
 }
 
 
 #[derive(Clone, Debug)]
 pub struct MIRPlace {
     pub typ: Type,
-    pub base: CellId,
+    pub base: MIRPlaceBase,
     pub fieldchain: Vec<String>
+}
+
+#[derive(Clone, Debug)]
+pub enum MIRPlaceBase {
+    Cell(CellId),
+    Deref(CellId),
 }
 
 #[derive(Clone, Debug)]

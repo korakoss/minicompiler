@@ -62,10 +62,11 @@ pub enum ASTStatement {
 #[derive(Debug, Clone)]
 pub enum ASTLValue {        // Rename to ASTPlace
    Variable(String),
-   FieldAccess {
+   FieldAccess {            // MAybe change to a chain
        of: Box<ASTLValue>,
        field: String,
     },
+    Deref(ASTExpression)
 }
 
 #[derive(Debug, Clone)]
@@ -93,6 +94,9 @@ pub enum ASTExpression {
         typ: Type,
         fields: HashMap<String, ASTExpression>,
     },
+
+    Reference(Box<ASTExpression>),
+    Dereference(Box<ASTExpression>)
 }
 
 

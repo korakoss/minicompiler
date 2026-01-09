@@ -129,6 +129,13 @@ impl HIRBuilder {
                     }
                 }
             }
+            ASTLValue::Deref(reference) => {
+                let hir_ref = self.lower_expression(reference);
+                Place {
+                    typ: Type::Reference(Box::new(hir_ref.typ.clone())),
+                    place: PlaceKind::Deref(hir_ref)
+                }
+            }
         }
     }
 
@@ -320,6 +327,24 @@ impl HIRBuilder {
                     }
                 }
             }
+            ASTExpression::Reference(refd) => {
+                let hir_refd = self.lower_expression(*refd);
+                HIRExpression{
+                    typ: Type::Reference(Box::new(hir_refd.typ.clone())),
+                    expr: HIRExpressionKind::Reference(Box::new(hir_refd)),
+                }
+            }
+            ASTExpression::Dereference(derefd) => {
+                let hir_derefd = self.lower_expression(*derefd);
+                let Type::Reference(deref_typ) = hir_derefd.typ.clone() else {
+                    unreachable!();
+                };
+                HIRExpression{
+                    typ: Type::Reference(Box::new(*deref_typ)),
+                    expr: HIRExpressionKind::Reference(Box::new(hir_derefd)),
+                }
+            }
+
         }
     }
 

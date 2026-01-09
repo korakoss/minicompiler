@@ -47,6 +47,9 @@ pub enum Token {
     Int, 
     Bool,
     RightArrow,
+
+    Ref,
+    Deref,
 }
 
 

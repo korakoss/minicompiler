@@ -193,6 +193,13 @@ impl Parser {
     fn parse_lvalue(&mut self) -> ASTLValue {
         let root = self.expect_identifier();
         let mut curr_lvalue = ASTLValue::Variable(root);
+
+        if self.tokens.peek().unwrap() == &Token::Deref {
+            self.tokens.next();
+            let refd_expr = self.parse_expression();
+            return ASTLValue::Deref(refd_expr)
+        }
+
         while self.tokens.peek().unwrap() == &Token::Dot {
             self.tokens.next();
             let curr_field = self.expect_identifier();
@@ -209,10 +216,11 @@ impl Parser {
     }
               
     fn parse_expression_with_precedence(&mut self, current_level: usize) -> ASTExpression {
-        let mut current_expr = self.parse_expression_atom();
+        let mut current_expr = self.parse_unary();
         loop {
-            let prec = match self.tokens.peek() {
-                Some(Token::Plus | Token::Minus | Token::Multiply | Token::Equals | Token::Less | Token::Modulo | Token::Dot) => {
+            let token = self.tokens.peek().unwrap();
+            let prec = match token {
+                Token::Plus | Token::Minus | Token::Multiply | Token::Equals | Token::Less | Token::Modulo  => {
                     get_connector_precedence(self.tokens.peek().unwrap())
                 }
                 _ => break,
@@ -237,6 +245,35 @@ impl Parser {
             };
         }
         current_expr
+    }
+
+    fn parse_unary(&mut self) -> ASTExpression {
+        match self.tokens.peek().unwrap() {
+            &Token::Ref => {
+                self.tokens.next();
+                let refd = self.parse_unary();
+                ASTExpression::Reference(Box::new(refd))
+            }
+            &Token::Deref => {
+                self.tokens.next();
+                let derefd = self.parse_unary();
+                ASTExpression::Dereference(Box::new(derefd))
+            }
+            _ => self.parse_postfix(),
+        }
+    }
+
+    fn parse_postfix(&mut self) -> ASTExpression {
+        let mut curr_expr = self.parse_expression_atom();
+        while self.tokens.peek().unwrap() == &Token::Dot {
+            self.tokens.next();
+            let field = self.expect_identifier();
+            curr_expr = ASTExpression::FieldAccess { 
+                expr: Box::new(curr_expr), 
+                field 
+            };
+        }
+        curr_expr
     }
     
     fn parse_expression_atom(&mut self) -> ASTExpression {
@@ -322,12 +359,23 @@ impl Parser {
     }
     
     fn expect_type(&mut self) -> Type {
-        let token = self.tokens.next().unwrap(); 
-        match token {
-            Token::Int => Type::Prim(PrimType::Integer),
-            Token::Bool => Type::Prim(PrimType::Bool),
-            Token::Identifier(type_id) => Type::NewType(TypeIdentifier(type_id)),
-            _ => {panic!("Expected primitive type or identifer token, got {:?}", token);}
+        match self.tokens.next().unwrap() {
+            Token::Int => {
+                Type::Prim(PrimType::Integer)
+            }
+            Token::Bool => {
+                Type::Prim(PrimType::Bool)
+            }
+            Token::Identifier(type_id) => {
+                Type::NewType(TypeIdentifier(type_id))
+            }
+            Token::Ref => {
+                let refd_type = self.expect_type();
+                Type::Reference(Box::new(refd_type))
+            }
+            _ => {
+                panic!("Unexpected token while parsing type annotation");
+            }
         }
     }
 }
