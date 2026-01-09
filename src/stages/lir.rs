@@ -76,12 +76,14 @@ pub enum LIRValueKind {
     BoolTrue,
     BoolFalse,
     Reference(LIRPlace),
-    Dereference(VRegId),
+    Dereference(VRegId),  // TODO: this should be LIRPlace too? Or no?
 }
 
 #[derive(Clone, Debug)]
 pub struct LIRPlace {
     pub typ: Type,
+    // TODO: "size: usize" here -- Vregs are for storing 8bit info
+    // also align or whatever
     pub place: LIRPlaceKind
 }
 

@@ -237,6 +237,7 @@ impl LIRBuilder {
 
         match place.base {
             MIRPlaceBase::Cell(c_id) => {
+
                 let base_type = self.curr_cells[&c_id].typ.clone();
                 let (final_offset, final_type) = self.lower_fieldchain(base_type, place.fieldchain);
                 LIRPlace {
@@ -286,6 +287,7 @@ impl LIRBuilder {
     }
     
     fn lower_cell(&mut self, id: CellId, cell: Cell) {
+        // TODO: This should lower into LIRPlace. I think?
         self.curr_cells.insert(id.clone(), cell.clone());
         let cell_vreg_info = VRegInfo { 
             size: self.layouts.get_layout(cell.typ).size(),
