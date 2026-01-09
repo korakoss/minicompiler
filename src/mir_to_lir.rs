@@ -235,10 +235,38 @@ impl LIRBuilder {
     fn lower_place(&self, place: MIRPlace) -> LIRPlace {
         // TODO: weird solution, change it
 
-        let mut curr_typ = place.typ.clone();
-        let mut curr_offs = 0;
+        match place.base {
+            MIRPlaceBase::Cell(c_id) => {
+                let base_type = self.curr_cells[&c_id].typ.clone();
+                let (final_offset, final_type) = self.lower_fieldchain(base_type, place.fieldchain);
+                LIRPlace {
+                    typ: place.typ, 
+                    place: LIRPlaceKind::Local{
+                        base: self.curr_cell_vreg_map[&c_id], 
+                        offset: final_offset 
+                    }
+                }
+            },
+            MIRPlaceBase::Deref(c_id) => {
+                let ref_type = self.curr_cells[&c_id].typ.clone();
+                let Type::Reference(deref_type) = ref_type else {unreachable!()};
+                let (final_offset, final_type) = self.lower_fieldchain(*deref_type, place.fieldchain);
+                LIRPlace {
+                    typ: place.typ,
+                    place: LIRPlaceKind::Deref { 
+                        pointer: self.curr_cell_vreg_map[&c_id], 
+                        offset: final_offset,
+                    }
+                }
+            }
+        }
+    }
+
+    fn lower_fieldchain(&self, base_type: Type, chain: Vec<String>) -> (usize, Type) {
+        let mut curr_typ = base_type;
+        let mut curr_offset = 0;
         
-        for field in place.fieldchain {
+        for field in chain {
             let curr_typ_layout = self.layouts.get_layout(curr_typ.clone());
 
             match curr_typ_layout {
@@ -247,29 +275,14 @@ impl LIRBuilder {
                         unreachable!();
                     };
                     curr_typ = fields[&field].clone();
-                    curr_offs = curr_offs + field_offsets[&field];
+                    curr_offset = curr_offset + field_offsets[&field];
                 } 
                 LayoutInfo::Primitive(..) => {
                     panic!("This is primitive, shouldn't have a field");
                 }
             }
         }
-        match place.base {
-            MIRPlaceBase::Cell(c_id) => LIRPlace{
-                typ: place.typ, 
-                place: LIRPlaceKind::Local{
-                    base: self.curr_cell_vreg_map[&c_id], 
-                    offset: curr_offs
-                }
-            },
-            MIRPlaceBase::Deref(c_id) => LIRPlace { 
-                typ: place.typ, 
-                place: LIRPlaceKind::Deref { 
-                    pointer: self.curr_cell_vreg_map[&c_id], 
-                    offset: curr_offs
-                } 
-            }
-        }
+        (curr_offset, curr_typ)
     }
     
     fn lower_cell(&mut self, id: CellId, cell: Cell) {
