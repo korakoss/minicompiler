@@ -8,8 +8,7 @@ for t in primetest nonparam_func long_ass_binop; do
     src_path="./tests/src/$t.yum"
     ass_path="./tests/ass/$t.s"
     tok_path="./tests/tok/$t.txt"
-    uast_path="./tests/uast/$t.txt"
-    tast_path="./tests/tast/$t.txt"
+    ast_path="./tests/ast/$t.txt"
     hir_path="./tests/hir/$t.txt"
     mir_path="./tests/mir/$t.txt"
     lir_path="./tests/lir/$t.txt"
@@ -17,7 +16,7 @@ for t in primetest nonparam_func long_ass_binop; do
 
     rm -f "$ass_path" "$tok_path" "$ast_path" "$hir_path" "$mir_path" "$lir_path" "$ex_path"
 
-    RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" "$ass_path" "$tok_path" "$uast_path" "$tast_path" "$hir_path" "$mir_path" "$lir_path"
+    RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" "$ass_path" "$tok_path" "$ast_path" "$hir_path" "$mir_path" "$lir_path"
     as -o TEMP.o "$ass_path"
     gcc -o "$ex_path" TEMP.o
     rm TEMP.o

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::iter::Peekable;
 
 use crate::shared::tokens::*;
-use crate::shared::newtyping::*;
+use crate::shared::typing::*;
 use crate::stages::ast::*;
 
 pub struct Parser {

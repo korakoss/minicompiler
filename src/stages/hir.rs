@@ -1,4 +1,4 @@
-use crate::shared::newtyping::*;
+use crate::shared::typing::*;
 use crate::shared::binops::*;
 use crate::stages::common::FuncId;
 

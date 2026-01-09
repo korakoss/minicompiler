@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::stages::lir::*;
 use crate::stages::mir::*;
-use crate::shared::newtyping::*;
+use crate::shared::typing::*;
 
 
 pub struct LIRBuilder {

@@ -1,4 +1,4 @@
-use crate::shared::newtyping::*;
+use crate::shared::typing::*;
 use crate::stages::common::*;
 use crate::stages::ast::*;
 use crate::stages::hir::*;

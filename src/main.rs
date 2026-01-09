@@ -29,11 +29,10 @@ fn main() {
     let code_filename = &args[1];
     let assembly_filename = &args[2];
     let tokens_filepath = &args[3];
-    let uast_filepath = &args[4];
-    let tast_filepath = &args[5];
-    let hir_filepath = &args[6];
-    let mir_filepath = &args[7];
-    let lir_filepath = &args[8];
+    let ast_filepath = &args[4];
+    let hir_filepath = &args[5];
+    let mir_filepath = &args[6];
+    let lir_filepath = &args[7];
 
     let program_text = &fs::read_to_string(code_filename).unwrap();
     let tokens = lex(program_text);
@@ -41,7 +40,7 @@ fn main() {
     fs::write(tokens_filepath, format!("{:#?}", tokens)).unwrap();
 
     let ast = Parser::parse_program(tokens);
-    fs::write(uast_filepath, format!("{:#?}", ast)).unwrap();
+    fs::write(ast_filepath, format!("{:#?}", ast)).unwrap();
 
     let hir = HIRBuilder::lower_ast(ast);
     fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();

@@ -1,4 +1,4 @@
-use crate::shared::newtyping::*;
+use crate::shared::typing::*;
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
