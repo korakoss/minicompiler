@@ -201,27 +201,35 @@ impl MIRBuilder {
 
     fn lower_expr(&mut self, expr: HIRExpression) -> (MIRValue, Vec<MIRStatement>) {
         match expr.expr {
-            HIRExpressionKind::IntLiteral(num) => (MIRValue::IntLiteral(num), Vec::new()),
+            HIRExpressionKind::IntLiteral(num) => {
+                (MIRValue{
+                    typ: Type::Prim(PrimType::Integer),
+                    value: MIRValueKind::IntLiteral(num)
+                }, Vec::new())
+            },
             HIRExpressionKind::Variable(var_id) => {
-                let var_val = MIRValue::Place(MIRPlace { 
-                    typ: expr.typ.clone(), 
-                    base: self.var_map[&var_id].clone(),
-                    fieldchain: Vec::new(),
-                });
+                let var_val = MIRValue {
+                    typ: expr.typ.clone(),
+                    value: MIRValueKind::Place(MIRPlace { 
+                        typ: expr.typ, 
+                        base: self.var_map[&var_id].clone(),
+                        fieldchain: Vec::new(),
+                    }),
+                };
                 (var_val, Vec::new())
             },
             HIRExpressionKind::BinOp { op, left, right } => {
                 let (l_val, l_stmts) = self.lower_expr(*left);
                 let (r_val, r_stmts) = self.lower_expr(*right);
                 let resc_id = self.add_cell(Cell{typ: expr.typ.clone(), kind: CellKind::Temp});
-                let target = MIRPlace { typ: expr.typ, base: resc_id, fieldchain: Vec::new()}; 
+                let target = MIRPlace { typ: expr.typ.clone(), base: resc_id, fieldchain: Vec::new()}; 
                 let bin_stmt = MIRStatement::BinOp { 
                     target: target.clone(),
                     op, 
                     left: l_val, 
                     right: r_val 
                 };
-                (MIRValue::Place(target), [l_stmts, r_stmts, vec![bin_stmt]].concat()) 
+                (MIRValue{typ: expr.typ, value: MIRValueKind::Place(target)}, [l_stmts, r_stmts, vec![bin_stmt]].concat()) 
             },
             HIRExpressionKind::FuncCall { id, args } => {
                 let (arg_vals, arg_stmt_coll): (Vec<MIRValue>, Vec<Vec<MIRStatement>>) = args
@@ -229,12 +237,12 @@ impl MIRBuilder {
                     .map(|arg| self.lower_expr(arg))
                     .unzip();
                 let resc_id = self.add_cell(Cell{typ: expr.typ.clone(), kind: CellKind::Temp});
-                let target = MIRPlace { typ: expr.typ, base: resc_id, fieldchain: Vec::new()}; 
+                let target = MIRPlace { typ: expr.typ.clone(), base: resc_id, fieldchain: Vec::new()}; 
                 let call_stmt = MIRStatement::Call { target: target.clone(), func: id, args: arg_vals};
-                (MIRValue::Place(target), [arg_stmt_coll.into_iter().flatten().collect(), vec![call_stmt]].concat())
+                (MIRValue{typ: expr.typ, value: MIRValueKind::Place(target)}, [arg_stmt_coll.into_iter().flatten().collect(), vec![call_stmt]].concat())
             },
-            HIRExpressionKind::BoolTrue => (MIRValue::BoolTrue, Vec::new()),
-            HIRExpressionKind::BoolFalse => (MIRValue::BoolFalse, Vec::new()),
+            HIRExpressionKind::BoolTrue => (MIRValue{typ: Type::Prim(PrimType::Bool) ,value: MIRValueKind::BoolTrue}, Vec::new()),
+            HIRExpressionKind::BoolFalse=> (MIRValue{typ: Type::Prim(PrimType::Bool) ,value: MIRValueKind::BoolFalse}, Vec::new()),
             HIRExpressionKind::FieldAccess { expr: base_expr, field } => { 
                 let typ = expr.typ.clone();
                 let (expr_val, expr_stmts) = self.lower_expr(*base_expr);
@@ -249,23 +257,23 @@ impl MIRBuilder {
                     stmts.extend(f_stmts.into_iter());
                     mir_fields.insert(fname, f_val);
                 }
-                (MIRValue::StructLiteral{ typ: expr.typ,fields: mir_fields}, stmts)
+                (MIRValue{typ: expr.typ.clone(), value: MIRValueKind::StructLiteral{ typ: expr.typ,fields: mir_fields}}, stmts)
             },
         }
     }
 
     fn lower_field_access(&self, of: MIRValue, field: String, typ: Type) -> MIRValue {
-        let MIRValue::Place(place) = of else {
+        let MIRValueKind::Place(place) = of.value else {
            unreachable!(); 
         };
         let mut fieldchain = place.fieldchain;
         fieldchain.push(field);
         let access_place = MIRPlace {
-            typ,
+            typ: typ.clone(),
             base: place.base,
             fieldchain 
         };
-        MIRValue::Place(access_place)
+        MIRValue{typ: typ, value: MIRValueKind::Place(access_place)}
     }
     
     fn push_to_current_block(&mut self, stmts: Vec<MIRStatement>) {

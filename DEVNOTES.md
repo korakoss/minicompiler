@@ -1,16 +1,28 @@
 
 # Where are we
-Structs and MIR done-ish, seems to work, but unclear how stable. Test it, clean up everything.
+Structs and MIR done-ish, seems to work, but not fully clear how stably. Refactored the typing so that newtypes are kept symbolic. Did some other cleanups and polish.
+Next, the polishing should be finished, and some more tests should be added (potentially also making testing nicer -- eg. being able to test for compilation _failure_).
+After everything stabilized, probably start working on enums.
 
-## Current cleanup, refactors
-- (see INSECTS.md; not all are urgent, but some)
-    - particularly the break/continue issue
-- uniformize the design and namings (esp. between MIR and LIR)
-- newtypes should be symbolic throughout, with a carried symbol table
-- derive Copy for IDs, get rid of all the cloning
-- use borrows where possible, especially in function passes and so on
-- finalize function call ABI
-    - pointers for args!
+
+## Finalizations
+- remaining naming uniformizations (especially between MIR and LIR)
+- function call ABI
+    - use pointers for args
+    - maybe stack spilling
+- some (not all) items from INSECTS.md
+    - void funccall parsing issue
+    - struct literal issues
+
+## Tests to add
+- break and continue
+- some functions calling each other back and forth
+
+## Things to find out 
+- do struct returns and struct arguments work?
+    - struct returns do, args don't
+- do struct moves work?
+    - no
 
 
 ## Possible next steps

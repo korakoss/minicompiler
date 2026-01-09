@@ -129,51 +129,52 @@ impl LIRBuilder {
     }
 
     fn lower_value_into_operand(&mut self, value: MIRValue) -> (LIRValue, Vec<LIRStatement>) {
-        match value {
-            MIRValue::Place(val_place) => {
+        let val_typ = value.typ.clone();
+        match value.value {
+            MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                (LIRValue::Place(lir_val_place), Vec::new())
+                (LIRValue::Place{typ: val_typ, place: lir_val_place}, Vec::new())
             },
-            MIRValue::IntLiteral(num) => {
+            MIRValueKind::IntLiteral(num) => {
                 (LIRValue::IntLiteral(num), Vec::new())
             },
-            MIRValue::BoolTrue => {
+            MIRValueKind::BoolTrue => {
                 (LIRValue::BoolTrue, Vec::new())
             }
-            MIRValue::BoolFalse => {
+            MIRValueKind::BoolFalse => {
                 (LIRValue::BoolFalse, Vec::new())
             }
-            MIRValue::StructLiteral { typ, fields } => {
+            MIRValueKind::StructLiteral {..} => {
                 let temp_vreg_info = VRegInfo {
-                    size: self.layouts.get_layout(typ.clone()).size(),
+                    size: self.layouts.get_layout(val_typ.clone()).size(),
                     align: 8
                 };
                 let temp_id = self.add_vreg(temp_vreg_info);
                 let temp_place = LIRPlace { base: temp_id, offset: 0};
 
                 // Mehh. Maybe add type info back to MIRV?
-                let stmts = self.lower_value_into_place(MIRValue::StructLiteral{typ, fields}, temp_place.clone());
-                (LIRValue::Place(temp_place), stmts)
+                let stmts = self.lower_value_into_place(value, temp_place.clone());
+                (LIRValue::Place{ typ: val_typ, place: temp_place}, stmts)
             }
         }
     }
 
     fn lower_value_into_place(&self, value: MIRValue, target: LIRPlace) -> Vec<LIRStatement> {
-        match value {
-            MIRValue::Place(val_place) => {
+        match value.value {
+            MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                vec![LIRStatement::Store{dest: target, value: LIRValue::Place(lir_val_place)}] 
+                vec![LIRStatement::Store{dest: target, value: LIRValue::Place{typ: value.typ, place: lir_val_place}}] 
             },
-            MIRValue::IntLiteral(num) => {
+            MIRValueKind::IntLiteral(num) => {
                 vec![LIRStatement::Store{dest: target, value: LIRValue::IntLiteral(num)}]
             },
-            MIRValue::BoolTrue => {
+            MIRValueKind::BoolTrue => {
                 vec![LIRStatement::Store{dest: target, value: LIRValue::BoolTrue}]
             }
-            MIRValue::BoolFalse => {
+            MIRValueKind::BoolFalse => {
                 vec![LIRStatement::Store{dest: target, value: LIRValue::BoolFalse}]
             }
-            MIRValue::StructLiteral { typ, fields } => {
+            MIRValueKind::StructLiteral { typ, fields } => {
                 let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(typ) else {
                     unreachable!();
                 };

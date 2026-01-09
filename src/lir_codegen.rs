@@ -203,7 +203,7 @@ self.emit_operand_load(left, frame);
 
     fn emit_operand_load(&mut self, operand: LIRValue, frame: &StackFrame) {
         match operand {
-            LIRValue::Place(place) => {
+            LIRValue::Place{typ, place} => {
                 let place_offset = self.compute_place_offset(place, frame);
                 self.emit(&format!("    ldr r0, [fp, #-{}]", place_offset));
             }

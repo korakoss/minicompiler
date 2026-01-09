@@ -1,5 +1,6 @@
 use crate::shared::binops::*;
 use crate::stages::common::*;
+use crate::shared::typing::*;
 
 use std::{collections::HashMap};
 
@@ -63,7 +64,10 @@ pub enum LIRTerminator {
 
 #[derive(Clone, Debug)]
 pub enum LIRValue {
-    Place(LIRPlace), 
+    Place{
+        typ: Type,
+        place: LIRPlace
+    }, 
     IntLiteral(i32),
     BoolTrue,
     BoolFalse,
