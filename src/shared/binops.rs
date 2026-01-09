@@ -1,4 +1,4 @@
-use crate::shared::typing::*;
+use crate::shared::newtyping::*;
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
@@ -14,8 +14,8 @@ pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type)
     
     match op {
         &BinaryOperator::Add | &BinaryOperator::Sub | &BinaryOperator::Mul| &BinaryOperator::Modulo=>{
-            if left_type == &Type::Prim(PrimitiveType::Integer) && right_type == &Type::Prim(PrimitiveType::Integer){
-                Some(Type::Prim(PrimitiveType::Integer))
+            if left_type == &Type::Prim(PrimType::Integer) && right_type == &Type::Prim(PrimType::Integer){
+                Some(Type::Prim(PrimType::Integer))
             } else {
                 None
             }
@@ -23,14 +23,14 @@ pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type)
         &BinaryOperator::Equals => {
             if left_type == right_type {
                 // TODO: careful later
-                Some(Type::Prim(PrimitiveType::Bool))
+                Some(Type::Prim(PrimType::Bool))
             } else {
                 None
             }
         }
         &BinaryOperator::Less => {
-            if left_type == &Type::Prim(PrimitiveType::Integer) && right_type == &Type::Prim(PrimitiveType::Integer){
-                Some(Type::Prim(PrimitiveType::Bool))
+            if left_type == &Type::Prim(PrimType::Integer) && right_type == &Type::Prim(PrimType::Integer){
+                Some(Type::Prim(PrimType::Bool))
             } else {
                 None
             }

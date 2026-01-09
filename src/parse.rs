@@ -3,19 +3,19 @@ use std::collections::HashMap;
 use std::iter::Peekable;
 
 use crate::shared::tokens::*;
-use crate::shared::typing::*;
+use crate::shared::newtyping::*;
 use crate::stages::ast::*;
 
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
-    new_types: HashMap<TypeIdentifier, DeferredDerivType>,
-    functions: HashMap<FuncSignature<DeferredType>, UASTFunction>,
+    new_types: HashMap<TypeIdentifier, TypeConstructor>,
+    functions: HashMap<FuncSignature, ASTFunction>,
 }
 
 
 impl Parser {
 
-    pub fn parse_program(tokens: Vec<Token>) -> UASTProgram {
+    pub fn parse_program(tokens: Vec<Token>) -> ASTProgram {
         let mut parser = Parser {
             tokens: tokens.into_iter().peekable(),
             new_types: HashMap::new(),
@@ -32,8 +32,8 @@ impl Parser {
                 _ => {panic!("Invalid token, expected struct or func def");}
             }
         }
-        UASTProgram { 
-            new_types: parser.new_types,
+        ASTProgram { 
+            typetable: TypeTable::make(parser.new_types),
             functions: parser.functions,
         } 
     }
@@ -46,12 +46,12 @@ impl Parser {
         while self.tokens.peek() != Some(&Token::RightBrace) {
             let field_name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
-            let field_type = self.expect_deferred_type();
+            let field_type = self.expect_type();
             self.expect_unparametric_token(Token::Comma);
             fields.insert(field_name, field_type);
         }
         self.expect_unparametric_token(Token::RightBrace);
-        let struct_type = DeferredDerivType::Struct { 
+        let struct_type = TypeConstructor::Struct { 
             fields: fields 
         };
         self.new_types.insert(struct_identifier, struct_type); 
@@ -62,14 +62,14 @@ impl Parser {
         let funcname = self.expect_identifier(); 
 
         self.expect_unparametric_token(Token::LeftParen);
-        let args:HashMap<String, DeferredType> = match self.tokens.peek().unwrap() {
+        let args:HashMap<String, Type> = match self.tokens.peek().unwrap() {
             &Token::RightParen => {
                 HashMap::new()
             }
             &Token::Identifier(_) => {
                 let name1 = self.expect_identifier();
                 self.expect_unparametric_token(Token::Colon);
-                let typ1 = self.expect_deferred_type();
+                let typ1 = self.expect_type();
                 let mut args = HashMap::new();
                 args.insert(name1, typ1);
 
@@ -77,7 +77,7 @@ impl Parser {
                     self.tokens.next();
                     let arg_name = self.expect_identifier();
                     self.expect_unparametric_token(Token::Colon);
-                    let arg_type = self.expect_deferred_type();
+                    let arg_type = self.expect_type();
                     args.insert(arg_name, arg_type);
                 }
                 args
@@ -91,19 +91,19 @@ impl Parser {
         let ret_type_id = match self.tokens.peek().unwrap() {
             Token::RightArrow => {
                 self.tokens.next();
-                self.expect_deferred_type()
+                self.expect_type()
             },
             _ => {
-                DeferredType::Prim(PrimitiveType::None)
+                Type::Prim(PrimType::None)
             }
         };
         let body = self.parse_statement_block();
-        let func = UASTFunction {name: funcname, args: args, body: body, ret_type: ret_type_id};
-        let sgn: FuncSignature<DeferredType> = func.get_signature();
+        let func = ASTFunction {name: funcname, args: args, body: body, ret_type: ret_type_id};
+        let sgn = func.get_signature();
         self.functions.insert(sgn, func);
     }
     
-    fn parse_statement_block(&mut self) -> Vec<UASTStatement> {
+    fn parse_statement_block(&mut self) -> Vec<ASTStatement> {
         let mut statements = Vec::new();
         self.expect_unparametric_token(Token::LeftBrace);
         while !matches!(self.tokens.peek(), Some(Token::RightBrace)){
@@ -113,21 +113,21 @@ impl Parser {
         statements
     }
     
-    fn parse_statement(&mut self) -> UASTStatement {
+    fn parse_statement(&mut self) -> ASTStatement {
         match self.tokens.peek().unwrap() {           
             &Token::Let => {
                 self.tokens.next();
                 let var_name = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
-                let var_type = self.expect_deferred_type();
-                let var = DeferredTypeVariable{
+                let var_type = self.expect_type();
+                let var = Variable{
                     name: var_name, 
                     typ: var_type
                 };
                 self.expect_unparametric_token(Token::Assign);
                 let value = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
-                UASTStatement::Let{var, value}
+                ASTStatement::Let{var, value}
             }
             &Token::Identifier(_)  => {                
                 // Assignment 
@@ -136,7 +136,7 @@ impl Parser {
                 self.expect_unparametric_token(Token::Assign);
                 let assign_value = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
-                UASTStatement::Assign { 
+                ASTStatement::Assign { 
                     target,
                     value: assign_value
                 }
@@ -149,13 +149,13 @@ impl Parser {
                     self.tokens.next();
                     Some(self.parse_statement_block())
                 } else {None};
-                UASTStatement::If {condition, if_body, else_body}
+                ASTStatement::If {condition, if_body, else_body}
             }
             &Token::While => {
                 self.tokens.next();
                 let cond = self.parse_expression();
                 let body = self.parse_statement_block();
-                UASTStatement::While { 
+                ASTStatement::While { 
                     condition: cond, 
                     body: body,
                 }
@@ -163,18 +163,18 @@ impl Parser {
             &Token::Break => {         
                 self.tokens.next();
                 self.expect_unparametric_token(Token::Semicolon);
-                UASTStatement::Break
+                ASTStatement::Break
             }
             &Token::Continue => {         
                 self.tokens.next();
                 self.expect_unparametric_token(Token::Semicolon);
-                UASTStatement::Continue
+                ASTStatement::Continue
             }
             &Token::Return => {
                 self.tokens.next();
                 let return_expr = self.parse_expression();
                 self.expect_unparametric_token(Token::Semicolon);
-                UASTStatement::Return(return_expr)
+                ASTStatement::Return(return_expr)
             }
             &Token::Print => {
                 self.tokens.next();
@@ -182,7 +182,7 @@ impl Parser {
                 let expr = self.parse_expression();
                 self.expect_unparametric_token(Token::RightParen);
                 self.expect_unparametric_token(Token::Semicolon);        
-                UASTStatement::Print(expr)
+                ASTStatement::Print(expr)
             },
             _ => {                                      
                 panic!("Cannot recognize valid statement starting with token {:?}", self.tokens.next());              
@@ -204,11 +204,11 @@ impl Parser {
         curr_lvalue
     }
         
-    fn parse_expression(&mut self) -> UASTExpression {
+    fn parse_expression(&mut self) -> ASTExpression {
         self.parse_expression_with_precedence(0)
     }
               
-    fn parse_expression_with_precedence(&mut self, current_level: usize) -> UASTExpression {
+    fn parse_expression_with_precedence(&mut self, current_level: usize) -> ASTExpression {
         let mut current_expr = self.parse_expression_atom();
         loop {
             let prec = match self.tokens.peek() {
@@ -224,7 +224,7 @@ impl Parser {
             current_expr = match conn_token {
                 Token::Dot => {
                     let field = self.expect_identifier();
-                    UASTExpression::FieldAccess { 
+                    ASTExpression::FieldAccess { 
                         expr: Box::new(current_expr), 
                         field 
                     }
@@ -232,25 +232,25 @@ impl Parser {
                 _ => {
                     let op = map_binop_token(&conn_token);
                     let next_expr = self.parse_expression_with_precedence(prec + 1);
-                    UASTExpression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr) }
+                    ASTExpression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr) }
                 }
             };
         }
         current_expr
     }
     
-    fn parse_expression_atom(&mut self) -> UASTExpression {
+    fn parse_expression_atom(&mut self) -> ASTExpression {
         let token = self.tokens.next().unwrap();  
         match token {
-            Token::IntLiteral(int) => UASTExpression::IntLiteral(int),
+            Token::IntLiteral(int) => ASTExpression::IntLiteral(int),
             Token::Identifier(name) => {
                 match self.tokens.peek().unwrap() {
                     &Token::LeftParen => {                                                      // FuncCall
                         self.tokens.next();
-                        let args: Vec<UASTExpression> = match self.tokens.peek().unwrap() {
+                        let args: Vec<ASTExpression> = match self.tokens.peek().unwrap() {
                             &Token::RightParen => Vec::new(),
                             _ => {
-                                let mut collected_args: Vec<UASTExpression> = Vec::new();
+                                let mut collected_args: Vec<ASTExpression> = Vec::new();
                                 collected_args.push(self.parse_expression());
                                 while self.tokens.peek().unwrap() == &Token::Comma {
                                     self.tokens.next();
@@ -260,21 +260,21 @@ impl Parser {
                             }
                         };
                         self.expect_unparametric_token(Token::RightParen);
-                        UASTExpression::FuncCall { funcname: name, args: args}
+                        ASTExpression::FuncCall { funcname: name, args: args}
                     }
 
                     &Token::LeftBrace => {                                                  // StructLiteral
                         if self.new_types.contains_key(&TypeIdentifier(name.clone())) {
-                            UASTExpression::StructLiteral{
-                                typ: DeferredType::Symbolic(TypeIdentifier(name)),
+                            ASTExpression::StructLiteral{
+                                typ: Type::NewType(TypeIdentifier(name)),
                                 fields: self.parse_struct_literal_internals(),
                             }
                         } else {
-                            UASTExpression::Variable(name)
+                            ASTExpression::Variable(name)
                         }
                     }
                     
-                    _ => UASTExpression::Variable(name)
+                    _ => ASTExpression::Variable(name)
                 }
             },
             Token::LeftParen => {
@@ -282,15 +282,15 @@ impl Parser {
                 self.expect_unparametric_token(Token::RightParen);
                 paren_expr
             },
-            Token::True => UASTExpression::BoolTrue,
-            Token::False => UASTExpression::BoolFalse,
+            Token::True => ASTExpression::BoolTrue,
+            Token::False => ASTExpression::BoolFalse,
             _ => {
                 panic!("Unexpected token {:?} during expression parsing", token);
             },
         }
     }
     
-    fn parse_struct_literal_internals(&mut self) -> HashMap<String, UASTExpression>{
+    fn parse_struct_literal_internals(&mut self) -> HashMap<String, ASTExpression>{
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = HashMap::new();
         while self.tokens.peek() != Some(&Token::RightBrace) {
@@ -321,12 +321,12 @@ impl Parser {
         name
     }
     
-    fn expect_deferred_type(&mut self) -> DeferredType {
+    fn expect_type(&mut self) -> Type {
         let token = self.tokens.next().unwrap(); 
         match token {
-            Token::Int => DeferredType::Prim(PrimitiveType::Integer),
-            Token::Bool => DeferredType::Prim(PrimitiveType::Bool),
-            Token::Identifier(type_id) => DeferredType::Symbolic(TypeIdentifier(type_id)),
+            Token::Int => Type::Prim(PrimType::Integer),
+            Token::Bool => Type::Prim(PrimType::Bool),
+            Token::Identifier(type_id) => Type::NewType(TypeIdentifier(type_id)),
             _ => {panic!("Expected primitive type or identifer token, got {:?}", token);}
         }
     }

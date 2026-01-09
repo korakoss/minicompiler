@@ -1,5 +1,5 @@
 use crate::shared::binops::BinaryOperator;
-use crate::shared::typing::*;
+use crate::shared::newtyping::*;
 use crate::stages::common::*;
 
 use std::{collections::HashMap};

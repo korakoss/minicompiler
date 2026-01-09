@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::stages::lir::*;
 use crate::stages::mir::*;
-use crate::shared::typing::*;
+use crate::shared::newtyping::*;
 
 
 pub struct LIRBuilder {
@@ -11,18 +11,20 @@ pub struct LIRBuilder {
     layouts: LayoutTable,
     curr_vreg_table: HashMap<VRegId, VRegInfo>,
     vreg_counter: usize,
+    typetable: TypeTable,
 }
 
 impl LIRBuilder {
     
     pub fn lower_mir(program: MIRProgram) -> LIRProgram {
-        let layouts = LayoutTable::make(program.typetable);
+        let layouts = LayoutTable::make(program.typetable.clone());
         let mut builder = LIRBuilder {
             curr_cell_vreg_map: HashMap::new(),
             curr_cells: HashMap::new(),
             layouts,
             curr_vreg_table: HashMap::new(),
-            vreg_counter: 0
+            vreg_counter: 0,
+            typetable: program.typetable
         };
         LIRProgram {
             functions: program.functions
@@ -201,7 +203,7 @@ impl LIRBuilder {
 
             match curr_typ_layout {
                 LayoutInfo::Struct { size, field_offsets } => {
-                    let Type::Derived(TypeConstructor::Struct { fields }) = curr_typ else {
+                    let TypeDef::NewType(TypeConstructor::Struct { fields }) = self.typetable.get_typedef(curr_typ) else {
                         unreachable!();
                     };
                     curr_typ = fields[&field].clone();
@@ -257,7 +259,7 @@ impl LayoutInfo {
 
 #[derive(Clone, Debug)]
 pub struct LayoutTable {
-    newtype_layouts: HashMap<DerivType, LayoutInfo>
+    newtype_layouts: HashMap<TypeIdentifier, LayoutInfo>
 }
 
 impl LayoutTable {
@@ -265,24 +267,24 @@ impl LayoutTable {
     pub fn make(typetable: TypeTable) -> LayoutTable {
         let mut table = LayoutTable{newtype_layouts: HashMap::new()};
         for tp_id in typetable.topo_order {
-            let tp = typetable.newtype_map[&tp_id].clone();
-            table.newtype_layouts.insert(tp.clone(), table.make_newtype_layout(tp));
+            let tp_constr = typetable.newtype_map[&tp_id].clone();
+            table.newtype_layouts.insert(tp_id, table.make_newtype_layout(tp_constr));
         }
-table
+        table
     }   
 
     pub fn get_layout(&self, typ: Type) -> LayoutInfo {
         match typ {
             Type::Prim(prim_tp) => self.get_primitive_layout(prim_tp),
-            Type::Derived(tp_constr) => self.newtype_layouts[&tp_constr].clone(),
+            Type::NewType(tp_constr) => self.newtype_layouts[&tp_constr].clone(),
         }
     }
 
-    fn get_primitive_layout(&self, prim_tp: PrimitiveType) -> LayoutInfo {
+    fn get_primitive_layout(&self, prim_tp: PrimType) -> LayoutInfo {
         LayoutInfo::Primitive(8)        // Temporarily so; update later
     }
     
-    fn make_newtype_layout(&self, deriv_typ: DerivType) -> LayoutInfo {
+    fn make_newtype_layout(&self, deriv_typ: TypeConstructor) -> LayoutInfo {
         
         let TypeConstructor::Struct{fields} = deriv_typ else {
             unimplemented!();

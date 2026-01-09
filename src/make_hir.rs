@@ -1,4 +1,4 @@
-use crate::shared::typing::*;
+use crate::shared::newtyping::*;
 use crate::stages::common::*;
 use crate::stages::ast::*;
 use crate::stages::hir::*;
@@ -34,17 +34,18 @@ impl Scope {
 
 pub struct HIRBuilder {
     scope_stack: Vec<Scope>,
-    curr_variable_coll: HashMap<VarId, TypedVariable>,
-    function_map: HashMap<CompleteFunctionSignature, (FuncId, Type)>,
+    curr_variable_coll: HashMap<VarId, Variable>,
+    function_map: HashMap<FuncSignature, (FuncId, Type)>,
     var_counter: usize,
+    typetable: TypeTable
 }
 
 impl HIRBuilder {
     
-    pub fn lower_ast(tast: TASTProgram) -> HIRProgram {
-        let TASTProgram{typetable, functions} = tast;
+    pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
+        let ASTProgram{typetable, functions} = ast;
 
-        let function_map: HashMap<CompleteFunctionSignature, (FuncId, Type)> = functions
+        let function_map: HashMap<FuncSignature, (FuncId, Type)> = functions
             .iter()
             .enumerate()
             .map(|(i, (sgn, func))| (sgn.clone(), (FuncId(i), func.ret_type.clone())))
@@ -60,6 +61,7 @@ impl HIRBuilder {
             curr_variable_coll: HashMap::new(),
             function_map,
             var_counter: 0,
+            typetable,
         };
 
         let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
@@ -70,21 +72,21 @@ impl HIRBuilder {
         }
 
         HIRProgram {
-            typetable, 
+            typetable: builder.typetable, 
             functions: hir_functions,
             entry, 
         }
     }
 
-    fn lower_function(&mut self, func: TASTFunction) -> HIRFunction {
-        let TASTFunction { name, args, body, ret_type } = func;
+    fn lower_function(&mut self, func: ASTFunction) -> HIRFunction {
+        let ASTFunction { name, args, body, ret_type } = func;
         self.scope_stack.push(Scope::new(ret_type.clone()));
         let arg_ids: Vec<VarId>  = args
             .into_iter()
-            .map(|arg| self.register_new_var(TypedVariable{name: arg.0, typ: arg.1}))
+            .map(|arg| self.register_new_var(Variable{name: arg.0, typ: arg.1}))
             .collect();
         let mut hir_body = self.lower_block(body);
-        if ret_type == Type::Prim(PrimitiveType::None) {
+        if ret_type == Type::Prim(PrimType::None) {
             hir_body.push(HIRStatement::Return(None));
         }
         let hir_func = HIRFunction { 
@@ -111,8 +113,8 @@ impl HIRBuilder {
             }
             ASTLValue::FieldAccess { of, field } => {
                 let hir_of = self.lower_lvalue(*of);
-                let Type::Derived(TypeConstructor::Struct{fields }) = hir_of.typ.clone() else {
-                    panic!("Expression in field access isn't struct");
+                let TypeDef::NewType(TypeConstructor::Struct { fields }) = self.typetable.get_typedef(hir_of.typ.clone()) else {
+                    panic!("Expression in field access isn't a struct");
                 };
                 let field_type = fields.get(&field).expect("Field not found in struct").clone();
                 Place {
@@ -126,9 +128,9 @@ impl HIRBuilder {
         }
     }
 
-    fn lower_statement(&mut self, statement: TASTStatement) -> HIRStatement {
+    fn lower_statement(&mut self, statement: ASTStatement) -> HIRStatement {
         match statement {
-            TASTStatement::Let {var, value} => {
+            ASTStatement::Let {var, value} => {
                 let hir_value = self.lower_expression(value);
                 if hir_value.typ != var.typ {
                     panic!("Variable definition inconsistent with value type");
@@ -139,7 +141,7 @@ impl HIRBuilder {
                     value: hir_value,
                 }
             }
-            TASTStatement::Assign { target, value } => {
+            ASTStatement::Assign { target, value } => {
                 let hir_target = self.lower_lvalue(target);
                 let hir_value = self.lower_expression(value);
                 if hir_target.typ != hir_value.typ {
@@ -147,9 +149,9 @@ impl HIRBuilder {
                 }
                 HIRStatement::Assign { target: hir_target, value: hir_value}
             }
-            TASTStatement::If { condition, if_body, else_body } => {
+            ASTStatement::If { condition, if_body, else_body } => {
                 let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != Type::Prim(PrimitiveType::Bool) {
+                if hir_condition.typ != Type::Prim(PrimType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::If {
@@ -161,9 +163,9 @@ impl HIRBuilder {
                     }
                 }
             }
-            TASTStatement::While { condition, body } => {
+            ASTStatement::While { condition, body } => {
                 let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != Type::Prim(PrimitiveType::Bool) {
+                if hir_condition.typ != Type::Prim(PrimType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::While { 
@@ -171,33 +173,33 @@ impl HIRBuilder {
                     body: self.lower_block(body),
                 }
             }
-            TASTStatement::Break => {
+            ASTStatement::Break => {
                 if self.scope_stack.last().unwrap().loop_nest_level < 1 {
                     panic!("Break statement detected out of loop");
                 }
                 HIRStatement::Break
             }
-            TASTStatement::Continue => {
+            ASTStatement::Continue => {
                 if self.scope_stack.last().unwrap().loop_nest_level < 1 {
                     panic!("Continue statement detected out of loop");
                 }
                 HIRStatement::Continue
             }
-            TASTStatement::Return(expr) => {
+            ASTStatement::Return(expr) => {
                 let hir_expr = self.lower_expression(expr);
                 if hir_expr.typ != self.scope_stack.last().unwrap().ambient_ret_type {
                     panic!("Return statement has unexpected type");
                 }
                 HIRStatement::Return(Some(hir_expr))
             }
-            TASTStatement::Print(expr) => {
+            ASTStatement::Print(expr) => {
                 let hir_expr = self.lower_expression(expr);
                 HIRStatement::Print(hir_expr)    // Subtler later
             }
         }
     }
 
-    fn lower_block(&mut self, stmts: Vec<TASTStatement>) -> Vec<HIRStatement>{
+    fn lower_block(&mut self, stmts: Vec<ASTStatement>) -> Vec<HIRStatement>{
         self.scope_stack.push(self.scope_stack.last().unwrap().copy_blank());
         let stmts: Vec<HIRStatement> = stmts 
             .into_iter()
@@ -207,7 +209,7 @@ impl HIRBuilder {
         stmts
     }
 
-    fn register_new_var(&mut self, var: TypedVariable) -> VarId {
+    fn register_new_var(&mut self, var: Variable) -> VarId {
         let var_id = VarId(self.var_counter);
         self.var_counter = self.var_counter + 1;
         self.curr_variable_coll.insert(var_id, var.clone());
@@ -227,13 +229,13 @@ impl HIRBuilder {
         panic!("Variable name not found in scope");
     }
 
-    fn lower_expression(&self, expr: TASTExpression) -> HIRExpression {
+    fn lower_expression(&self, expr: ASTExpression) -> HIRExpression {
         match expr {
-            TASTExpression::IntLiteral(num) => HIRExpression {
-                typ: Type::Prim(PrimitiveType::Integer),
+            ASTExpression::IntLiteral(num) => HIRExpression {
+                typ: Type::Prim(PrimType::Integer),
                 expr: HIRExpressionKind::IntLiteral(num),
             },
-            TASTExpression::Variable(varname) => {
+            ASTExpression::Variable(varname) => {
                 let var_id = self.get_var_from_scope(varname);
                 let vartype = self.curr_variable_coll[&var_id].typ.clone();
                 HIRExpression {
@@ -241,7 +243,7 @@ impl HIRBuilder {
                     expr: HIRExpressionKind::Variable(var_id)
                 }
             }
-            TASTExpression::BinOp{ op, left, right} => {
+            ASTExpression::BinOp{ op, left, right} => {
                 let left_hir = self.lower_expression(*left);
                 let right_hir = self.lower_expression(*right);
                 let result_type = binop_typecheck(&op, &left_hir.typ, &right_hir.typ)
@@ -255,7 +257,7 @@ impl HIRBuilder {
                     }
                 }
             }
-            TASTExpression::FuncCall { funcname, args } => {
+            ASTExpression::FuncCall { funcname, args } => {
                 let hir_args: Vec<HIRExpression> = args
                     .into_iter()
                     .map(|arg| self.lower_expression(arg))
@@ -277,18 +279,18 @@ impl HIRBuilder {
                     }
                 } 
             }
-            TASTExpression::BoolTrue => HIRExpression {
-                typ: Type::Prim(PrimitiveType::Bool),
+            ASTExpression::BoolTrue => HIRExpression {
+                typ: Type::Prim(PrimType::Bool),
                 expr: HIRExpressionKind::BoolTrue,
             },
-            TASTExpression::BoolFalse => HIRExpression {
-                typ: Type::Prim(PrimitiveType::Bool),
+            ASTExpression::BoolFalse => HIRExpression {
+                typ: Type::Prim(PrimType::Bool),
                 expr: HIRExpressionKind::BoolFalse,
             },
-            TASTExpression::FieldAccess{expr, field} => {
+            ASTExpression::FieldAccess{expr, field} => {
                 let hir_expr = self.lower_expression(*expr);
-                let Type::Derived(TypeConstructor::Struct { fields }) = hir_expr.typ.clone() else {
-                    panic!("Expression in field access is not a struct");
+                let TypeDef::NewType(TypeConstructor::Struct { fields }) = self.typetable.get_typedef(hir_expr.typ.clone()) else {
+                    panic!("Expression in field access isn't a struct");
                 };
                 let field_type = fields.get(&field)
                     .expect("Struct in field access doesn't have the requested field")
@@ -301,7 +303,7 @@ impl HIRBuilder {
                      }
                 }
             }
-            TASTExpression::StructLiteral{typ, fields} => {
+            ASTExpression::StructLiteral{typ, fields} => {
                 let hir_fields: HashMap<String, HIRExpression> = fields 
                         .into_iter()
                         .map(|(fname, fexpr)| (fname, self.lower_expression(fexpr)))
@@ -318,11 +320,10 @@ impl HIRBuilder {
     }
 
     fn typecheck_struct(&self, typ:Type , field_exprs: HashMap<String, HIRExpression>) {
-        let Type::Derived(TypeConstructor::Struct{fields: struct_fields}) = typ else {
-            panic!("Type annotation doesn't correspond to struct type");
-        };         
-
-        for (fname, exp_type) in struct_fields {
+        let TypeDef::NewType(TypeConstructor::Struct { fields: expected_fields }) = self.typetable.get_typedef(typ) else {
+            panic!("Type annotation doesn't correspond to a struct newtype");
+        };
+        for (fname, exp_type) in expected_fields {
             if exp_type != field_exprs.get(&fname).expect("Field not found").typ {
                 panic!("Field type doesn't match expected type");
             }

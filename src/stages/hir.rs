@@ -1,4 +1,4 @@
-use crate::shared::typing::*;
+use crate::shared::newtyping::*;
 use crate::shared::binops::*;
 use crate::stages::common::FuncId;
 
@@ -16,7 +16,7 @@ pub struct HIRProgram {
 pub struct HIRFunction {
     pub name: String,
     pub args: Vec<VarId>,
-    pub variables: HashMap<VarId, TypedVariable>,
+    pub variables: HashMap<VarId, Variable>,
     pub body: Vec<HIRStatement>,
     pub ret_type: Type,
 }

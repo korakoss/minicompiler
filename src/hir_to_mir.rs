@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::stages::common::*;
 use crate::stages::hir::*;
 use crate::stages::mir::*;
-use crate::shared::typing::*;
+use crate::shared::newtyping::*;
 
 
 pub struct MIRBuilder {

@@ -10,9 +10,6 @@ use lex::*;
 mod parse;
 use parse::*;
 
-mod convert_ast;
-use convert_ast::*;
-
 mod make_hir;
 use make_hir::*;
 
@@ -43,14 +40,10 @@ fn main() {
     
     fs::write(tokens_filepath, format!("{:#?}", tokens)).unwrap();
 
-    let uast = Parser::parse_program(tokens);
+    let ast = Parser::parse_program(tokens);
+    fs::write(uast_filepath, format!("{:#?}", ast)).unwrap();
 
-    fs::write(uast_filepath, format!("{:#?}", uast)).unwrap();
-
-    let tast = ASTConverter::convert_uast(uast);
-    fs::write(tast_filepath, format!("{:#?}", tast)).unwrap();
-
-    let hir = HIRBuilder::lower_ast(tast);
+    let hir = HIRBuilder::lower_ast(ast);
     fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
 
     let mir = MIRBuilder::lower_hir(hir);

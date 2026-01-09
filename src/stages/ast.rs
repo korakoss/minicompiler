@@ -1,42 +1,27 @@
-use crate::shared::typing::*;
+use crate::shared::newtyping::*;
 use crate::shared::binops::*;
 
 use std::collections::HashMap;
 
 
 #[derive(Debug, Clone)]
-pub struct TASTProgram {
+pub struct ASTProgram {
     pub typetable: TypeTable,
-    pub functions: HashMap<CompleteFunctionSignature, TASTFunction>,
+    pub functions: HashMap<FuncSignature, ASTFunction>,
 }
-
-pub type TASTFunction = ASTFunction<Type>;
-pub type TASTStatement = ASTStatement<Type>;
-pub type TASTExpression = ASTExpression<Type>;
 
 
 #[derive(Debug, Clone)]
-pub struct UASTProgram {
-    pub new_types: HashMap<TypeIdentifier, DeferredDerivType>,
-    pub functions: HashMap<DeferredFunctionSignature, UASTFunction>,
-}
-
-pub type UASTFunction = ASTFunction<DeferredType>;
-pub type UASTStatement = ASTStatement<DeferredType>;
-pub type UASTExpression = ASTExpression<DeferredType>;
-
-
-#[derive(Debug, Clone)]
-pub struct ASTFunction<T> {
+pub struct ASTFunction {
     pub name: String,
-    pub args: HashMap<String, T>,
-    pub body: Vec<ASTStatement<T>>,
-    pub ret_type: T,
+    pub args: HashMap<String, Type>,
+    pub body: Vec<ASTStatement>,
+    pub ret_type: Type,
 }
 
-impl<T: Clone> ASTFunction<T> {
+impl ASTFunction {
    
-    pub fn get_signature(&self) -> FuncSignature<T> {
+    pub fn get_signature(&self) -> FuncSignature {
         FuncSignature { 
             name: self.name.clone(), 
             argtypes: self.args
@@ -50,32 +35,32 @@ impl<T: Clone> ASTFunction<T> {
 
 
 #[derive(Debug, Clone)]
-pub enum ASTStatement<T> {
+pub enum ASTStatement {
     Let {
-        var: Variable<T>,
-        value: ASTExpression<T>,
+        var: Variable,
+        value: ASTExpression,
     },
     Assign {
         target: ASTLValue,
-        value: ASTExpression<T>
+        value: ASTExpression
     },
     If {
-        condition: ASTExpression<T>,
-        if_body: Vec<ASTStatement<T>>,
-        else_body: Option<Vec<ASTStatement<T>>>,
+        condition: ASTExpression,
+        if_body: Vec<ASTStatement>,
+        else_body: Option<Vec<ASTStatement>>,
     },
     While {
-        condition: ASTExpression<T>,
-        body: Vec<ASTStatement<T>>,
+        condition: ASTExpression,
+        body: Vec<ASTStatement>,
     },
     Break,
     Continue,
-    Return(ASTExpression<T>),
-    Print(ASTExpression<T>),
+    Return(ASTExpression),
+    Print(ASTExpression),
 }
 
 #[derive(Debug, Clone)]
-pub enum ASTLValue {
+pub enum ASTLValue {        // Rename to ASTPlace
    Variable(String),
    FieldAccess {
        of: Box<ASTLValue>,
@@ -84,29 +69,29 @@ pub enum ASTLValue {
 }
 
 #[derive(Debug, Clone)]
-pub enum ASTExpression<T> {
+pub enum ASTExpression {
     IntLiteral(i32),
     Variable(String),
     BinOp {
        op: BinaryOperator,
-       left: Box<ASTExpression<T>>,
-       right: Box<ASTExpression<T>>,
+       left: Box<ASTExpression>,
+       right: Box<ASTExpression>,
     },
     FuncCall {
         funcname: String,
-        args: Vec<ASTExpression<T>>,
+        args: Vec<ASTExpression>,
     },
     BoolTrue,
     BoolFalse,
     
     FieldAccess {
-        expr: Box<ASTExpression<T>>,
+        expr: Box<ASTExpression>,
         field: String,
     },
 
     StructLiteral {
-        typ: T,
-        fields: HashMap<String, ASTExpression<T>>,
+        typ: Type,
+        fields: HashMap<String, ASTExpression>,
     },
 }
 
