@@ -22,10 +22,14 @@ impl Scope {
         }
     }
 
-    fn copy_blank(&self) -> Scope {
+    fn copy_blank(&self, incr_loop: bool) -> Scope {
+        let mut nest_level = self.loop_nest_level;
+        if incr_loop {
+            nest_level = nest_level + 1;
+        }
         Scope {
             scope_vars: HashMap::new(),
-            loop_nest_level: self.loop_nest_level,
+            loop_nest_level: nest_level,
             ambient_ret_type: self.ambient_ret_type.clone()
         }
     }
@@ -85,7 +89,7 @@ impl HIRBuilder {
             .into_iter()
             .map(|arg| self.register_new_var(Variable{name: arg.0, typ: arg.1}))
             .collect();
-        let mut hir_body = self.lower_block(body);
+        let mut hir_body = self.lower_block(body, false);
         if ret_type == Type::Prim(PrimType::None) {
             hir_body.push(HIRStatement::Return(None));
         }
@@ -156,10 +160,10 @@ impl HIRBuilder {
                 }
                 HIRStatement::If {
                     condition: hir_condition, 
-                    if_body: self.lower_block(if_body), 
+                    if_body: self.lower_block(if_body, false), 
                     else_body: match else_body {
                         None => None,
-                        Some(block) => Some(self.lower_block(block)),
+                        Some(block) => Some(self.lower_block(block, false)),
                     }
                 }
             }
@@ -170,7 +174,7 @@ impl HIRBuilder {
                 }
                 HIRStatement::While { 
                     condition: hir_condition,
-                    body: self.lower_block(body),
+                    body: self.lower_block(body, true),
                 }
             }
             ASTStatement::Break => {
@@ -199,8 +203,8 @@ impl HIRBuilder {
         }
     }
 
-    fn lower_block(&mut self, stmts: Vec<ASTStatement>) -> Vec<HIRStatement>{
-        self.scope_stack.push(self.scope_stack.last().unwrap().copy_blank());
+    fn lower_block(&mut self, stmts: Vec<ASTStatement>, loop_block: bool) -> Vec<HIRStatement>{
+        self.scope_stack.push(self.scope_stack.last().unwrap().copy_blank(loop_block));
         let stmts: Vec<HIRStatement> = stmts 
             .into_iter()
             .map(|stmt| self.lower_statement(stmt))

@@ -10,6 +10,7 @@ After everything stabilized, probably start working on enums.
 - function call ABI
     - use pointers for args
     - maybe stack spilling
+- implement struct moves
 - some (not all) items from INSECTS.md
     - void funccall parsing issue
     - struct literal issues

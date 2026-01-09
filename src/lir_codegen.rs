@@ -114,7 +114,7 @@ impl LIRCompiler {
                 self.emit_place_store(dest, frame);
             }
             LIRStatement::BinOp { dest, op, left, right } => {
-self.emit_operand_load(left, frame);
+                self.emit_operand_load(left, frame);
                 self.emit("    mov r1, r0");
                 self.emit_operand_load(right, frame);
                 self.compile_binop(op);

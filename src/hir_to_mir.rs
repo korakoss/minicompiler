@@ -141,12 +141,13 @@ impl MIRBuilder {
                 let head_id = self.add_new_block();
                 self.loop_start_stack.push(head_id);
                 self.terminate_current_block(MIRTerminator::Goto(head_id));
-               
-                let body_id = self.lower_stmt_block(body, MIRTerminator::Goto(head_id));
-
+                
                 let after_id = self.add_new_block();
                 self.loop_end_stack.push(after_id);
 
+                let body_id = self.lower_stmt_block(body, MIRTerminator::Goto(head_id));
+
+                
                 self.switch_to_block(head_id);
                 let (cond_val, cond_stmts) = self.lower_expr(condition);
                 self.push_to_current_block(cond_stmts);
@@ -157,7 +158,6 @@ impl MIRBuilder {
                 LoweredStatement::TabulaRasa(after_id)
             },
             HIRStatement::Break => {
-                // TODO: add a "WIP block processing stack", jump back in it here
                 LoweredStatement::Termination(vec![], MIRTerminator::Goto(*self.loop_end_stack.last().unwrap())) 
             }
             HIRStatement::Continue => {
