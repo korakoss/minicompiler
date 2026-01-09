@@ -5,6 +5,9 @@ Next, the polishing should be finished, and some more tests should be added (pot
 After everything stabilized, probably start working on enums.
 
 Okay fuck it we are adding pointers apparently.
+Added pointers throughout the stack but no codegen yet.
+The next steps should be first adding references under the hood for funargs. Afterwards, implementing the user-facing pointer stuff too.
+
 
 ## Finalizations
 - remaining naming uniformizations (especially between MIR and LIR)
@@ -29,6 +32,9 @@ Okay fuck it we are adding pointers apparently.
 
 ## Possible next steps
 - add pointers
+- next, we could add generics actually, and start heaping
+    - fixed-size arrays
+    - ARGUMENT: indexing probably fucks up the current state of all the passes and it'd be good to have it stabilize
 - add enums, _match_, and some or a lot of pattern matching
 - add an ownership and move checker
 
