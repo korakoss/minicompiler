@@ -27,6 +27,7 @@ After everything stabilized, probably start working on enums.
 
 
 ## Possible next steps
+- add pointers
 - add enums, _match_, and some or a lot of pattern matching
 - add an ownership and move checker
 
