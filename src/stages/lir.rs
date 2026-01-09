@@ -42,7 +42,7 @@ pub enum LIRStatement {
     Call {
         dest: LIRPlace,
         func: FuncId,
-        args: Vec<LIRValue>,
+        args: Vec<LIRPlace>,
     },
     Print(LIRValue),
 }

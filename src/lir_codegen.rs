@@ -129,7 +129,7 @@ impl LIRCompiler {
                 }
 
                 for (i, arg) in args.into_iter().enumerate() {
-                    self.emit_operand_load(arg, frame);
+                    self.emit_operand_load(LIRValue::Place { typ: arg.typ.clone(), place: arg}, frame);
                     self.emit(&format!("     mov r{}, r0", i+1));
                 }
                 

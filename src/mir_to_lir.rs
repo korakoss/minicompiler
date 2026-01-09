@@ -86,16 +86,32 @@ impl LIRBuilder {
             }
             MIRStatement::Call { target, func, args } => {
                 let lir_target = self.lower_place(target);
-                let (arg_opnds, arg_stmt_coll): (Vec<LIRValue>, Vec<Vec<LIRStatement>>) = args
-                    .into_iter()
-                    .map(|arg| self.lower_value_into_operand(arg))
-                    .unzip();
+                let mut arg_places: Vec<LIRPlace> = Vec::new();
+                let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();
+
+                for arg in args {
+                    let arg_typ = arg.typ.clone();
+                    let arg_vreg = self.add_vreg(VRegInfo{
+                        size: self.layouts.get_layout(arg_typ.clone()).size(),
+                        align: 8,
+                    }); 
+                    let arg_place = LIRPlace {
+                        typ: arg_typ.clone(),
+                        place: LIRPlaceKind::Local { 
+                            base: arg_vreg, 
+                            offset: 0, 
+                        }
+                    };
+                    arg_places.push(arg_place.clone());
+                    let arg_stmts = self.lower_value_into_place(arg, arg_place);
+                    arg_stmts_coll.extend(arg_stmts.into_iter());
+                }
                 let lir_call = LIRStatement::Call { 
                     dest: lir_target, 
                     func, 
-                    args: arg_opnds 
+                    args: arg_places
                 };
-                [arg_stmt_coll.into_iter().flatten().collect(), vec![lir_call]].concat()
+                [arg_stmts_coll, vec![lir_call]].concat()
             }
             MIRStatement::Print(value) => {
                 let (opnd, stmts) = self.lower_value_into_operand(value);
