@@ -150,7 +150,10 @@ impl LIRBuilder {
                     align: 8
                 };
                 let temp_id = self.add_vreg(temp_vreg_info);
-                let temp_place = LIRPlace { base: temp_id, offset: 0};
+                let temp_place = LIRPlace {
+                    typ: val_typ.clone(),
+                    place: LIRPlaceKind::Local { base: temp_id, offset: 0}
+                };
 
                 // Mehh. Maybe add type info back to MIRV?
                 let stmts = self.lower_value_into_place(value, temp_place.clone());
@@ -181,8 +184,8 @@ impl LIRBuilder {
                 let mut stmts: Vec<LIRStatement> = Vec::new();
                 for (fname, fexpr) in fields {
                     let f_target = LIRPlace {
-                        base: target.base.clone(),
-                        offset: target.offset + field_offsets[&fname]
+                        typ: fexpr.typ.clone(),
+                        place: increment_place_offset(target.place.clone(), field_offsets[&fname]),
                     };
                     stmts.extend(self.lower_value_into_place(fexpr, f_target));
                 }
@@ -215,7 +218,7 @@ impl LIRBuilder {
                 }
             }
         }
-        LIRPlace{base, offset: curr_offs}
+        LIRPlace{typ: place.typ ,place: LIRPlaceKind::Local{base, offset: curr_offs}}
     }
     
     fn lower_cell(&mut self, id: CellId, cell: Cell) {
@@ -237,6 +240,12 @@ impl LIRBuilder {
 }
 
 
+fn increment_place_offset(place: LIRPlaceKind, increment: usize) -> LIRPlaceKind {
+    match place {
+        LIRPlaceKind::Local { base, offset } => LIRPlaceKind::Local { base, offset: offset + increment },
+        LIRPlaceKind::Deref { pointer, offset } => LIRPlaceKind::Deref { pointer, offset: offset + increment},
+    }
+}
 
 
 #[derive(Clone, Debug)]

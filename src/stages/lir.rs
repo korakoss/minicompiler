@@ -75,8 +75,20 @@ pub enum LIRValue {
 
 #[derive(Clone, Debug)]
 pub struct LIRPlace {
-    pub base: VRegId,
-    pub offset: usize,
+    pub typ: Type,
+    pub place: LIRPlaceKind
+}
+
+#[derive(Clone, Debug)]
+pub enum LIRPlaceKind {
+    Local {
+        base: VRegId,
+        offset: usize,
+    },
+    Deref {
+        pointer: VRegId,
+        offset: usize,
+    }
 }
 
 #[derive(Clone, Debug)]

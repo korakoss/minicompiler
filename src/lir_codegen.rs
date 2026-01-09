@@ -224,8 +224,14 @@ impl LIRCompiler {
     }
 
     fn compute_place_offset(&self, place: LIRPlace, frame: &StackFrame) -> usize {
-        let base_offs = frame.offsets[&place.base];
-        base_offs + place.offset
+        match place.place {
+            LIRPlaceKind::Local { base, offset } => {
+                frame.offsets[&base] + offset
+            }
+            LIRPlaceKind::Deref { pointer, offset } => {
+                unimplemented!()
+            }
+        }
     }
     
     fn emit(&mut self, line: &str) {        
