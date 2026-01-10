@@ -11,7 +11,6 @@ pub struct LIRBuilder {
     curr_chunks: HashMap<ChunkId, Chunk>,
     curr_vregs: Vec<VRegId>,
     layouts: LayoutTable,
-    vreg_counter: usize,
     chunk_counter: usize,
     typetable: TypeTable,
 }
@@ -25,7 +24,6 @@ impl LIRBuilder {
             curr_chunks: HashMap::new(),
             curr_vregs: Vec::new(),
             layouts,
-            vreg_counter: 0,
             chunk_counter: 0,
             typetable: program.typetable
         };
@@ -178,10 +176,6 @@ impl LIRBuilder {
                 let refd_place = self.lower_place(refd);
                 (LIRValue {size, value: LIRValueKind::Reference(refd_place)}, vec![]) 
             }
-            MIRValueKind::Dereference(reference) => {
-                let ref_chunk = self.cell_chunk_map[&reference].0;
-                (LIRValue {size, value: LIRValueKind::Dereference(ref_chunk)}, vec![])
-            }
         }
     }
 
@@ -219,11 +213,6 @@ impl LIRBuilder {
             MIRValueKind::Reference(refd) => {
                 let refd_place = self.lower_place(refd);
                 let stmt = LIRStatement::Store { dest: target, value: LIRValue { size, value: LIRValueKind::Reference(refd_place)}}; 
-                vec![stmt]
-            }
-            MIRValueKind::Dereference(reference) => {
-                let ref_chunk = self.cell_chunk_map[&reference].0;
-                let stmt = LIRStatement::Store { dest: target, value: LIRValue { size, value: LIRValueKind::Dereference(ref_chunk)}};
                 vec![stmt]
             }
         }
@@ -297,11 +286,6 @@ impl LIRBuilder {
         chunk_id
     }
 
-    fn add_vreg(&mut self) -> VRegId {
-        let vreg_id = VRegId(self.vreg_counter);
-        self.vreg_counter = self.vreg_counter + 1;
-        vreg_id
-    }
 }
 
 

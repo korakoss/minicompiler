@@ -75,7 +75,6 @@ pub enum LIRValueKind {
     BoolTrue,
     BoolFalse,
     Reference(LIRPlace),
-    Dereference(ChunkId),  // TODO: this should be LIRPlace too? Or no?
 }
 
 #[derive(Clone, Debug)]

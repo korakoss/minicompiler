@@ -76,7 +76,6 @@ pub enum MIRValueKind {
         fields: HashMap<String, MIRValue>,
     },
     Reference(MIRPlace),
-    Dereference(CellId)
 }
 
 

@@ -136,12 +136,22 @@ impl LIRCompiler {
                     self.emit(&format!("     mov r{}, r0", i+1));
                 }
                 
-                let target_offs = self.compute_place_offset(dest, frame);
-
                 self.emit("    push {r12}"); 
-                self.emit(&format!("    sub r12, fp, #{}", target_offs));
-                self.emit(&format!("    bl func_{}", func.0));
+                match dest.place {
+                    LIRPlaceKind::Local { base, offset } => {
+                        let target_offset = frame.offsets[&base] + offset;
+                        self.emit(&format!("    sub r12, fp, #{}", target_offset));
+                        self.emit(&format!("    bl func_{}", func.0));
+                    }
+                    LIRPlaceKind::Deref { pointer, offset } => {
+                        let pointer_st_offset = frame.offsets[&pointer];
+                        self.emit(&format!("    ldr r0, [fp, #-{}]", pointer_st_offset));  
+                        self.emit(&format!("    ldr r0, [r0, #-{}]", offset));  
+                        self.emit(&format!("    bl func_{}", func.0));                       
+                    }
+                }
                 self.emit("    pop {r12}"); 
+
             }
             LIRStatement::Print(operand) => {
                 self.emit_operand_load(operand, frame);
@@ -207,8 +217,17 @@ impl LIRCompiler {
     fn emit_operand_load(&mut self, operand: LIRValue, frame: &StackFrame) {
         match operand.value {
             LIRValueKind::Place(place) => {
-                let place_offset = self.compute_place_offset(place, frame);
-                self.emit(&format!("    ldr r0, [fp, #-{}]", place_offset));
+                match place.place {
+                    LIRPlaceKind::Local { base, offset } => {
+                        let place_offset = frame.offsets[&base] + offset;
+                        self.emit(&format!("    ldr r0, [fp, #-{}]", place_offset));
+                    }
+                    LIRPlaceKind::Deref { pointer, offset } => {
+                        let pointer_st_offs = frame.offsets[&pointer];
+                        self.emit(&format!("    ldr r0, [fp, #-{}]", pointer_st_offs));  
+                        self.emit(&format!("    ldr r0, [r0, #-{}]", offset));  
+                    }
+                }
             }
             LIRValueKind::IntLiteral(num) => {
                 self.emit(&format!("     ldr r0, ={}", num));
@@ -220,25 +239,30 @@ impl LIRCompiler {
                 self.emit(&"    ldr r0, =0");   
             }
             LIRValueKind::Reference(refd) => {
-                unimplemented!();
-            }
-            LIRValueKind::Dereference(reference) => {
-                unimplemented!();
+                match refd.place {
+                    LIRPlaceKind::Local { base, offset } => {
+                        let place_offset = frame.offsets[&base] + offset;
+                        self.emit(&format!("    sub r0, fp, #{}", place_offset));  
+                    }
+                    LIRPlaceKind::Deref { pointer, offset } => {
+                        unimplemented!();       // Shouldn't really happen, maybe refactor stuff
+                    }
+                }
             }
         }
     }
 
     fn emit_place_store(&mut self, place: LIRPlace, frame: &StackFrame) {
-        self.emit(&format!("    str r0, [fp, #-{}]", self.compute_place_offset(place, frame)));
-    }
-
-    fn compute_place_offset(&self, place: LIRPlace, frame: &StackFrame) -> usize {
         match place.place {
             LIRPlaceKind::Local { base, offset } => {
-                frame.offsets[&base] + offset
+                let place_offset = frame.offsets[&base] + offset;
+                self.emit(&format!("    str r0, [fp, #-{}]", place_offset));
             }
             LIRPlaceKind::Deref { pointer, offset } => {
-                unimplemented!()
+                // TODO: this fails for >8B values probably
+                let pointer_st_offs = frame.offsets[&pointer];
+                self.emit(&format!("    ldr r1, [fp, #-{}]", pointer_st_offs));  
+                self.emit(&format!("    str r0, [r1, #-{}]", offset));  
             }
         }
     }

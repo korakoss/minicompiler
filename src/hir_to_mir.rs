@@ -310,8 +310,12 @@ impl MIRBuilder {
                     value: ref_val
                 };
                 (MIRValue {
-                    typ: expr.typ, 
-                    value: MIRValueKind::Dereference(ref_val_cell),
+                    typ: expr.typ.clone(), 
+                    value: MIRValueKind::Place(MIRPlace { 
+                        typ: expr.typ, 
+                        base: MIRPlaceBase::Deref(ref_val_cell), 
+                        fieldchain: vec![], 
+                    }),
                 }, [ref_stmts, vec![ref_assign_stmt]].concat())
 
             }

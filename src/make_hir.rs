@@ -340,8 +340,8 @@ impl HIRBuilder {
                     unreachable!();
                 };
                 HIRExpression{
-                    typ: Type::Reference(Box::new(*deref_typ)),
-                    expr: HIRExpressionKind::Reference(Box::new(hir_derefd)),
+                    typ: *deref_typ,
+                    expr: HIRExpressionKind::Dereference(Box::new(hir_derefd)),
                 }
             }
 
