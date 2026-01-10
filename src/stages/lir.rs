@@ -1,6 +1,5 @@
-use crate::{shared::binops::*, stages::mir::MIRPlace};
+use crate::shared::binops::*;
 use crate::stages::common::*;
-use crate::shared::typing::*;
 
 use std::{collections::HashMap};
 
@@ -15,8 +14,8 @@ pub struct LIRProgram {
 pub struct LIRFunction {
     pub blocks: HashMap<BlockId, LIRBlock>,
     pub entry: BlockId,
-    pub vregs: HashMap<VRegId, VRegInfo>,
-    pub args: Vec<VRegId>
+    pub chunks: HashMap<ChunkId, Chunk>,
+    pub args: Vec<ChunkId>
 }
 
 #[derive(Clone, Debug)]
@@ -64,7 +63,7 @@ pub enum LIRTerminator {
 
 #[derive(Clone, Debug)]
 pub struct LIRValue {
-    pub typ: Type,
+    pub size: usize,
     pub value: LIRValueKind,
 }
 
@@ -76,35 +75,35 @@ pub enum LIRValueKind {
     BoolTrue,
     BoolFalse,
     Reference(LIRPlace),
-    Dereference(VRegId),  // TODO: this should be LIRPlace too? Or no?
+    Dereference(ChunkId),  // TODO: this should be LIRPlace too? Or no?
 }
 
 #[derive(Clone, Debug)]
 pub struct LIRPlace {
-    pub typ: Type,
-    // TODO: "size: usize" here -- Vregs are for storing 8bit info
-    // also align or whatever
+    pub size: usize,
     pub place: LIRPlaceKind
 }
 
 #[derive(Clone, Debug)]
 pub enum LIRPlaceKind {
     Local {
-        base: VRegId,
+        base: ChunkId,
         offset: usize,
     },
     Deref {
-        pointer: VRegId,
+        pointer: ChunkId,
         offset: usize,
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct VRegInfo{
+pub struct Chunk {
     pub size: usize,
-    pub align: usize,
+    // TODO: align or whatever
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
+pub struct ChunkId(pub usize);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub struct VRegId(pub usize);

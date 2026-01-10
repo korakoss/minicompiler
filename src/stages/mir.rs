@@ -107,5 +107,4 @@ pub enum CellKind {
     Temp,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
-pub struct CellId(pub usize);
+

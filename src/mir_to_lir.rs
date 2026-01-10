@@ -1,16 +1,18 @@
 use std::collections::HashMap;
 
+use crate::stages::common::*;
 use crate::stages::lir::*;
 use crate::stages::mir::*;
 use crate::shared::typing::*;
 
 
 pub struct LIRBuilder {
-    curr_cell_vreg_map: HashMap<CellId, VRegId>,
-    curr_cells: HashMap<CellId, Cell>,
+    cell_chunk_map: HashMap<CellId, (ChunkId, Type)>,
+    curr_chunks: HashMap<ChunkId, Chunk>,
+    curr_vregs: Vec<VRegId>,
     layouts: LayoutTable,
-    curr_vreg_table: HashMap<VRegId, VRegInfo>,
     vreg_counter: usize,
+    chunk_counter: usize,
     typetable: TypeTable,
 }
 
@@ -19,11 +21,12 @@ impl LIRBuilder {
     pub fn lower_mir(program: MIRProgram) -> LIRProgram {
         let layouts = LayoutTable::make(program.typetable.clone());
         let mut builder = LIRBuilder {
-            curr_cell_vreg_map: HashMap::new(),
-            curr_cells: HashMap::new(),
+            cell_chunk_map: HashMap::new(),
+            curr_chunks: HashMap::new(),
+            curr_vregs: Vec::new(),
             layouts,
-            curr_vreg_table: HashMap::new(),
             vreg_counter: 0,
+            chunk_counter: 0,
             typetable: program.typetable
         };
         LIRProgram {
@@ -36,8 +39,8 @@ impl LIRBuilder {
     }
 
     fn lower_function(&mut self, func: MIRFunction) -> LIRFunction {
-        self.curr_cell_vreg_map = HashMap::new();
-        self.curr_vreg_table = HashMap::new();
+        self.cell_chunk_map = HashMap::new();
+        self.curr_vregs = Vec::new();
         for (id, cell) in func.cells {
             self.lower_cell(id, cell);
         }
@@ -47,10 +50,10 @@ impl LIRBuilder {
                 .map(|(id, block)| (id, self.lower_block(block)))
                 .collect(),
             entry: func.entry,
-            vregs: self.curr_vreg_table.clone(),
+            chunks: self.curr_chunks.clone(), 
             args: func.args
                 .into_iter()
-                .map(|cell_id| self.curr_cell_vreg_map[&cell_id].clone())
+                .map(|cell_id| self.cell_chunk_map[&cell_id].0.clone())
                 .collect()
         }
     }
@@ -90,15 +93,12 @@ impl LIRBuilder {
                 let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();
 
                 for arg in args {
-                    let arg_typ = arg.typ.clone();
-                    let arg_vreg = self.add_vreg(VRegInfo{
-                        size: self.layouts.get_layout(arg_typ.clone()).size(),
-                        align: 8,
-                    }); 
+                    let arg_size = self.layouts.get_layout(arg.typ.clone()).size();
+                    let arg_chunk = self.add_chunk(Chunk { size: arg_size});
                     let arg_place = LIRPlace {
-                        typ: arg_typ.clone(),
+                        size: arg_size, 
                         place: LIRPlaceKind::Local { 
-                            base: arg_vreg, 
+                            base: arg_chunk, 
                             offset: 0, 
                         }
                     };
@@ -145,63 +145,61 @@ impl LIRBuilder {
     }
 
     fn lower_value_into_operand(&mut self, value: MIRValue) -> (LIRValue, Vec<LIRStatement>) {
-        let val_typ = value.typ.clone();
+        let size = self.layouts.get_layout(value.typ.clone()).size();
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                (LIRValue {typ: val_typ.clone(), value: LIRValueKind::Place(lir_val_place)}, Vec::new())
+                (LIRValue {size, value: LIRValueKind::Place(lir_val_place)}, Vec::new())
             },
             MIRValueKind::IntLiteral(num) => {
-                (LIRValue {typ: Type::Prim(PrimType::Integer), value: LIRValueKind::IntLiteral(num)}, Vec::new())
+                (LIRValue {size, value: LIRValueKind::IntLiteral(num)}, Vec::new())
             },
             MIRValueKind::BoolTrue => {
-                (LIRValue {typ: Type::Prim(PrimType::Bool), value: LIRValueKind::BoolTrue}, Vec::new())
+                (LIRValue {size, value: LIRValueKind::BoolTrue}, Vec::new())
             }
             MIRValueKind::BoolFalse => {
-                (LIRValue {typ: Type::Prim(PrimType::Bool), value: LIRValueKind::BoolFalse}, Vec::new())
+                (LIRValue {size, value: LIRValueKind::BoolFalse}, Vec::new())
             }
             MIRValueKind::StructLiteral {..} => {
-                let temp_vreg_info = VRegInfo {
-                    size: self.layouts.get_layout(val_typ.clone()).size(),
-                    align: 8
+                let temp_chunk = Chunk {
+                    size: self.layouts.get_layout(value.typ.clone()).size(),
                 };
-                let temp_id = self.add_vreg(temp_vreg_info);
+                let temp_id = self.add_chunk(temp_chunk);
                 let temp_place = LIRPlace {
-                    typ: val_typ.clone(),
+                    size: size,
                     place: LIRPlaceKind::Local { base: temp_id, offset: 0}
                 };
 
                 // Mehh. Maybe add type info back to MIRV?
                 let stmts = self.lower_value_into_place(value, temp_place.clone());
-                (LIRValue{ typ: val_typ, value: LIRValueKind::Place(temp_place)}, stmts)
+                (LIRValue{ size, value: LIRValueKind::Place(temp_place)}, stmts)
             }
             MIRValueKind::Reference(refd) => {
                 let refd_place = self.lower_place(refd);
-                (LIRValue { typ: Type::Reference(Box::new(refd_place.typ.clone())), value: LIRValueKind::Reference(refd_place)}, vec![]) 
+                (LIRValue {size, value: LIRValueKind::Reference(refd_place)}, vec![]) 
             }
             MIRValueKind::Dereference(reference) => {
-                let ref_vreg = self.curr_cell_vreg_map[&reference].clone();
-                let ref_type = self.curr_cells[&reference].typ.clone();
-                let Type::Reference(deref_typ) = ref_type else {unreachable!()};
-                (LIRValue { typ: *deref_typ, value: LIRValueKind::Dereference(ref_vreg)}, vec![])
+                let ref_chunk = self.cell_chunk_map[&reference].0;
+                (LIRValue {size, value: LIRValueKind::Dereference(ref_chunk)}, vec![])
             }
         }
     }
 
     fn lower_value_into_place(&self, value: MIRValue, target: LIRPlace) -> Vec<LIRStatement> {
+        let size = self.layouts.get_layout(value.typ.clone()).size();
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                vec![LIRStatement::Store{dest: target, value: LIRValue { typ: value.typ, value: LIRValueKind::Place(lir_val_place)}}] 
+                vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::Place(lir_val_place)}}] 
             },
             MIRValueKind::IntLiteral(num) => {
-                vec![LIRStatement::Store{dest: target, value: LIRValue{ typ: Type::Prim(PrimType::Integer), value: LIRValueKind::IntLiteral(num)}}]
+                vec![LIRStatement::Store{dest: target, value: LIRValue{ size, value: LIRValueKind::IntLiteral(num)}}]
             },
             MIRValueKind::BoolTrue => {
-                vec![LIRStatement::Store{dest: target, value: LIRValue { typ: Type::Prim(PrimType::Bool), value: LIRValueKind::BoolTrue}}]
+                vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::BoolTrue}}]
             }
             MIRValueKind::BoolFalse => {
-                vec![LIRStatement::Store{dest: target, value: LIRValue { typ: Type::Prim(PrimType::Bool), value: LIRValueKind::BoolFalse}}]
+                vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::BoolFalse}}]
             }
             MIRValueKind::StructLiteral { typ, fields } => {
                 let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(typ) else {
@@ -209,8 +207,9 @@ impl LIRBuilder {
                 };
                 let mut stmts: Vec<LIRStatement> = Vec::new();
                 for (fname, fexpr) in fields {
+                    let fsize = self.layouts.get_layout(fexpr.typ.clone()).size();
                     let f_target = LIRPlace {
-                        typ: fexpr.typ.clone(),
+                        size: fsize,
                         place: increment_place_offset(target.place.clone(), field_offsets[&fname]),
                     };
                     stmts.extend(self.lower_value_into_place(fexpr, f_target));
@@ -219,14 +218,12 @@ impl LIRBuilder {
             }
             MIRValueKind::Reference(refd) => {
                 let refd_place = self.lower_place(refd);
-                let stmt = LIRStatement::Store { dest: target, value: LIRValue { typ: Type::Reference(Box::new(refd_place.typ.clone())), value: LIRValueKind::Reference(refd_place)}}; 
+                let stmt = LIRStatement::Store { dest: target, value: LIRValue { size, value: LIRValueKind::Reference(refd_place)}}; 
                 vec![stmt]
             }
             MIRValueKind::Dereference(reference) => {
-                let ref_vreg = self.curr_cell_vreg_map[&reference].clone();
-                let ref_type = self.curr_cells[&reference].typ.clone();
-                let Type::Reference(deref_typ) = ref_type else {unreachable!()};
-                let stmt = LIRStatement::Store { dest: target, value: LIRValue { typ: *deref_typ, value: LIRValueKind::Dereference(ref_vreg)}};
+                let ref_chunk = self.cell_chunk_map[&reference].0;
+                let stmt = LIRStatement::Store { dest: target, value: LIRValue { size, value: LIRValueKind::Dereference(ref_chunk)}};
                 vec![stmt]
             }
         }
@@ -234,28 +231,28 @@ impl LIRBuilder {
 
     fn lower_place(&self, place: MIRPlace) -> LIRPlace {
         // TODO: weird solution, change it
-
+        let size = self.layouts.get_layout(place.typ).size();
         match place.base {
             MIRPlaceBase::Cell(c_id) => {
 
-                let base_type = self.curr_cells[&c_id].typ.clone();
+                let base_type = self.cell_chunk_map[&c_id].1.clone();
                 let (final_offset, final_type) = self.lower_fieldchain(base_type, place.fieldchain);
                 LIRPlace {
-                    typ: place.typ, 
+                    size,
                     place: LIRPlaceKind::Local{
-                        base: self.curr_cell_vreg_map[&c_id], 
+                        base: self.cell_chunk_map[&c_id].0, 
                         offset: final_offset 
                     }
                 }
             },
             MIRPlaceBase::Deref(c_id) => {
-                let ref_type = self.curr_cells[&c_id].typ.clone();
+                let ref_type = self.cell_chunk_map[&c_id].1.clone();
                 let Type::Reference(deref_type) = ref_type else {unreachable!()};
                 let (final_offset, final_type) = self.lower_fieldchain(*deref_type, place.fieldchain);
                 LIRPlace {
-                    typ: place.typ,
+                    size,
                     place: LIRPlaceKind::Deref { 
-                        pointer: self.curr_cell_vreg_map[&c_id], 
+                        pointer: self.cell_chunk_map[&c_id].0, 
                         offset: final_offset,
                     }
                 }
@@ -288,19 +285,21 @@ impl LIRBuilder {
     
     fn lower_cell(&mut self, id: CellId, cell: Cell) {
         // TODO: This should lower into LIRPlace. I think?
-        self.curr_cells.insert(id.clone(), cell.clone());
-        let cell_vreg_info = VRegInfo { 
-            size: self.layouts.get_layout(cell.typ).size(),
-            align: 8
-        };
-        let vreg_id = self.add_vreg(cell_vreg_info);
-        self.curr_cell_vreg_map.insert(id, vreg_id);
+        let chunk = Chunk {size: self.layouts.get_layout(cell.typ.clone()).size()};
+        let chunk_id = self.add_chunk(chunk);
+        self.cell_chunk_map.insert(id, (chunk_id, cell.typ));
     }
 
-    fn add_vreg(&mut self, info: VRegInfo) -> VRegId {
+    fn add_chunk(&mut self, chunk: Chunk) -> ChunkId {
+        let chunk_id = ChunkId(self.chunk_counter);
+        self.chunk_counter = self.chunk_counter + 1;
+        self.curr_chunks.insert(chunk_id, chunk);
+        chunk_id
+    }
+
+    fn add_vreg(&mut self) -> VRegId {
         let vreg_id = VRegId(self.vreg_counter);
         self.vreg_counter = self.vreg_counter + 1;
-        self.curr_vreg_table.insert(vreg_id.clone(), info);
         vreg_id
     }
 }

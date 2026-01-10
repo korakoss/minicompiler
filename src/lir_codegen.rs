@@ -7,8 +7,24 @@ use crate::shared::binops::BinaryOperator;
 
 struct StackFrame {
     size: usize,
-    offsets: HashMap<VRegId, usize>,
+    offsets: HashMap<ChunkId, usize>,
 }
+
+impl StackFrame {
+    fn make(chunks: HashMap<ChunkId, Chunk>) -> StackFrame {
+        let mut offsets: HashMap<ChunkId, usize> = HashMap::new();
+        let mut curr_offset = 8;
+        for (id, chunk) in chunks {
+            offsets.insert(id, curr_offset);
+            curr_offset = curr_offset + chunk.size; 
+        }
+        StackFrame {
+            size: curr_offset,
+            offsets,
+        }
+    }
+}
+
 
 pub struct LIRCompiler {
     output: String,
@@ -56,8 +72,8 @@ impl LIRCompiler {
 
 
     fn compile_function(&mut self, func_id: FuncId,lir_func: LIRFunction) {
-        let LIRFunction { blocks, entry, vregs, args } = lir_func;
-        let frame = self.make_stack_frame(&vregs);
+        let LIRFunction { blocks, entry, chunks, args } = lir_func;
+        let frame = StackFrame::make(chunks);
         
         self.emit(&format!("func_{}:", func_id.0));
         self.emit("    push {fp, lr}");     
@@ -83,20 +99,7 @@ impl LIRCompiler {
 
     }
 
-    fn make_stack_frame(&self, vregs: &HashMap<VRegId, VRegInfo>) -> StackFrame {
-        // TODO: do alignment later
-        let mut offsets: HashMap<VRegId, usize> = HashMap::new();
-        let mut curr_offset = 8;
-        for (id, reg_info) in vregs {
-            offsets.insert(id.clone(), curr_offset);
-            curr_offset = curr_offset + reg_info.size;
-        }
-        StackFrame {
-            size: curr_offset,
-            offsets,
-        }
-    }
-
+    
     fn compile_block(&mut self, id: BlockId, block: LIRBlock, frame: &StackFrame, func: FuncId) {
         self.emit(&format!("block_{}:", id.0));
         let LIRBlock {statements, terminator} = block;
@@ -129,7 +132,7 @@ impl LIRCompiler {
                 }
 
                 for (i, arg) in args.into_iter().enumerate() {
-                    self.emit_operand_load(LIRValue{ typ: arg.typ.clone(), value: LIRValueKind::Place(arg)}, frame);
+                    self.emit_operand_load(LIRValue{ size: arg.size, value: LIRValueKind::Place(arg)}, frame);
                     self.emit(&format!("     mov r{}, r0", i+1));
                 }
                 
