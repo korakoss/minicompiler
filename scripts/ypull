@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+# Pull yum/ outputs from pi to mac
+rsync -av "$PI_YUM/yum/" "$MAC_YUM/yum/"
