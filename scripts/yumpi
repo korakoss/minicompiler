@@ -1,0 +1,3 @@
+cd ~/programming_projects/minicompiler
+rsync -av --exclude "target" . akos@pir:/home/akos/programming_projects/minicompiler/
+ssh pir -t 'source ~/.cargo/env && cd programming_projects/minicompiler && exec $SHELL'
