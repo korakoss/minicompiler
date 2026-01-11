@@ -290,16 +290,27 @@ impl MIRBuilder {
                 (MIRValue{typ: expr.typ.clone(), value: MIRValueKind::StructLiteral{ typ: expr.typ,fields: mir_fields}}, stmts)
             },
             HIRExpressionKind::Reference(refd) => {
-                 let (mir_refd, refd_stmts) = self.lower_expr(*refd);
-                 let MIRValue { typ, value: MIRValueKind::Place(refd_place)} = mir_refd else {unreachable!();};
-                 (MIRValue{typ: Type::Reference(Box::new(typ)), value: MIRValueKind::Reference(refd_place)}, refd_stmts)
+                let (mir_refd, refd_stmts) = self.lower_expr(*refd);
+                match mir_refd.value {
+                    MIRValueKind::Place(refd_place) => {
+                        (MIRValue{typ: Type::Reference(Box::new(mir_refd.typ)), value: MIRValueKind::Reference(refd_place)}, refd_stmts)
+                    }
+                    MIRValueKind::Reference(refd_ref) => {
+                        let tempc = self.add_cell(Cell{typ: mir_refd.typ.clone(), kind: CellKind::Temp});
+                        let temp_place = MIRPlace{typ: mir_refd.typ.clone(), base: MIRPlaceBase::Cell(tempc), fieldchain: vec![]};
+                        let assign_stmt = MIRStatement::Assign { target: temp_place.clone(), value: MIRValue { typ: mir_refd.typ.clone(), value: MIRValueKind::Reference(refd_ref)}};
+                        (MIRValue{typ: expr.typ, value: MIRValueKind::Reference(temp_place)}, [refd_stmts, vec![assign_stmt]].concat())
+                    }
+                    _ => {unreachable!();}
+                }
             }
+
             HIRExpressionKind::Dereference(reference) => {
                 let (ref_val, ref_stmts) = self.lower_expr(*reference); 
 
                 let ref_val_cell = self.add_cell(Cell { 
                     typ:  ref_val.typ.clone(),
-                    kind: CellKind::Temp 
+                    kind: CellKind::Temp
                 });
                 let ref_assign_stmt = MIRStatement::Assign { 
                     target: MIRPlace { 

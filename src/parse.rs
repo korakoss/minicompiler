@@ -188,26 +188,28 @@ impl Parser {
     } 
 
     fn parse_lvalue(&mut self) -> ASTLValue {
-
-        if self.tokens.peek().unwrap() == &Token::Deref {
-            self.tokens.next();
-            let refd_expr = self.parse_expression();
-            ASTLValue::Deref(refd_expr)
-        } else {
-            let root = self.expect_identifier();
-            let mut curr_lvalue = ASTLValue::Variable(root);
-            while self.tokens.peek().unwrap() == &Token::Dot {
+        let mut curr_lvalue = match self.tokens.peek().unwrap() {
+            &Token::Deref => {
                 self.tokens.next();
-                let curr_field = self.expect_identifier();
-                curr_lvalue = ASTLValue::FieldAccess { 
-                    of: Box::new(curr_lvalue), 
-                    field: curr_field 
-                };
+                ASTLValue::Deref(self.parse_expression())
+            },
+            _ => {
+                let root_var = self.expect_identifier();
+                ASTLValue::Variable(root_var)
             }
-            curr_lvalue
+        };
+        while self.tokens.peek().unwrap() == &Token::Dot {
+            self.tokens.next();
+            let curr_field = self.expect_identifier();
+            curr_lvalue = ASTLValue::FieldAccess { 
+                of: Box::new(curr_lvalue), 
+                field: curr_field 
+            };
         }
+        curr_lvalue
+
     }
-        
+
     fn parse_expression(&mut self) -> ASTExpression {
         self.parse_expression_with_precedence(0)
     }
