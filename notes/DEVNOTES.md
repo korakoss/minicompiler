@@ -13,12 +13,14 @@ I originally started to add pointers to enable passing function arguments as cal
 After that, finalization and cleanup.
 Also, more tests should be added (some are collected below). It'd also be nice to improve the test script. In particular, enabling "negative testing": tests for compilation _failures_.
 
+*NOTE:* as I just discovered, struct returns actually don't work, the previous seemingly functional example probably just lucked out by querying the 0-offset field. A more through code fail. See strucret.yum.
 
 ## Plans for the caller frame pointer thing
 - each function determines a "callee layout" -- basically offsets in a struct-like memory chunk that they expect argument info in
 - this "struct" will contain the actual pointers to argument values (in the caller frame or wherever)
 - the caller then passesa single pointer to this "struct"
 - the callee chases down the pointers to get the real argument values
+- use r2 for the arg struct pointer and r3 for the return pointer 
 
 
 ## Finalizations
