@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-
-cd ~/programming_projects/minicompiler
-rsync -av --exclude "target" . akos@pir:/home/akos/programming_projects/minicompiler/
-ssh pir -t "source ~/.cargo/env && cd programming_projects/minicompiler && cargo build && ./yumc $1 && exec \$SHELL"

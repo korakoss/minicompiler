@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Sync mac -> pi
+rsync -av --exclude "target" "$MAC_YUM/" "$PI_YUM/"
+
+# If on mac, jump to pi
+if [[ "$(hostname)" == "mac" ]]; then
+    ssh pi -t "cd ~/programming_projects/minicompiler && exec \$SHELL"
+fi

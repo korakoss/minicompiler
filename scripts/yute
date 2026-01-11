@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-source ./yum-common.sh
+source $YUM/scripts/common
 
 cargo build
 

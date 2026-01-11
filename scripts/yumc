@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-source ./yum-common.sh
+source $YUM/scripts/common
 
 ex_path=$(compile_yum "./yum" "$1")
 ./"$ex_path"
-aliases
