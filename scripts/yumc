@@ -1,5 +1,28 @@
 #!/usr/bin/env bash
-source $YUM/scripts/common
 
-ex_path=$(compile_yum "./yum" "$1")
-./"$ex_path"
+BUILD=true
+PROGRAM=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n) BUILD=false; shift ;;
+        *) PROGRAM="$1"; shift ;;
+    esac
+done
+
+# Sync mac -> pi
+rsync -av --exclude "target" "$MAC_YUM/" "$PI_YUM/"
+
+if [[ "$(hostname)" == "mac" ]]; then
+    PI_PATH="${PI_YUM#pi:}"
+    if $BUILD; then
+        ssh pi -t "source ~/.zshrc && cd $PI_PATH && cargo build && ./scripts/yumc -n $PROGRAM && exec \$SHELL"
+    else
+        ssh pi -t "source ~/.zshrc && cd $PI_PATH && cargo build && ./scripts/yumc -n $PROGRAM && exec \$SHELL"
+    fi
+else
+    source $PI_YUM/scripts/common
+    $BUILD && cargo build
+    ex_path=$(compile_yum "./yum" "$PROGRAM")
+    "$ex_path"
+fi
