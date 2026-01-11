@@ -14,6 +14,13 @@ After that, finalization and cleanup.
 Also, more tests should be added (some are collected below). It'd also be nice to improve the test script. In particular, enabling "negative testing": tests for compilation _failures_.
 
 
+## Plans for the caller frame pointer thing
+- each function determines a "callee layout" -- basically offsets in a struct-like memory chunk that they expect argument info in
+- this "struct" will contain the actual pointers to argument values (in the caller frame or wherever)
+- the caller then passesa single pointer to this "struct"
+- the callee chases down the pointers to get the real argument values
+
+
 ## Finalizations
 - some naming cleanup/uniformization (especially between MIR and LIR, I think)
 - some items from INSECTS.md
