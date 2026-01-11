@@ -59,6 +59,7 @@ If still continuing after those, I think the better pattern matching could be th
 - Make compilation and test scripts nicer
     - internal stages could be optional
     - test script could call the compile script
+    - some script that jumps over to Pi and compiles there in one go
 - Add informative errors
 
 
