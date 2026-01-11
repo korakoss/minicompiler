@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+source ./yum-common.sh
+
+cargo build
+
+failures=()
+
+for t in primetest nonparam_func long_ass_binop; do
+    ex_path=$(compile_yum "./tests" "$t")
+    
+    ./"$ex_path"
+    exit_code=$?
+
+    if [ $exit_code -ne 1 ]; then
+        failures+=("$t (exit code: $exit_code)")
+    fi
+done
+
+echo ""
+echo "================================"
+if [ ${#failures[@]} -eq 0 ]; then
+    echo "All tests passed!"
+else
+    echo "FAILURES (${#failures[@]}):"
+    for f in "${failures[@]}"; do
+        echo "  - $f"
+    done
+    exit 1
+fi
