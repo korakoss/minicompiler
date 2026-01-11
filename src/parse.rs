@@ -129,18 +129,6 @@ impl Parser {
                 self.expect_unparametric_token(Token::Semicolon);
                 ASTStatement::Let{var, value}
             }
-            &Token::Identifier(_)  => {                
-                // Assignment 
-                // TODO: an identifier could actually mean funccalls too
-                let target = self.parse_lvalue();
-                self.expect_unparametric_token(Token::Assign);
-                let assign_value = self.parse_expression();
-                self.expect_unparametric_token(Token::Semicolon);
-                ASTStatement::Assign { 
-                    target,
-                    value: assign_value
-                }
-            }
             &Token::If => {
                 self.tokens.next();
                 let condition = self.parse_expression();
@@ -185,30 +173,39 @@ impl Parser {
                 ASTStatement::Print(expr)
             },
             _ => {                                      
-                panic!("Cannot recognize valid statement starting with token {:?}", self.tokens.next());              
+                // We assume it's an assignment 
+                // TODO: this is not actually correct, it might be a funccall
+                let target = self.parse_lvalue();
+                self.expect_unparametric_token(Token::Assign);
+                let assign_value = self.parse_expression();
+                self.expect_unparametric_token(Token::Semicolon);
+                ASTStatement::Assign { 
+                    target,
+                    value: assign_value
+                }
             }
         }
     } 
 
     fn parse_lvalue(&mut self) -> ASTLValue {
-        let root = self.expect_identifier();
-        let mut curr_lvalue = ASTLValue::Variable(root);
 
         if self.tokens.peek().unwrap() == &Token::Deref {
             self.tokens.next();
             let refd_expr = self.parse_expression();
-            return ASTLValue::Deref(refd_expr)
+            ASTLValue::Deref(refd_expr)
+        } else {
+            let root = self.expect_identifier();
+            let mut curr_lvalue = ASTLValue::Variable(root);
+            while self.tokens.peek().unwrap() == &Token::Dot {
+                self.tokens.next();
+                let curr_field = self.expect_identifier();
+                curr_lvalue = ASTLValue::FieldAccess { 
+                    of: Box::new(curr_lvalue), 
+                    field: curr_field 
+                };
+            }
+            curr_lvalue
         }
-
-        while self.tokens.peek().unwrap() == &Token::Dot {
-            self.tokens.next();
-            let curr_field = self.expect_identifier();
-            curr_lvalue = ASTLValue::FieldAccess { 
-                of: Box::new(curr_lvalue), 
-                field: curr_field 
-            };
-        }
-        curr_lvalue
     }
         
     fn parse_expression(&mut self) -> ASTExpression {
