@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No color
+
 BUILD=true
 
 while [[ $# -gt 0 ]]; do
@@ -25,6 +29,7 @@ else
 
     failures=()
 
+    # Positive tests - should compile and return 1
     for t in primetest nonparam_func long_ass_binop; do
         ex_path=$(compile_yum "./tests" "$t")
         
@@ -32,19 +37,34 @@ else
         exit_code=$?
 
         if [ $exit_code -ne 1 ]; then
-            failures+=("$t (exit code: $exit_code)")
+            failures+=("$t (expected exit 1, got $exit_code)")
+        fi
+    done
+
+    # Negative tests - should fail to compile
+    for t in bad_branch; do
+        src_path="./tests/src/$t.yum"
+        
+        if RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" /dev/null /dev/null /dev/null /dev/null /dev/null /dev/null 2>/dev/null; then
+            failures+=("$t (should have failed to compile)")
         fi
     done
 
     echo ""
+    echo ""
     echo "================================"
+    echo ""
     if [ ${#failures[@]} -eq 0 ]; then
-        echo "All tests passed!"
-    else
-        echo "FAILURES (${#failures[@]}):"
-        for f in "${failures[@]}"; do
-            echo "  - $f"
-        done
+        echo -e "${GREEN}All tests passed!${NC}"
+        echo ""
+        echo ""
         exit 1
+    else
+        echo -e "${RED}FAILURES (${#failures[@]}):${NC}"
+        for f in "${failures[@]}"; do
+            echo -e "  ${RED}- $f${NC}"
+        done
+        echo ""
+        echo ""
     fi
 fi
