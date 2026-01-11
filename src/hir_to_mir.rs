@@ -18,7 +18,6 @@ pub struct MIRBuilder {
     processing_stack: Vec<BlockId>,
 }
 
-
 impl MIRBuilder {
     
     pub fn lower_hir(program: HIRProgram) -> MIRProgram {
