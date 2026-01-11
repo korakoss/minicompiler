@@ -4,6 +4,5 @@ fun big_ass_exp(n: int) -> int {
 
 fun main() -> bool {
     let res: int = big_ass_exp(6);
-    print(res);
     return res==114;
 }
