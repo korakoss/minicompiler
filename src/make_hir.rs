@@ -131,8 +131,9 @@ impl HIRBuilder {
             }
             ASTLValue::Deref(reference) => {
                 let hir_ref = self.lower_expression(reference);
+                let Type::Reference(refd_typ) = hir_ref.typ.clone() else {unreachable!()};
                 Place {
-                    typ: Type::Reference(Box::new(hir_ref.typ.clone())),
+                    typ: *refd_typ,
                     place: PlaceKind::Deref(hir_ref)
                 }
             }
@@ -156,7 +157,7 @@ impl HIRBuilder {
                 let hir_target = self.lower_lvalue(target);
                 let hir_value = self.lower_expression(value);
                 if hir_target.typ != hir_value.typ {
-                    panic!("Non-matching types in assignment to struct field");
+                    panic!("Non-matching types in assignment");
                 }
                 HIRStatement::Assign { target: hir_target, value: hir_value}
             }
