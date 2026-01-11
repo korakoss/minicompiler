@@ -1,12 +1,12 @@
 
 # Where are we
 
-Added structs and the MIR. Seems mostly functional, except passing struct args. To fix that, I started working on passing arguments as pointers. Most of the machinery is done, but not codegen yet.
-Currently contemplating some refactors in LIR and MIR->LIR. The issue is that vregs were so far handled as corresponding to MIR cells, basically, having sizes and so on. I think that's wrong, they are8-bit values (pointers or primitives). So LIRPlace should take most of its roles. I wrote some TODO notes in the two files, but not implemented yet.
+Added structs and the MIR. Seems mostly functional, except passing struct args.
+Then I added pointers, which also seem to work, even convoluted programs now.
+But neiter structs, nor pointers were meticulously tested.
 
-After that is sorted out, pointers should be added. First, only adding them under the hood for the function argument thing. Then, if those work, finish implementing user-facing pointers too.
-
-Then, once pointers are finished, there should be finalization and cleanup. 
+I originally started to add pointers to enable passing function arguments as caller frame pointers. This is still not implemented however -- this should be next.
+After that, finalization and cleanup.
 Also, more tests should be added (some are collected below). It'd also be nice to improve the test script. In particular, enabling "negative testing": tests for compilation _failures_.
 
 
@@ -60,6 +60,7 @@ If still continuing after those, I think the better pattern matching could be th
     - internal stages could be optional
     - test script could call the compile script
     - some script that jumps over to Pi and compiles there in one go
+    - put the yumpi/yute scripts here, not in dotfs
 - Add informative errors
 
 
