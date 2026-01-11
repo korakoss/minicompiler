@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 
+BUILD=true
+while getopts "n" opt; do
+    case $opt in
+        n) BUILD=false ;;
+    esac
+done
+
 # Sync mac -> pi
 rsync -av --exclude "target" "$MAC_YUM/" "$PI_YUM/"
 
 # If on mac, jump to pi
 if [[ "$(hostname)" == "mac" ]]; then
-    ssh pi -t "cd ~/programming_projects/minicompiler && exec \$SHELL"
+    if $BUILD; then
+        ssh pi -t "cd ~/programming_projects/minicompiler && source ~/.cargo/env && cargo build && exec \$SHELL"
+    else
+        ssh pi -t "cd ~/programming_projects/minicompiler && exec \$SHELL"
+    fi
 fi
