@@ -20,7 +20,11 @@ Also, more tests should be added (some are collected below). It'd also be nice t
 - this "struct" will contain the actual pointers to argument values (in the caller frame or wherever)
 - the caller then passesa single pointer to this "struct"
 - the callee chases down the pointers to get the real argument values
-- use r2 for the arg struct pointer and r3 for the return pointer 
+- use r3 for the arg struct pointer and r4 for the return pointer 
+    - reminder: 
+        r0 -> main operational register 
+        r1 -> helper register (eg for binops)
+        r2 -> used in modulo
 
 
 ## Finalizations

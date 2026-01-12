@@ -184,10 +184,6 @@ impl LIRBuilder {
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                if lir_val_place.size != 8 {
-                    panic!("Large moves not implementd");
-                }
-
                 vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::Place(lir_val_place)}}] 
             },
             MIRValueKind::IntLiteral(num) => {
