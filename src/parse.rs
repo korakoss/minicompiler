@@ -8,7 +8,7 @@ use crate::stages::ast::*;
 
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
-    new_types: HashMap<TypeIdentifier, TypeConstructor>,
+    new_types: HashMap<PolyTypeIdentifier, TypeConstructor>,
     functions: HashMap<FuncSignature, ASTFunction>,
 }
 
@@ -40,7 +40,7 @@ impl Parser {
     
     fn process_struct_typedef(&mut self) {
         self.expect_unparametric_token(Token::Struct);
-        let struct_identifier = TypeIdentifier(self.expect_identifier());
+        let struct_identifier = PolyTypeIdentifier(self.expect_identifier());
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = BTreeMap::new();
         while self.tokens.peek() != Some(&Token::RightBrace) {
@@ -300,9 +300,9 @@ impl Parser {
                     }
 
                     &Token::LeftBrace => {                                                  // StructLiteral
-                        if self.new_types.contains_key(&TypeIdentifier(name.clone())) {
+                        if self.new_types.contains_key(&PolyTypeIdentifier(name.clone())) {
                             ASTExpression::StructLiteral{
-                                typ: Type::NewType(TypeIdentifier(name)),
+                                typ: Type::NewType(PolyTypeIdentifier(name)),
                                 fields: self.parse_struct_literal_internals(),
                             }
                         } else {
@@ -366,7 +366,7 @@ impl Parser {
                 Type::Prim(PrimType::Bool)
             }
             Token::Identifier(type_id) => {
-                Type::NewType(TypeIdentifier(type_id))
+                Type::NewType(PolyTypeIdentifier(type_id))
             }
             Token::Ref => {
                 let refd_type = self.expect_type();

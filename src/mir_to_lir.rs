@@ -318,7 +318,7 @@ impl LayoutInfo {
 
 #[derive(Clone, Debug)]
 pub struct LayoutTable {
-    newtype_layouts: HashMap<TypeIdentifier, LayoutInfo>
+    newtype_layouts: HashMap<PolyTypeIdentifier, LayoutInfo>
 }
 
 impl LayoutTable {

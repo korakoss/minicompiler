@@ -1,41 +1,101 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::{collections::{BTreeMap, HashMap, VecDeque}};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Type {
-    Prim(PrimType),
-    NewType(TypeIdentifier),
-    Reference(Box<Type>),
+type ConcreteCompositeType = CompositeType<ConcreteType>;
+type GenericCompositeType = CompositeType<GenericType>; 
+
+impl GenericCompositeType {
+    pub fn monomorphize(&self, bindings: HashMap<String, ConcreteType>) -> ConcreteCompositeType {
+        match self {
+            Self::Struct { fields } => {
+                ConcreteCompositeType::Struct { 
+                    fields: fields.iter().map(|(fname, ftype)| (fname.clone(), ftype.monomorphize(bindings.clone()))).collect()
+                }
+            }
+            Self::Enum { variants } => {
+                ConcreteCompositeType::Enum { variants: variants.iter().map(|var| var.monomorphize(bindings.clone())).collect()}
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum TypeDef {
+pub enum ConcreteType {
     Prim(PrimType),
-    NewType(TypeConstructor),
-    Reference(Type)
+    NewType(MonoTypeIdentifier),
+    Reference(Box<ConcreteType>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum GenericType {
+    Prim(PrimType),
+    NewType(PolyTypeIdentifier),
+    Reference(Box<GenericType>),
+    TypeVar(String)
+}
+
+impl GenericType {
+    
+    pub fn monomorphize(&self, bindings: HashMap<String, ConcreteType>) -> ConcreteType {
+        match self {
+            Self::Prim(prim_typ) => ConcreteType::Prim(*prim_typ),
+            Self::NewType(PolyTypeIdentifier(id)) => ConcreteType::NewType(MonoTypeIdentifier { name: id.clone(), bindings }),
+            Self::Reference(typ) => ConcreteType::Reference(Box::new(typ.monomorphize(bindings))),
+            Self::TypeVar(id) => {
+                bindings[id].clone()
+            }
+        }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct GenericNewType {
+    pub type_params: Vec<String>,
+    pub defn: GenericCompositeType,
+}
+
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum CompositeType<T>{
+    Struct {
+        fields: BTreeMap<String, T>
+    },
+    Enum {
+        variants: Vec<T>
+    },
+}
+
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub enum PrimType {
     Integer,
     Bool,
     None,
 }
 
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct PolyTypeIdentifier(pub String); 
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum TypeConstructor{
-    Struct {
-        fields: BTreeMap<String, Type>
-    },
-    Enum {
-        variants: Vec<Type>
-    },
+pub struct MonoTypeIdentifier {
+    name: String,
+    bindings: HashMap<String, ConcreteType>
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct TypeIdentifier(pub String); 
 
 
+
+// TODO: throw this out. TypeTable should only concern newtypes (and map to TypeConstructor). Logic related to handling other
+// stuff should be handled elsewhere
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TypeDef {
+    Prim(PrimType),
+    NewType(CompositeType),
+    Reference(Type)
+}
+
+
+// Maybe drop this too
+// Or at least put elsewhere
 #[derive(Debug, Clone)]
 pub struct Variable {
     pub name: String,
@@ -53,13 +113,13 @@ pub struct FuncSignature {
 
 #[derive(Debug, Clone)]
 pub struct TypeTable {
-    pub topo_order: Vec<TypeIdentifier>,
-    pub newtype_map: HashMap<TypeIdentifier, TypeConstructor>,
+    pub topo_order: Vec<PolyTypeIdentifier>,
+    pub newtype_map: HashMap<PolyTypeIdentifier, CompositeType>,
 }
 
 impl TypeTable {
 
-    pub fn make(newtype_defs: HashMap<TypeIdentifier, TypeConstructor>) -> TypeTable {
+    pub fn make(newtype_defs: HashMap<PolyTypeIdentifier, CompositeType>) -> TypeTable {
         let topo_order = toposort_depgraph(get_newtype_dependencies(&newtype_defs));        
         TypeTable {
             topo_order,
@@ -78,15 +138,15 @@ impl TypeTable {
 
 
 
-fn get_newtype_dependencies(newtype_defs: &HashMap<TypeIdentifier, TypeConstructor>) -> HashMap<TypeIdentifier, Vec<TypeIdentifier>> {
-    let mut dep_graph: HashMap<TypeIdentifier, Vec<TypeIdentifier>> = HashMap::new();
+fn get_newtype_dependencies(newtype_defs: &HashMap<PolyTypeIdentifier, CompositeType>) -> HashMap<PolyTypeIdentifier, Vec<PolyTypeIdentifier>> {
+    let mut dep_graph: HashMap<PolyTypeIdentifier, Vec<PolyTypeIdentifier>> = HashMap::new();
     for (type_id, newtype) in newtype_defs {
-        let deps: Vec<TypeIdentifier> = match newtype {
-            TypeConstructor::Struct {fields} => fields
+        let deps: Vec<PolyTypeIdentifier> = match newtype {
+            CompositeType::Struct {fields} => fields
                 .values()
                 .filter_map(|ftyp| get_underlying_newtype(ftyp.clone()))
                 .collect(),
-            TypeConstructor::Enum { variants } => variants
+            CompositeType::Enum { variants } => variants
                 .iter()
                 .filter_map(|vtyp| get_underlying_newtype(vtyp.clone()))
                 .collect(),
@@ -97,7 +157,7 @@ fn get_newtype_dependencies(newtype_defs: &HashMap<TypeIdentifier, TypeConstruct
 }
 
 
-fn get_underlying_newtype(t: Type) -> Option<TypeIdentifier> {
+fn get_underlying_newtype(t: Type) -> Option<PolyTypeIdentifier> {
     match t {
         Type::Prim(..) => None,
         Type::NewType(id) => Some(id),
@@ -106,9 +166,9 @@ fn get_underlying_newtype(t: Type) -> Option<TypeIdentifier> {
 }
 
 
-fn toposort_depgraph(depgraph: HashMap<TypeIdentifier, Vec<TypeIdentifier>>) -> Vec<TypeIdentifier> {
+fn toposort_depgraph(depgraph: HashMap<PolyTypeIdentifier, Vec<PolyTypeIdentifier>>) -> Vec<PolyTypeIdentifier> {
 
-    let mut indegrees: HashMap<TypeIdentifier, usize> = depgraph
+    let mut indegrees: HashMap<PolyTypeIdentifier, usize> = depgraph
         .keys()
         .map(|k| (k.clone(),0))
         .collect();
@@ -119,12 +179,12 @@ fn toposort_depgraph(depgraph: HashMap<TypeIdentifier, Vec<TypeIdentifier>>) -> 
         }
     }
 
-    let mut queue: VecDeque<TypeIdentifier> = depgraph
+    let mut queue: VecDeque<PolyTypeIdentifier> = depgraph
         .keys()
         .filter(|node| indegrees[node] == 0)
         .cloned()
         .collect();
-    let mut result: Vec<TypeIdentifier> = Vec::new();
+    let mut result: Vec<PolyTypeIdentifier> = Vec::new();
     
     while let Some(node) = queue.pop_front() {
         result.push(node.clone());
