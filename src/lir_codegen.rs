@@ -71,8 +71,8 @@ impl LIRCompiler {
     }
 
 
-    fn compile_function(&mut self, func_id: FuncId,lir_func: LIRFunction) {
-        let LIRFunction { blocks, entry, chunks, args } = lir_func;
+    fn compile_function(&mut self, func_id: FuncId, lir_func: LIRFunction) {
+        let LIRFunction { blocks, entry, chunks, arg_struct_pointer, ret_pointer, args } = lir_func;
         let frame = StackFrame::make(chunks);
         
         self.emit(&format!("func_{}:", func_id.0));
@@ -80,13 +80,10 @@ impl LIRCompiler {
         self.emit("    mov fp, sp");     
         self.emit(&format!("    sub sp, sp, #{}", frame.size)); 
 
-        for (i,arg) in args.iter().enumerate() {
-            let arg_offset = frame.offsets[&arg];
-            self.emit(&format!("    str r{}, [fp, #-{}]", i+1, arg_offset));
-}
+        self.emit(&format!("    str r4, [fp, #-{}]", frame.offsets[&arg_struct_pointer])); 
+
 
         self.emit(&format!("    b block_{}", entry.0));
-
         for (id, block) in blocks.into_iter() {
             self.compile_block(id, block, &frame, func_id);
         }

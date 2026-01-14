@@ -6,54 +6,133 @@ use crate::stages::mir::*;
 use crate::shared::typing::*;
 
 
+struct CallArgTable {
+    arg_sizes: HashMap< FuncId, Vec<usize>>,
+}
+
+impl CallArgTable {
+
+    fn make(sgns: HashMap<FuncId, FuncSignature>, layouts: &LayoutTable) -> CallArgTable {
+        let mut arg_sizes: HashMap< FuncId, Vec<usize>> = HashMap::new();
+        for (id, sgn) in sgns {
+            let mut func_arg_sizes: Vec<usize> = Vec::new();
+            for argt in sgn.argtypes.iter() {
+                func_arg_sizes.push(layouts.get_layout(argt.clone()).size());
+            }
+            arg_sizes.insert(id, func_arg_sizes);
+            
+        }
+        CallArgTable { arg_sizes}
+    }
+
+    fn table_size(&self, id: FuncId) -> usize {
+        self.arg_sizes[&id].iter().sum()
+    }
+
+    fn get_offset(&self, id: FuncId, index: usize) -> usize {
+        self.arg_sizes[&id][..index].iter().sum()
+    }
+}
+
+
 pub struct LIRBuilder {
     cell_chunk_map: HashMap<CellId, (ChunkId, Type)>,
     curr_chunks: HashMap<ChunkId, Chunk>,
-    curr_vregs: Vec<VRegId>,
     layouts: LayoutTable,
     chunk_counter: usize,
     typetable: TypeTable,
+    calltable: CallArgTable
 }
 
 impl LIRBuilder {
     
     pub fn lower_mir(program: MIRProgram) -> LIRProgram {
         let layouts = LayoutTable::make(program.typetable.clone());
+
+        let func_sgns: HashMap<FuncId, FuncSignature> = program.functions
+            .iter()
+            .map(|(id, func)| (*id, func.sgn.0.clone()))
+            .collect();
+
+        let calltable = CallArgTable::make(func_sgns, &layouts);
+
         let mut builder = LIRBuilder {
             cell_chunk_map: HashMap::new(),
             curr_chunks: HashMap::new(),
-            curr_vregs: Vec::new(),
             layouts,
             chunk_counter: 0,
-            typetable: program.typetable
+            typetable: program.typetable,
+            calltable: calltable
         };
         LIRProgram {
             functions: program.functions
 .into_iter()
-                .map(|(id, func)| (id, builder.lower_function(func)))
+                .map(|(id, func)| (id, builder.lower_function(id, func)))
                 .collect(),
             entry: program.entry
         }
     }
 
-    fn lower_function(&mut self, func: MIRFunction) -> LIRFunction {
-        self.cell_chunk_map = HashMap::new();
-        self.curr_vregs = Vec::new();
+    fn lower_function(&mut self, id: FuncId,func: MIRFunction) -> LIRFunction {
+        self.cell_chunk_map = HashMap::new();   // TODO: assignment could be inlined 
         for (id, cell) in func.cells {
             self.lower_cell(id, cell);
         }
-        LIRFunction {
-            blocks: func.blocks
-                .into_iter()
-                .map(|(id, block)| (id, self.lower_block(block)))
-                .collect(),
-            entry: func.entry,
-            chunks: self.curr_chunks.clone(), 
-            args: func.args
+        let arg_structp_chunk = self.add_chunk_to_frame(Chunk { size: 8});
+        let retp_chunk = self.add_chunk_to_frame(Chunk { size: 8});       
+        
+        let arg_chunks: Vec<ChunkId> = func.args
                 .into_iter()
                 .map(|cell_id| self.cell_chunk_map[&cell_id].0.clone())
-                .collect()
+                .collect();
+
+        let mut lowered_blocks: HashMap<BlockId, LIRBlock> = func.blocks
+                .into_iter()
+                .map(|(id, block)| (id, self.lower_block(block)))
+                .collect();
+
+
+        let header_stmts = self.make_func_header(id, arg_chunks.clone());
+        lowered_blocks.get_mut(&func.entry).unwrap().statements.splice(0..0, header_stmts);
+
+        LIRFunction {
+            blocks: lowered_blocks,
+            entry: func.entry,
+            chunks: self.curr_chunks.clone(), 
+            arg_struct_pointer: arg_structp_chunk,
+            ret_pointer: retp_chunk,
+            args: arg_chunks,
         }
+    }
+
+    fn make_func_header(&mut self, id: FuncId, arg_cells: Vec<ChunkId>) -> Vec<LIRStatement> {
+        let arg_structp_chunk = self.add_chunk_to_frame(
+            Chunk{size: self.calltable.table_size(id)}
+        );
+
+        let mut assign_stmts: Vec<LIRStatement> = Vec::new();
+        for (i, arg) in arg_cells.iter().enumerate() {
+            let arg_offs = self.calltable.get_offset(id, i);
+            let argsize = self.calltable.arg_sizes[&id][i];
+            let arg_assignment = LIRStatement::Store { 
+                dest: LIRPlace { 
+                    size: argsize, 
+                    place: LIRPlaceKind::Local { base: *arg, offset: 0}
+                }, 
+                value: LIRValue { 
+                    size: argsize, 
+                    value: LIRValueKind::Place(LIRPlace { 
+                        size: argsize, 
+                        place:  LIRPlaceKind::Deref { 
+                            pointer: arg_structp_chunk, 
+                            offset: arg_offs, 
+                        }
+                    })
+                }
+            };
+            assign_stmts.push(arg_assignment);
+        }
+        assign_stmts
     }
 
     fn lower_block(&mut self, block: MIRBlock) -> LIRBlock {
@@ -87,27 +166,30 @@ impl LIRBuilder {
             }
             MIRStatement::Call { target, func, args } => {
                 let lir_target = self.lower_place(target);
-                let mut arg_places: Vec<LIRPlace> = Vec::new();
+
                 let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();
 
-                for arg in args {
+                let args_struct_chunk = self.add_chunk_to_frame(Chunk { 
+                    size: self.calltable.table_size(func)
+                });
+                for (i, arg) in args.into_iter().enumerate() {
                     let arg_size = self.layouts.get_layout(arg.typ.clone()).size();
-                    let arg_chunk = self.add_chunk(Chunk { size: arg_size});
+                    let arg_offset = self.calltable.get_offset(func, i);
                     let arg_place = LIRPlace {
                         size: arg_size, 
                         place: LIRPlaceKind::Local { 
-                            base: arg_chunk, 
-                            offset: 0, 
+                            base: args_struct_chunk, 
+                            offset: arg_offset, 
                         }
                     };
-                    arg_places.push(arg_place.clone());
                     let arg_stmts = self.lower_value_into_place(arg, arg_place);
                     arg_stmts_coll.extend(arg_stmts.into_iter());
-                }
+
+                 }
                 let lir_call = LIRStatement::Call { 
                     dest: lir_target, 
                     func, 
-                    args: arg_places
+                    arg_struct_base: args_struct_chunk 
                 };
                 [arg_stmts_coll, vec![lir_call]].concat()
             }
@@ -162,7 +244,7 @@ impl LIRBuilder {
                 let temp_chunk = Chunk {
                     size: self.layouts.get_layout(value.typ.clone()).size(),
                 };
-                let temp_id = self.add_chunk(temp_chunk);
+                let temp_id = self.add_chunk_to_frame(temp_chunk);
                 let temp_place = LIRPlace {
                     size: size,
                     place: LIRPlaceKind::Local { base: temp_id, offset: 0}
@@ -275,11 +357,11 @@ impl LIRBuilder {
     fn lower_cell(&mut self, id: CellId, cell: Cell) {
         // TODO: This should lower into LIRPlace. I think?
         let chunk = Chunk {size: self.layouts.get_layout(cell.typ.clone()).size()};
-        let chunk_id = self.add_chunk(chunk);
+        let chunk_id = self.add_chunk_to_frame(chunk);
         self.cell_chunk_map.insert(id, (chunk_id, cell.typ));
     }
 
-    fn add_chunk(&mut self, chunk: Chunk) -> ChunkId {
+    fn add_chunk_to_frame(&mut self, chunk: Chunk) -> ChunkId {
         let chunk_id = ChunkId(self.chunk_counter);
         self.chunk_counter = self.chunk_counter + 1;
         self.curr_chunks.insert(chunk_id, chunk);

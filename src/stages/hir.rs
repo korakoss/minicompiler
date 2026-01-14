@@ -14,11 +14,10 @@ pub struct HIRProgram {
 
 #[derive(Clone, Debug)]
 pub struct HIRFunction {
-    pub name: String,
+    pub sgn: (FuncSignature, Type),
     pub args: Vec<VarId>,
     pub variables: HashMap<VarId, Variable>,
     pub body: Vec<HIRStatement>,
-    pub ret_type: Type,
 }
 
 

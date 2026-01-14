@@ -83,6 +83,7 @@ impl HIRBuilder {
     }
 
     fn lower_function(&mut self, func: ASTFunction) -> HIRFunction {
+        let sgn = func.get_signature();
         let ASTFunction { name, args, body, ret_type } = func;
         self.scope_stack.push(Scope::new(ret_type.clone()));
         let arg_ids: Vec<VarId>  = args
@@ -94,11 +95,10 @@ impl HIRBuilder {
             hir_body.push(HIRStatement::Return(None));
         }
         let hir_func = HIRFunction { 
-            name, 
+            sgn: (sgn, ret_type), 
             args: arg_ids,
             variables: self.curr_variable_coll.clone(),
             body: hir_body, 
-            ret_type 
         }; 
         self.curr_variable_coll = HashMap::new();
         self.scope_stack.pop();

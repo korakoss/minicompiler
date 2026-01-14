@@ -15,16 +15,41 @@ Also, more tests should be added (some are collected below). It'd also be nice t
 
 *NOTE:* as I just discovered, struct returns actually don't work, the previous seemingly functional example probably just lucked out by querying the 0-offset field. A more through code fail. See strucret.yum.
 
+Maybe it's redundant in LIR that both places and values has a _size_. Or in upper IRs, the same with types. Dunno.
+
 ## Plans for the caller frame pointer thing
 - each function determines a "callee layout" -- basically offsets in a struct-like memory chunk that they expect argument info in
 - this "struct" will contain the actual pointers to argument values (in the caller frame or wherever)
 - the caller then passesa single pointer to this "struct"
 - the callee chases down the pointers to get the real argument values
-- use r3 for the arg struct pointer and r4 for the return pointer 
+- use r4 for the arg struct pointer and r5 for the return pointer 
     - reminder: 
         r0 -> main operational register 
         r1 -> helper register (eg for binops)
-        r2 -> used in modulo
+        r2 -> used in modulo, derefs
+        r3 -> used in derefs
+- okay, so at which point does this happen? *MIR->LIR* or *LIR->asm*?
+    - what do we need to modify relative to the source Yum?
+        - we need to add the creation of the **argtable** for the call
+            - okay wait, does this work for any call? if the function calls another function in a loop or something?
+                - i think so, yeah, at least in our current basic model. the code cannot hit a call again, in a given stack frame, without having finished the original call
+                - and what about the output value? well, that does get overwritten, but that maps onto how the source uses that value (or rather, place) –– if someone needed it, they yanked it already
+        - so probably the easiest way to hook this up is: we leave the functions as they are now and add synthetic scaffolding
+            - in the current model, the functions basically assume that they have their arg values in local cells
+            - we want to transform each function, by LIR, to have signature (&[argtable_type], &[ret_typ]) -> void. 
+                - first, we create the struct type representing the argtable, which has fields of type &argtype_n and some synthetic labels or whatever
+                - next, in MIR->LIR, we make the following changes to functions:
+                    - callee-role modifications
+                        - as input, only a single pointer argument is expected (pointing to a struct of type(argtable)) obviously
+                        - the derefs of the fields of that struct are copied into the argument cells of the LIRFunction (the ones it currently uses to handle arguments)
+                            - wait not, you can maybe overwrite them in the cell mapping? that would be neat!
+                        - we switch return statements to a statement that loads the return value into the deref of the return pointer
+                    - caller-role modifications
+                        - each funccall expression is modified
+                            - we add an argtable cell and fill it with the right refs
+                            - we make a pointer to that argtable cell
+                            - we make a pointer to the cell where we want the return value
+                            - we pass the argtable and the return pointer to the (transformed) callee
 
 
 ## Finalizations

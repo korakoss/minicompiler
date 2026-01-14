@@ -59,12 +59,11 @@ impl MIRBuilder {
             .map(|arg_id| self.var_map[&arg_id].clone())
             .collect();
         MIRFunction {
-            name: func.name,
+            sgn: func.sgn,
             args: arg_cells,
             cells: self.current_cells.clone(),
             blocks: self.curr_collected_blocks.clone(),
             entry: entry_id,
-            ret_type: func.ret_type
         }
     }
 

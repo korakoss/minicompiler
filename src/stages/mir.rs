@@ -14,12 +14,11 @@ pub struct MIRProgram {
 
 #[derive(Clone, Debug)]
 pub struct MIRFunction {
-    pub name: String,
+    pub sgn: (FuncSignature, Type),
     pub args: Vec<CellId>,
     pub cells: HashMap<CellId, Cell>,
     pub blocks: HashMap<BlockId, MIRBlock>,
     pub entry: BlockId,
-    pub ret_type: Type,
 }
 
 #[derive(Clone, Debug)]

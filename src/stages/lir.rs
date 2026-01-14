@@ -15,6 +15,8 @@ pub struct LIRFunction {
     pub blocks: HashMap<BlockId, LIRBlock>,
     pub entry: BlockId,
     pub chunks: HashMap<ChunkId, Chunk>,
+    pub arg_struct_pointer: ChunkId,
+    pub ret_pointer: ChunkId,
     pub args: Vec<ChunkId>
 }
 
@@ -41,7 +43,7 @@ pub enum LIRStatement {
     Call {
         dest: LIRPlace,
         func: FuncId,
-        args: Vec<LIRPlace>,
+        arg_struct_base: ChunkId, 
     },
     Print(LIRValue),
 }
@@ -77,6 +79,7 @@ pub enum LIRValueKind {
     Reference(LIRPlace),
 }
 
+
 #[derive(Clone, Debug)]
 pub struct LIRPlace {
     pub size: usize,
@@ -104,5 +107,7 @@ pub struct Chunk {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub struct ChunkId(pub usize);
 
+
+// TODO: probably delete this
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub struct VRegId(pub usize);
