@@ -1,11 +1,10 @@
-use std::{collections::{BTreeMap, HashMap, VecDeque}};
+use std::{collections::{BTreeMap}};
 
 pub type ConcreteCompositeType = CompositeType<ConcreteType>;
 pub type GenericCompositeType = CompositeType<GenericType>; 
 
 impl GenericCompositeType {
-    pub fn monomorphize(&self, binding: Binding) -> ConcreteCompositeType {
-        let Binding(binding) = binding; 
+    pub fn monomorphize(&self, binding: &Binding) -> ConcreteCompositeType {
         match self {
             Self::Struct { fields } => {
                 ConcreteCompositeType::Struct { 
@@ -42,7 +41,7 @@ impl GenericType {
             Self::NewType(PolyTypeIdentifier(id)) => ConcreteType::NewType(MonoTypeIdentifier { name: id.clone(), bindings }),
             Self::Reference(typ) => ConcreteType::Reference(Box::new(typ.monomorphize(bindings))),
             Self::TypeVar(id) => {
-                bindings[id].clone()
+                bindings.resolve(&id)
             }
         }
     }
@@ -76,14 +75,23 @@ pub enum PrimType {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Binding(BTreeMap<String, ConcreteType>);
 
+impl Binding {
+    pub fn resolve(&self, symbol: &String) -> ConcreteType {
+        self.0.get(symbol).unwrap().clone()
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct PolyTypeIdentifier(pub String); 
 
 impl PolyTypeIdentifier {
     
-    pub fn bind(&self, binding: Binding) -> MonoTypeIdentifier {
+    pub fn bind(&self, binding: &Binding) -> MonoTypeIdentifier {
         let PolyTypeIdentifier(name) = self;
-        MonoTypeIdentifier { name: name.clone(), bindings}
+        MonoTypeIdentifier { 
+            name: name.clone(), 
+            bindings: binding.clone()
+        }
     }
 }
 

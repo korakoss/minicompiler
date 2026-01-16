@@ -1,4 +1,4 @@
-use std::{collections::{BTreeMap, HashMap, VecDeque}};
+use std::{collections::{HashMap, VecDeque}};
 use crate::shared::typing::*;
 
 
@@ -29,9 +29,9 @@ impl GenericTypeTable {
             let curr_bindings = bindings.remove(&id).unwrap();
 
             for bdg in curr_bindings {
-                let mono_id = id.bind(bdg);
-                let mono_type = curr_gen_type.monomorphize(bdg);
-                topo_order.push(mono_id);
+                let mono_id = id.bind(&bdg);
+                let mono_type = curr_gen_type.monomorphize(&bdg);
+                topo_order.push(mono_id.clone());
                 monom_types.insert(mono_id, mono_type);
             }
         }
@@ -65,11 +65,12 @@ fn extract_newtype_dependencies(newtype_defs: &HashMap<PolyTypeIdentifier, Gener
 }
 
 
-fn get_underlying_newtype(t: Type) -> Option<PolyTypeIdentifier> {
+fn get_underlying_newtype(t: GenericType) -> Option<PolyTypeIdentifier> {
     match t {
-        Type::Prim(..) => None,
-        Type::NewType(id) => Some(id),
-        Type::Reference(typ) => get_underlying_newtype(*typ),
+        GenericType::Prim(..) => None,
+        GenericType::NewType(id) => Some(id),
+        GenericType::Reference(typ) => get_underlying_newtype(*typ),
+        GenericType::TypeVar(..) => None
     }
 }
 
