@@ -1,4 +1,9 @@
 
+# Generics syntax
+
+We use Generic[T: Bound] for type vars, to avoid the turbofish, parsing ambiguities, etc.
+
+
 # Enum syntax notes
 
 Enums should be free sum types, eg.:
