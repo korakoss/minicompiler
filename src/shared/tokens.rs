@@ -18,6 +18,8 @@ pub enum Token {
     RightParen,
     LeftBrace,
     RightBrace,
+    LeftSqBracket,
+    RightSqBracket,
     Comma,
     Colon,
     Dot,

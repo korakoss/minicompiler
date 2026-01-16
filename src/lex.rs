@@ -97,6 +97,8 @@ pub fn lex(program: &str) -> Vec<Token> {
                 '.' => Token::Dot,
                 '&' => Token::Ref,
                 '?' => Token::Deref,
+                '[' => Token::LeftSqBracket,
+                ']' => Token::RightSqBracket,
                 _ => {panic!("Unexpected character: {}",c)},
             };
             chars.next();
