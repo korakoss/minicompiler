@@ -3,6 +3,23 @@ use std::{collections::{BTreeMap}};
 
 pub type GenericFuncSignature = FuncSignature<GenericType>;
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FuncSignature<T> {
+    pub name: String,
+    pub argtypes: Vec<T>,
+}
+
+pub type GenTypeVariable = Variable<GenericType>;
+
+// TODO: refactor this somehow
+#[derive(Debug, Clone)]
+pub struct Variable<T> {
+    pub name: String,
+    pub typ: T,
+    // TODO: mutable, etc
+}
+
+
 pub type ConcreteCompositeType = CompositeType<ConcreteType>;
 pub type GenericCompositeType = CompositeType<GenericType>; 
 
@@ -95,8 +112,4 @@ impl Binding {
 pub struct NewtypeId(pub String); 
 
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FuncSignature<T> {
-    pub name: String,
-    pub argtypes: Vec<T>,
-}
+

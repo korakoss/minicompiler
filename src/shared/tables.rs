@@ -2,7 +2,7 @@ use std::{collections::{HashMap, VecDeque}};
 use crate::shared::typing::*;
 
 
-
+#[derive(Debug, Clone)]
 pub struct GenericTypetable {
     topo_order: Vec<NewtypeId>,
     pub defs: HashMap<NewtypeId, GenericTypeDef>

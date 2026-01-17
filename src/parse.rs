@@ -7,6 +7,7 @@ use crate::shared::typing::*;
 use crate::stages::ast::*;
 use crate::shared::tables::*;
 
+
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
     new_types: HashMap<NewtypeId, GenericTypeDef>,
@@ -42,9 +43,10 @@ impl Parser {
     fn process_struct_typedef(&mut self) {
         self.expect_unparametric_token(Token::Struct);
         let struct_identifier = NewtypeId(self.expect_identifier());
+        let type_params = self.collect_type_vars();
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = BTreeMap::new();
-        while self.tokens.peek() != Some(&Token::RightBrace) {
+        while self.tokens.peek() != Some(&Token::RightBrace) { // TODO: update this to get rid of trail commas
             let field_name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
             let field_type = self.expect_type_annotation();
@@ -52,11 +54,30 @@ impl Parser {
             fields.insert(field_name, field_type);
         }
         self.expect_unparametric_token(Token::RightBrace);
-        let struct_type = TypeConstructor::Struct { 
-            fields: fields 
+        let typedef = GenericTypeDef {
+            type_params,
+            defn: GenericCompositeType::Struct { fields},
         };
-        self.new_types.insert(struct_identifier, struct_type); 
+        self.new_types.insert(struct_identifier, typedef); 
     }
+
+
+    fn collect_type_vars(&mut self) -> Vec<String> {
+        if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
+            return vec![]
+        } else {
+            self.tokens.next();
+        }
+        let mut type_params: Vec<String> = Vec::new();
+        type_params.push(self.expect_identifier());
+        while self.tokens.peek().unwrap() == &Token::Comma {
+            self.tokens.next();
+            type_params.push(self.expect_identifier());
+        }
+        self.expect_unparametric_token(Token::RightSqBracket);
+        type_params
+    }
+
        
     fn process_function_definition(&mut self) {
         self.expect_unparametric_token(Token::Function);
@@ -121,7 +142,7 @@ impl Parser {
                 let var_name = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
                 let var_type = self.expect_type_annotation();
-                let var = Variable{
+                let var = GenTypeVariable {
                     name: var_name, 
                     typ: var_type
                 };
@@ -281,6 +302,7 @@ impl Parser {
         match token {
             Token::IntLiteral(int) => ASTExpression::IntLiteral(int),
             Token::Identifier(name) => {
+                let bindings = self.expect_generic_bindings(); // TODO: add later for funccall case, reject properly for variables
                 match self.tokens.peek().unwrap() {
                     &Token::LeftParen => {                                                      // FuncCall
                         self.tokens.next();
@@ -299,18 +321,14 @@ impl Parser {
                         self.expect_unparametric_token(Token::RightParen);
                         ASTExpression::FuncCall { funcname: name, args: args}
                     }
-
-                    &Token::LeftBrace => {                                                  // StructLiteral
-                        if self.new_types.contains_key(&NewtypeId(name.clone())) {
-                            ASTExpression::StructLiteral{
-                                typ: GenericType::NewType(NewtypeId(name)),
-                                fields: self.parse_struct_literal_internals(),
-                            }
-                        } else {
-                            ASTExpression::Variable(name)
+                    &Token::LeftBrace => {                                                  
+                        let fields = self.parse_struct_literal_internals();
+                        self.expect_unparametric_token(Token::RightBrace);
+                        ASTExpression::StructLiteral {
+                            typ: GenericType::NewType(NewtypeId(name), bindings),
+                            fields
                         }
                     }
-                    
                     _ => ASTExpression::Variable(name)
                 }
             },
@@ -330,14 +348,13 @@ impl Parser {
     fn parse_struct_literal_internals(&mut self) -> HashMap<String, ASTExpression>{
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = HashMap::new();
-        while self.tokens.peek() != Some(&Token::RightBrace) {
+        while self.tokens.peek() != Some(&Token::RightBrace) { // TODO: change (trail comma issue)
             let field_name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
             let field_value = self.parse_expression();
             self.expect_unparametric_token(Token::Comma);
             fields.insert(field_name, field_value);
         }
-        self.expect_unparametric_token(Token::RightBrace);
         fields 
     }
 
@@ -367,7 +384,8 @@ impl Parser {
                 GenericType::Prim(PrimType::Bool)
             }
             Token::Identifier(type_id) => {
-                GenericType::NewType(NewtypeId(type_id))
+                let bindings = self.expect_generic_bindings();
+                GenericType::NewType(NewtypeId(type_id), bindings)
             }
             Token::Ref => {
                 let refd_type = self.expect_type_annotation();
@@ -377,6 +395,22 @@ impl Parser {
                 panic!("Unexpected token while parsing type annotation");
             }
         }
+    }
+
+    fn expect_generic_bindings(&mut self) -> Vec<GenericType> {
+        if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
+            return vec![]
+        } else {
+            self.tokens.next();
+        }
+        let mut bindings: Vec<GenericType> = Vec::new();
+        bindings.push(self.expect_type_annotation());
+        while self.tokens.peek().unwrap() == &Token::Comma {
+            self.tokens.next();
+            bindings.push(self.expect_type_annotation());
+        }
+        self.expect_unparametric_token(Token::RightSqBracket);
+        bindings
     }
 }
 

@@ -1,8 +1,14 @@
 
 # Where are we
 
->Doing generics currently. Working on parsing. We need to add parsing the type var stuff now
+> Doing generics currently. Working on parsing. We need to add parsing the type var stuff now
+Made changes in parsing, the AST. Next in the HIR lowering and so on. 
+Vaguely speaking, questions to sort out next are:
+- where do we monomorphize
+- how do we represent scopes where a given typevar means a given thing? what needs to be modified for that?
+- we could add tests (like not Yum test programs but Rust tests)
 
+## Older status notes
 
 Added structs and the MIR. Seems mostly functional, except passing struct args.
 Then I added pointers, which also seem to work, even convoluted programs now.

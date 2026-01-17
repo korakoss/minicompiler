@@ -1,27 +1,28 @@
 use crate::shared::typing::*;
 use crate::shared::binops::*;
+use crate::shared::tables::*;
 
 use std::collections::HashMap;
 
 
 #[derive(Debug, Clone)]
 pub struct ASTProgram {
-    pub typetable: TypeTable,
-    pub functions: HashMap<FuncSignature, ASTFunction>,
+    pub typetable: GenericTypetable,
+    pub functions: HashMap<GenericFuncSignature, ASTFunction>,
 }
 
 
 #[derive(Debug, Clone)]
 pub struct ASTFunction {
     pub name: String,
-    pub args: HashMap<String, Type>,
+    pub args: HashMap<String, GenericType>,
     pub body: Vec<ASTStatement>,
-    pub ret_type: Type,
+    pub ret_type: GenericType,
 }
 
 impl ASTFunction {
    
-    pub fn get_signature(&self) -> FuncSignature {
+    pub fn get_signature(&self) -> GenericFuncSignature {
         FuncSignature { 
             name: self.name.clone(), 
             argtypes: self.args
@@ -37,7 +38,7 @@ impl ASTFunction {
 #[derive(Debug, Clone)]
 pub enum ASTStatement {
     Let {
-        var: Variable,
+        var: GenTypeVariable,
         value: ASTExpression,
     },
     Assign {
@@ -91,7 +92,7 @@ pub enum ASTExpression {
     },
 
     StructLiteral {
-        typ: Type,
+        typ: NewtypeId,
         fields: HashMap<String, ASTExpression>,
     },
 
