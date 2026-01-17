@@ -5,11 +5,12 @@ use std::iter::Peekable;
 use crate::shared::tokens::*;
 use crate::shared::typing::*;
 use crate::stages::ast::*;
+use crate::shared::tables::*;
 
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
-    new_types: HashMap<PolyTypeIdentifier, TypeConstructor>,
-    functions: HashMap<FuncSignature, ASTFunction>,
+    new_types: HashMap<NewtypeId, GenericTypeDef>,
+    functions: HashMap<GenericFuncSignature, ASTFunction>,
 }
 
 
@@ -33,20 +34,20 @@ impl Parser {
             }
         }
         ASTProgram { 
-            typetable: TypeTable::make(parser.new_types),
+            typetable: GenericTypetable::new(parser.new_types),
             functions: parser.functions,
         } 
     }
     
     fn process_struct_typedef(&mut self) {
         self.expect_unparametric_token(Token::Struct);
-        let struct_identifier = PolyTypeIdentifier(self.expect_identifier());
+        let struct_identifier = NewtypeId(self.expect_identifier());
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = BTreeMap::new();
         while self.tokens.peek() != Some(&Token::RightBrace) {
             let field_name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
-            let field_type = self.expect_type();
+            let field_type = self.expect_type_annotation();
             self.expect_unparametric_token(Token::Comma);
             fields.insert(field_name, field_type);
         }
@@ -62,14 +63,14 @@ impl Parser {
         let funcname = self.expect_identifier(); 
 
         self.expect_unparametric_token(Token::LeftParen);
-        let args:HashMap<String, Type> = match self.tokens.peek().unwrap() {
+        let args:HashMap<String, GenericType> = match self.tokens.peek().unwrap() {
             &Token::RightParen => {
                 HashMap::new()
             }
             &Token::Identifier(_) => {
                 let name1 = self.expect_identifier();
                 self.expect_unparametric_token(Token::Colon);
-                let typ1 = self.expect_type();
+                let typ1 = self.expect_type_annotation();
                 let mut args = HashMap::new();
                 args.insert(name1, typ1);
 
@@ -77,7 +78,7 @@ impl Parser {
                     self.tokens.next();
                     let arg_name = self.expect_identifier();
                     self.expect_unparametric_token(Token::Colon);
-                    let arg_type = self.expect_type();
+                    let arg_type = self.expect_type_annotation();
                     args.insert(arg_name, arg_type);
                 }
                 args
@@ -91,10 +92,10 @@ impl Parser {
         let ret_type_id = match self.tokens.peek().unwrap() {
             Token::RightArrow => {
                 self.tokens.next();
-                self.expect_type()
+                self.expect_type_annotation()
             },
             _ => {
-                Type::Prim(PrimType::None)
+                GenericType::Prim(PrimType::None)
             }
         };
         let body = self.parse_statement_block();
@@ -119,7 +120,7 @@ impl Parser {
                 self.tokens.next();
                 let var_name = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
-                let var_type = self.expect_type();
+                let var_type = self.expect_type_annotation();
                 let var = Variable{
                     name: var_name, 
                     typ: var_type
@@ -300,9 +301,9 @@ impl Parser {
                     }
 
                     &Token::LeftBrace => {                                                  // StructLiteral
-                        if self.new_types.contains_key(&PolyTypeIdentifier(name.clone())) {
+                        if self.new_types.contains_key(&NewtypeId(name.clone())) {
                             ASTExpression::StructLiteral{
-                                typ: Type::NewType(PolyTypeIdentifier(name)),
+                                typ: GenericType::NewType(NewtypeId(name)),
                                 fields: self.parse_struct_literal_internals(),
                             }
                         } else {
@@ -357,20 +358,20 @@ impl Parser {
         name
     }
     
-    fn expect_type(&mut self) -> Type {
+    fn expect_type_annotation(&mut self) -> GenericType {
         match self.tokens.next().unwrap() {
             Token::Int => {
-                Type::Prim(PrimType::Integer)
+                GenericType::Prim(PrimType::Integer)
             }
             Token::Bool => {
-                Type::Prim(PrimType::Bool)
+                GenericType::Prim(PrimType::Bool)
             }
             Token::Identifier(type_id) => {
-                Type::NewType(PolyTypeIdentifier(type_id))
+                GenericType::NewType(NewtypeId(type_id))
             }
             Token::Ref => {
-                let refd_type = self.expect_type();
-                Type::Reference(Box::new(refd_type))
+                let refd_type = self.expect_type_annotation();
+                GenericType::Reference(Box::new(refd_type))
             }
             _ => {
                 panic!("Unexpected token while parsing type annotation");

@@ -2,61 +2,43 @@ use std::{collections::{HashMap, VecDeque}};
 use crate::shared::typing::*;
 
 
-pub struct TypeTable<I, T> {
-    pub topo_order: Vec<I>,
-    pub newtype_map: HashMap<I, T>
+
+pub struct GenericTypetable {
+    topo_order: Vec<NewtypeId>,
+    pub defs: HashMap<NewtypeId, GenericTypeDef>
 }
 
-pub type GenericTypeTable = TypeTable<PolyTypeIdentifier, GenericCompositeType>;
-pub type ConcreteTypeTable = TypeTable<MonoTypeIdentifier, ConcreteCompositeType>;
+impl GenericTypetable {
 
-
-impl GenericTypeTable {
-    
-    pub fn new(defs: HashMap<PolyTypeIdentifier, GenericCompositeType>) -> GenericTypeTable {
-        GenericTypeTable {
-            topo_order: toposort_depgraph(extract_newtype_dependencies(&defs)),
-            newtype_map: defs
+    pub fn new(defs: HashMap<NewtypeId, GenericTypeDef>) -> Self {
+        Self { 
+            topo_order: toposort_depgraph(extract_newtype_dependencies(&defs)), 
+            defs
         }
     }
 
-    pub fn monomorphize(mut self, mut bindings: HashMap<PolyTypeIdentifier, Vec<Binding>>) -> ConcreteTypeTable {
-        let mut monom_types: HashMap<MonoTypeIdentifier, ConcreteCompositeType> = HashMap::new();
-        let mut topo_order: Vec<MonoTypeIdentifier> = Vec::new();
-
-        for id in self.topo_order {
-            let curr_gen_type = self.newtype_map.remove(&id).unwrap();
-            let curr_bindings = bindings.remove(&id).unwrap();
-
-            for bdg in curr_bindings {
-                let mono_id = id.bind(&bdg);
-                let mono_type = curr_gen_type.monomorphize(&bdg);
-                topo_order.push(mono_id.clone());
-                monom_types.insert(mono_id, mono_type);
-            }
-        }
-
-        ConcreteTypeTable {
-            topo_order,
-            newtype_map: monom_types
-        }
-
+    pub fn topo_iter(&self) -> impl Iterator<Item = (&NewtypeId, &GenericTypeDef)> {
+        self.topo_order.iter().map(|id| (id, &self.defs[&id]))
     }
 }
 
 
 
-fn extract_newtype_dependencies(newtype_defs: &HashMap<PolyTypeIdentifier, GenericCompositeType>) -> HashMap<PolyTypeIdentifier, Vec<PolyTypeIdentifier>> {
-    let mut dep_graph: HashMap<PolyTypeIdentifier, Vec<PolyTypeIdentifier>> = HashMap::new();
+
+
+fn extract_newtype_dependencies(newtype_defs: &HashMap<NewtypeId, GenericTypeDef>) -> HashMap<NewtypeId, Vec<NewtypeId>> {
+    let mut dep_graph: HashMap<NewtypeId, Vec<NewtypeId>> = HashMap::new();
     for (type_id, newtype) in newtype_defs {
-        let deps: Vec<PolyTypeIdentifier> = match newtype {
+        let deps: Vec<NewtypeId> = match &newtype.defn {
             CompositeType::Struct {fields} => fields
                 .values()
-                .filter_map(|ftyp| get_underlying_newtype(ftyp.clone()))
+                .map(|ftyp| extract_type_id(&ftyp))
+                .flatten()
                 .collect(),
             CompositeType::Enum { variants } => variants
                 .iter()
-                .filter_map(|vtyp| get_underlying_newtype(vtyp.clone()))
+                .map(|vtyp| extract_type_id(&vtyp))
+                .flatten()
                 .collect(),
         };
         dep_graph.insert(type_id.clone(), deps);
@@ -65,19 +47,23 @@ fn extract_newtype_dependencies(newtype_defs: &HashMap<PolyTypeIdentifier, Gener
 }
 
 
-fn get_underlying_newtype(t: GenericType) -> Option<PolyTypeIdentifier> {
+fn extract_type_id(t: &GenericType) -> Vec<NewtypeId> {
     match t {
-        GenericType::Prim(..) => None,
-        GenericType::NewType(id) => Some(id),
-        GenericType::Reference(typ) => get_underlying_newtype(*typ),
-        GenericType::TypeVar(..) => None
+        GenericType::Prim(..) => vec![],
+        GenericType::NewType(id, t_params) => {
+            let mut deps: Vec<NewtypeId> = t_params.iter().map(|p| extract_type_id(p)).flatten().collect::<Vec<_>>();
+            deps.push(id.clone());
+            deps
+        }
+        GenericType::Reference(typ) => extract_type_id(&typ),
+        GenericType::TypeVar(..) => vec![] 
     }
 }
 
 
-fn toposort_depgraph(depgraph: HashMap<PolyTypeIdentifier, Vec<PolyTypeIdentifier>>) -> Vec<PolyTypeIdentifier> {
+fn toposort_depgraph(depgraph: HashMap<NewtypeId, Vec<NewtypeId>>) -> Vec<NewtypeId> {
 
-    let mut indegrees: HashMap<PolyTypeIdentifier, usize> = depgraph
+    let mut indegrees: HashMap<NewtypeId, usize> = depgraph
         .keys()
         .map(|k| (k.clone(),0))
         .collect();
@@ -88,12 +74,12 @@ fn toposort_depgraph(depgraph: HashMap<PolyTypeIdentifier, Vec<PolyTypeIdentifie
         }
     }
 
-    let mut queue: VecDeque<PolyTypeIdentifier> = depgraph
+    let mut queue: VecDeque<NewtypeId> = depgraph
         .keys()
         .filter(|node| indegrees[node] == 0)
         .cloned()
         .collect();
-    let mut result: Vec<PolyTypeIdentifier> = Vec::new();
+    let mut result: Vec<NewtypeId> = Vec::new();
     
     while let Some(node) = queue.pop_front() {
         result.push(node.clone());

@@ -1,6 +1,9 @@
 
 # Where are we
 
+>Doing generics currently. Working on parsing. We need to add parsing the type var stuff now
+
+
 Added structs and the MIR. Seems mostly functional, except passing struct args.
 Then I added pointers, which also seem to work, even convoluted programs now.
 But neiter structs, nor pointers were meticulously tested.

@@ -1,18 +1,22 @@
 use std::{collections::{BTreeMap}};
 
+
+pub type GenericFuncSignature = FuncSignature<GenericType>;
+
 pub type ConcreteCompositeType = CompositeType<ConcreteType>;
 pub type GenericCompositeType = CompositeType<GenericType>; 
 
 impl GenericCompositeType {
+
     pub fn monomorphize(&self, binding: &Binding) -> ConcreteCompositeType {
         match self {
             Self::Struct { fields } => {
                 ConcreteCompositeType::Struct { 
-                    fields: fields.iter().map(|(fname, ftype)| (fname.clone(), ftype.monomorphize(binding.clone()))).collect()
+                    fields: fields.iter().map(|(fname, ftype)| (fname.clone(), ftype.monomorphize(&binding))).collect()
                 }
             }
             Self::Enum { variants } => {
-                ConcreteCompositeType::Enum { variants: variants.iter().map(|var| var.monomorphize(binding.clone())).collect()}
+                ConcreteCompositeType::Enum { variants: variants.iter().map(|var| var.monomorphize(&binding)).collect()}
             }
         }
     }
@@ -21,24 +25,29 @@ impl GenericCompositeType {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
     Prim(PrimType),
-    NewType(MonoTypeIdentifier),
+    NewType(NewtypeId, Vec<ConcreteType>),
     Reference(Box<ConcreteType>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum GenericType {
+pub enum GenericType {                      
+    // This represent basically what we put in type annots and stuff, NOT the typedefs
     Prim(PrimType),
-    NewType(PolyTypeIdentifier),
+    NewType(NewtypeId, Vec<GenericType>),
     Reference(Box<GenericType>),
     TypeVar(String)
 }
 
 impl GenericType {
     
-    pub fn monomorphize(&self, bindings: Binding) -> ConcreteType {
+    pub fn monomorphize(&self, bindings: &Binding) -> ConcreteType {
         match self {
             Self::Prim(prim_typ) => ConcreteType::Prim(*prim_typ),
-            Self::NewType(PolyTypeIdentifier(id)) => ConcreteType::NewType(MonoTypeIdentifier { name: id.clone(), bindings }),
+            Self::NewType(id, gen_params) => {
+                let resolved_params = gen_params.iter().map(|p| p.monomorphize(bindings)).collect();
+                ConcreteType::NewType(id.clone(), resolved_params)
+                
+            }
             Self::Reference(typ) => ConcreteType::Reference(Box::new(typ.monomorphize(bindings))),
             Self::TypeVar(id) => {
                 bindings.resolve(&id)
@@ -47,8 +56,9 @@ impl GenericType {
     }
 }
 
+
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct GenericNewType {
+pub struct GenericTypeDef {
     pub type_params: Vec<String>,
     pub defn: GenericCompositeType,
 }
@@ -82,47 +92,11 @@ impl Binding {
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct PolyTypeIdentifier(pub String); 
-
-impl PolyTypeIdentifier {
-    
-    pub fn bind(&self, binding: &Binding) -> MonoTypeIdentifier {
-        let PolyTypeIdentifier(name) = self;
-        MonoTypeIdentifier { 
-            name: name.clone(), 
-            bindings: binding.clone()
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct MonoTypeIdentifier {
-    name: String,
-    bindings: Binding,
-}
-
-
-
-
-
-// Trashcan (probably -- or at least move)
-
-
-// Maybe drop this too
-// Or at least put elsewhere
-#[derive(Debug, Clone)]
-pub struct Variable {
-    pub name: String,
-    pub typ: Type,
-    // TODO: mutable, etc
-}
-
+pub struct NewtypeId(pub String); 
 
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FuncSignature {
+pub struct FuncSignature<T> {
     pub name: String,
-    pub argtypes: Vec<Type>,
+    pub argtypes: Vec<T>,
 }
-
-
