@@ -9,6 +9,10 @@ Typing, parsing and AST maybe done. HIR and HIR lowering are next. We need to de
 ## Scope
 In this first run, we are basically just making types generic, not functions. That is, we want to define a generic struct and then, make a concrete instance, and operate on it. 
 
+## Next step
+Update HIR to use the new typing system (still having generic types). Extend the type checking, and add resolution of type vars in scopes. 
+
+
 ## Design ideas
 
 I think we want to monomorphize in MIR->LIR. For futureproofing reasons, when MIR would be heavily analyzed, and we want to make that cheaper by staying generic. 

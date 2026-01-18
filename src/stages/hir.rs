@@ -1,12 +1,14 @@
 use crate::shared::typing::*;
 use crate::shared::binops::*;
 use crate::stages::common::FuncId;
+use crate::shared::tables::*;
+
 
 use std::{collections::HashMap};
 
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
-    pub typetable: TypeTable, 
+    pub typetable: GenericTypetable, 
     pub functions: HashMap<FuncId, HIRFunction>,
     pub entry: FuncId,
 }
@@ -16,9 +18,9 @@ pub struct HIRProgram {
 pub struct HIRFunction {
     pub name: String,
     pub args: Vec<VarId>,
-    pub variables: HashMap<VarId, Variable>,
+    pub variables: HashMap<VarId, GenTypeVariable>,
     pub body: Vec<HIRStatement>,
-    pub ret_type: Type,
+    pub ret_type: GenericType,
 }
 
 
@@ -49,7 +51,7 @@ pub enum HIRStatement {
 
 #[derive(Debug, Clone)]
 pub struct HIRExpression {
-    pub typ: Type,
+    pub typ: GenericType,
     pub expr: HIRExpressionKind,
 }
 
@@ -83,7 +85,7 @@ pub enum HIRExpressionKind {
 
 #[derive(Clone, Debug)]
 pub struct Place {
-    pub typ: Type,
+    pub typ: GenericType,
     pub place: PlaceKind,
 }
 
@@ -99,5 +101,4 @@ pub enum PlaceKind {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct VarId(pub usize);
-
 
