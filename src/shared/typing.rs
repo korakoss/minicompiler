@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 
 pub type GenericFuncSignature = FuncSignature<GenericType>;
+pub type ConcreteFuncSignature = FuncSignature<ConcreteType>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FuncSignature<T> {
@@ -10,6 +11,7 @@ pub struct FuncSignature<T> {
 }
 
 pub type GenTypeVariable = Variable<GenericType>;
+pub type ConcreteVariable = Variable<ConcreteType>;
 
 // TODO: refactor this somehow
 #[derive(Debug, Clone)]

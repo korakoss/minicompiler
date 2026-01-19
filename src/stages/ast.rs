@@ -8,21 +8,21 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct ASTProgram {
     pub typetable: GenericTypetable,
-    pub functions: HashMap<GenericFuncSignature, ASTFunction>,
+    pub functions: HashMap<ConcreteFuncSignature, ASTFunction>,
 }
 
 
 #[derive(Debug, Clone)]
 pub struct ASTFunction {
     pub name: String,
-    pub args: HashMap<String, GenericType>,
+    pub args: HashMap<String, ConcreteType>,
     pub body: Vec<ASTStatement>,
-    pub ret_type: GenericType,
+    pub ret_type: ConcreteType,
 }
 
 impl ASTFunction {
    
-    pub fn get_signature(&self) -> GenericFuncSignature {
+    pub fn get_signature(&self) -> ConcreteFuncSignature {
         FuncSignature { 
             name: self.name.clone(), 
             argtypes: self.args
@@ -92,7 +92,7 @@ pub enum ASTExpression {
     },
 
     StructLiteral {
-        typ: (NewtypeId, Vec<GenericType>),
+        typ: (NewtypeId, Vec<ConcreteType>),
         fields: HashMap<String, ASTExpression>,
     },
 

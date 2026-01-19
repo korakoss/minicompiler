@@ -1,11 +1,13 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::{collections::{BTreeMap, HashMap, VecDeque}, hash::Hash};
 use crate::shared::typing::*;
+
 
 
 #[derive(Debug, Clone)]
 pub struct GenericTypetable {
     topo_order: Vec<NewtypeId>,
-    pub defs: HashMap<NewtypeId, GenericTypeDef>
+    pub defs: HashMap<NewtypeId, GenericTypeDef>,
+    monomorph_requests: Vec<(NewtypeId, Vec<ConcreteType>)>
 }
 
 impl GenericTypetable {
@@ -13,7 +15,8 @@ impl GenericTypetable {
     pub fn new(defs: HashMap<NewtypeId, GenericTypeDef>) -> Self {
         Self { 
             topo_order: toposort_depgraph(extract_newtype_dependencies(&defs)), 
-            defs
+            defs,
+            monomorph_requests: Vec::new(),
         }
     }
 
@@ -23,7 +26,7 @@ impl GenericTypetable {
 
     pub fn eval(&self, id: NewtypeId, typ_var_vals: Vec<ConcreteType>) -> ConcreteType {
         // Attempts to evaluate a generic newtype with some typing expression substituted, hoping to get a concrete type
-        let typedef = self.defs[&id];
+        let typedef = self.defs[&id].clone();
         if typedef.type_params.len() != typ_var_vals.len() {
             panic!("Number of supplied type parameters doesn't match the expected number");
         }
@@ -34,7 +37,8 @@ impl GenericTypetable {
                 .zip(typ_var_vals.into_iter())
                 .collect::<BTreeMap<String, ConcreteType>>()
         );
-        
+
+        unimplemented!(); 
 
     }
 }
@@ -78,9 +82,9 @@ fn extract_type_id(t: &GenericType) -> Vec<NewtypeId> {
 }
 
 
-fn toposort_depgraph(depgraph: HashMap<NewtypeId, Vec<NewtypeId>>) -> Vec<NewtypeId> {
+fn toposort_depgraph<T: Clone + Eq + PartialEq + Hash>(depgraph: HashMap<T, Vec<T>>) -> Vec<T> {
 
-    let mut indegrees: HashMap<NewtypeId, usize> = depgraph
+    let mut indegrees: HashMap<T, usize> = depgraph
         .keys()
         .map(|k| (k.clone(),0))
         .collect();
@@ -91,12 +95,12 @@ fn toposort_depgraph(depgraph: HashMap<NewtypeId, Vec<NewtypeId>>) -> Vec<Newtyp
         }
     }
 
-    let mut queue: VecDeque<NewtypeId> = depgraph
+    let mut queue: VecDeque<T> = depgraph
         .keys()
         .filter(|node| indegrees[node] == 0)
         .cloned()
         .collect();
-    let mut result: Vec<NewtypeId> = Vec::new();
+    let mut result: Vec<T> = Vec::new();
     
     while let Some(node) = queue.pop_front() {
         result.push(node.clone());

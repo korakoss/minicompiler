@@ -49,7 +49,7 @@ impl Parser {
         while self.tokens.peek() != Some(&Token::RightBrace) { // TODO: update this to get rid of trail commas
             let field_name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
-            let field_type = self.expect_type_annotation();
+            let field_type = self.expect_concrete_type_annotation();
             self.expect_unparametric_token(Token::Comma);
             fields.insert(field_name, field_type);
         }
@@ -84,14 +84,14 @@ impl Parser {
         let funcname = self.expect_identifier(); 
 
         self.expect_unparametric_token(Token::LeftParen);
-        let args:HashMap<String, GenericType> = match self.tokens.peek().unwrap() {
+        let args:HashMap<String, ConcreteType> = match self.tokens.peek().unwrap() {
             &Token::RightParen => {
                 HashMap::new()
             }
             &Token::Identifier(_) => {
                 let name1 = self.expect_identifier();
                 self.expect_unparametric_token(Token::Colon);
-                let typ1 = self.expect_type_annotation();
+                let typ1 = self.expect_concrete_type_annotation();
                 let mut args = HashMap::new();
                 args.insert(name1, typ1);
 
@@ -99,7 +99,7 @@ impl Parser {
                     self.tokens.next();
                     let arg_name = self.expect_identifier();
                     self.expect_unparametric_token(Token::Colon);
-                    let arg_type = self.expect_type_annotation();
+                    let arg_type = self.expect_concrete_type_annotation();
                     args.insert(arg_name, arg_type);
                 }
                 args
@@ -113,10 +113,10 @@ impl Parser {
         let ret_type_id = match self.tokens.peek().unwrap() {
             Token::RightArrow => {
                 self.tokens.next();
-                self.expect_type_annotation()
+                self.expect_concrete_type_annotation()
             },
             _ => {
-                GenericType::Prim(PrimType::None)
+                ConcreteType::Prim(PrimType::None)
             }
         };
         let body = self.parse_statement_block();
@@ -141,7 +141,7 @@ impl Parser {
                 self.tokens.next();
                 let var_name = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
-                let var_type = self.expect_type_annotation();
+                let var_type = self.expect_concrete_type_annotation();
                 let var = GenTypeVariable {
                     name: var_name, 
                     typ: var_type
@@ -302,7 +302,7 @@ impl Parser {
         match token {
             Token::IntLiteral(int) => ASTExpression::IntLiteral(int),
             Token::Identifier(name) => {
-                let bindings = self.expect_generic_bindings(); // TODO: add later for funccall case, reject properly for variables
+                let bindings = self.expect_concrete_bindings(); // TODO: add later for funccall case, reject properly for variables
                 match self.tokens.peek().unwrap() {
                     &Token::LeftParen => {                                                      // FuncCall
                         self.tokens.next();
@@ -374,8 +374,8 @@ impl Parser {
         };
         name
     }
-    
-    fn expect_type_annotation(&mut self) -> GenericType {
+
+    fn expect_generic_type_annotation(&mut self, scope_typevars: &Vec<String>) -> GenericType {
         match self.tokens.next().unwrap() {
             Token::Int => {
                 GenericType::Prim(PrimType::Integer)
@@ -384,11 +384,11 @@ impl Parser {
                 GenericType::Prim(PrimType::Bool)
             }
             Token::Identifier(type_id) => {
-                let bindings = self.expect_generic_bindings();
+                let bindings = self.expect_generic_bindings(scope_typevars);
                 GenericType::NewType(NewtypeId(type_id), bindings)
             }
             Token::Ref => {
-                let refd_type = self.expect_type_annotation();
+                let refd_type = self.expect_generic_type_annotation(scope_typevars);
                 GenericType::Reference(Box::new(refd_type))
             }
             _ => {
@@ -396,18 +396,57 @@ impl Parser {
             }
         }
     }
-
-    fn expect_generic_bindings(&mut self) -> Vec<GenericType> {
+    
+    fn expect_generic_bindings(&mut self, scope_typevars: &Vec<String>) -> Vec<GenericType> {
         if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
             return vec![]
         } else {
             self.tokens.next();
         }
         let mut bindings: Vec<GenericType> = Vec::new();
-        bindings.push(self.expect_type_annotation());
+        bindings.push(self.expect_generic_type_annotation(scope_typevars));
         while self.tokens.peek().unwrap() == &Token::Comma {
             self.tokens.next();
-            bindings.push(self.expect_type_annotation());
+            bindings.push(self.expect_generic_type_annotation(scope_typevars));
+        }
+        self.expect_unparametric_token(Token::RightSqBracket);
+        bindings
+    }
+    
+    fn expect_concrete_type_annotation(&mut self) -> ConcreteType {
+        match self.tokens.next().unwrap() {
+            Token::Int => {
+                ConcreteType::Prim(PrimType::Integer)
+            }
+            Token::Bool => {
+                ConcreteType::Prim(PrimType::Bool)
+            }
+            Token::Identifier(type_id) => {
+                let bindings = self.expect_concrete_bindings();
+                ConcreteType::NewType(NewtypeId(type_id), bindings)
+            }
+            Token::Ref => {
+                let refd_type = self.expect_concrete_type_annotation();
+                ConcreteType::Reference(Box::new(refd_type))
+            }
+            _ => {
+                panic!("Unexpected token while parsing type annotation");
+            }
+        }
+    }
+
+
+    fn expect_concrete_bindings(&mut self) -> Vec<ConcreteType> {
+        if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
+            return vec![]
+        } else {
+            self.tokens.next();
+        }
+        let mut bindings: Vec<ConcreteType> = Vec::new();
+        bindings.push(self.expect_concrete_type_annotation());
+        while self.tokens.peek().unwrap() == &Token::Comma {
+            self.tokens.next();
+            bindings.push(self.expect_concrete_type_annotation());
         }
         self.expect_unparametric_token(Token::RightSqBracket);
         bindings
