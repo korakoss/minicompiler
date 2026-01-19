@@ -92,7 +92,7 @@ pub enum ASTExpression {
     },
 
     StructLiteral {
-        typ: NewtypeId,
+        typ: (NewtypeId, Vec<GenericType>),
         fields: HashMap<String, ASTExpression>,
     },
 

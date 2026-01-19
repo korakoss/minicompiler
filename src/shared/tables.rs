@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, VecDeque}};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use crate::shared::typing::*;
 
 
@@ -19,6 +19,23 @@ impl GenericTypetable {
 
     pub fn topo_iter(&self) -> impl Iterator<Item = (&NewtypeId, &GenericTypeDef)> {
         self.topo_order.iter().map(|id| (id, &self.defs[&id]))
+    }
+
+    pub fn eval(&self, id: NewtypeId, typ_var_vals: Vec<ConcreteType>) -> ConcreteType {
+        // Attempts to evaluate a generic newtype with some typing expression substituted, hoping to get a concrete type
+        let typedef = self.defs[&id];
+        if typedef.type_params.len() != typ_var_vals.len() {
+            panic!("Number of supplied type parameters doesn't match the expected number");
+        }
+        let bindings = Binding(
+            typedef.type_params
+                .iter()
+                .cloned()
+                .zip(typ_var_vals.into_iter())
+                .collect::<BTreeMap<String, ConcreteType>>()
+        );
+        
+
     }
 }
 

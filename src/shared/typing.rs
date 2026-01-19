@@ -1,4 +1,4 @@
-use std::{collections::{BTreeMap}};
+use std::collections::{BTreeMap, HashMap};
 
 
 pub type GenericFuncSignature = FuncSignature<GenericType>;
@@ -80,6 +80,31 @@ pub struct GenericTypeDef {
     pub defn: GenericCompositeType,
 }
 
+impl GenericTypeDef {
+
+    pub fn bind(&self, concrete_types: Vec<ConcreteType>) -> ConcreteCompositeType {
+        let type_param_map: BTreeMap<String, ConcreteType> = self.type_params
+            .iter()
+            .cloned()
+            .zip(concrete_types.into_iter())
+            .collect();
+        let bindings = Binding(type_param_map);
+        match self.defn.clone() {
+            GenericCompositeType::Struct { fields } => {
+                ConcreteCompositeType::Struct {
+                    fields: fields
+                        .iter()
+                        .map(|(fname, ftype)| (fname.clone(), ftype.monomorphize(&bindings)))
+                        .collect()
+                }
+            }
+
+            _ => {unimplemented!();}
+        }
+    }
+
+}
+
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum CompositeType<T>{
@@ -91,6 +116,20 @@ pub enum CompositeType<T>{
     },
 }
 
+impl<T: Clone> CompositeType<T> {
+
+    pub fn field_type(&self, field_name: &String) -> T {
+        match self {
+            Self::Struct { fields } => {
+                fields.get(field_name).expect("Type doesn't have field").clone()
+            }
+            _ => {
+                unimplemented!();
+            }
+        }
+    }
+}
+
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub enum PrimType {
@@ -100,7 +139,7 @@ pub enum PrimType {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Binding(BTreeMap<String, ConcreteType>);
+pub struct Binding(pub BTreeMap<String, ConcreteType>);
 
 impl Binding {
     pub fn resolve(&self, symbol: &String) -> ConcreteType {

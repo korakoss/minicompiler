@@ -85,6 +85,7 @@ impl HIRBuilder {
             }
             ASTLValue::FieldAccess { of, field } => {
                 let hir_of = self.lower_lvalue(*of);
+                let GenericTypeDef { type_params, defn } = self.typetable.get_typedef
                 let TypeDef::NewType(TypeConstructor::Struct { fields }) = self.typetable.get_typedef(hir_of.typ.clone()) else {
                     panic!("Expression in field access isn't a struct");
                 };
@@ -248,6 +249,10 @@ impl HIRBuilder {
             },
             ASTExpression::FieldAccess{expr, field} => {
                 let hir_expr = self.lower_expression(*expr);
+                let GenericType::NewType(id, bindings) = hir_expr.typ.clone() else {
+                    panic!("Expression in field access isn't a newtype");
+                };
+                let expr_typ = self.typetable.defs[&id].bind(bindings);
                 let TypeDef::NewType(TypeConstructor::Struct { fields }) = self.typetable.get_typedef(hir_expr.typ.clone()) else {
                     panic!("Expression in field access isn't a struct");
                 };
@@ -262,14 +267,14 @@ impl HIRBuilder {
                      }
                 }
             }
-            ASTExpression::StructLiteral{typ, fields} => {
+            ASTExpression::StructLiteral{typ: (typ_id, bindings), fields} => {
                 let hir_fields: HashMap<String, HIRExpression> = fields 
                         .into_iter()
                         .map(|(fname, fexpr)| (fname, self.lower_expression(fexpr)))
                         .collect();
                 self.typecheck_struct(typ.clone(), hir_fields.clone());
                 HIRExpression {
-                    typ,
+                    typ: GenericType::NewType(typ_id, bindings),
                     expr: HIRExpressionKind::StructLiteral { 
                         fields: hir_fields
                     }
@@ -296,7 +301,7 @@ impl HIRBuilder {
         }
     }
 
-    fn typecheck_struct(&self, typ:Type , field_exprs: HashMap<String, HIRExpression>) {
+    fn typecheck_struct(&self, typ:GenericType , field_exprs: HashMap<String, HIRExpression>) {
         let TypeDef::NewType(TypeConstructor::Struct { fields: expected_fields }) = self.typetable.get_typedef(typ) else {
             panic!("Type annotation doesn't correspond to a struct newtype");
         };

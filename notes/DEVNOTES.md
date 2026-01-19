@@ -12,6 +12,13 @@ In this first run, we are basically just making types generic, not functions. Th
 ## Next step
 Update HIR to use the new typing system (still having generic types). Extend the type checking, and add resolution of type vars in scopes. 
 
+## Current problem
+I'm a bit lost in the dichotomy of "generic vs concrete" types. So in the current version, we're not planning to have generic functions yet. What that means is: type variables exist in the the scope of struct definitions, and within function bodies, it has to work out to a concrete type. 
+
+And I guess that's exactly what GenericType and ConcreteType are meant for. Within a struct body, you can refer to the typevars, but outside, in functions, you mut put concrete types. So I suppose – at least in the current sprint – we must write two separate _parsers_, one accepting type variables and one not. Though, on second thought, this should probably be kept around for the later version, or something similar this, since we do want to get concrete types out of nongeneric functions (like, notably, the entry point _main_). 
+
+So the current task is maybe easier than I thought. We have immediate, on the spot monomorphization when we declare variables. 
+
 
 ## Design ideas
 
