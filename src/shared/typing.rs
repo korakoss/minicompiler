@@ -1,45 +1,5 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap};
 
-
-pub type GenericFuncSignature = FuncSignature<GenericType>;
-pub type ConcreteFuncSignature = FuncSignature<ConcreteType>;
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FuncSignature<T> {
-    pub name: String,
-    pub argtypes: Vec<T>,
-}
-
-pub type GenTypeVariable = Variable<GenericType>;
-pub type ConcreteVariable = Variable<ConcreteType>;
-
-// TODO: refactor this somehow
-#[derive(Debug, Clone)]
-pub struct Variable<T> {
-    pub name: String,
-    pub typ: T,
-    // TODO: mutable, etc
-}
-
-
-pub type ConcreteCompositeType = CompositeType<ConcreteType>;
-pub type GenericCompositeType = CompositeType<GenericType>; 
-
-impl GenericCompositeType {
-
-    pub fn monomorphize(&self, binding: &Binding) -> ConcreteCompositeType {
-        match self {
-            Self::Struct { fields } => {
-                ConcreteCompositeType::Struct { 
-                    fields: fields.iter().map(|(fname, ftype)| (fname.clone(), ftype.monomorphize(&binding))).collect()
-                }
-            }
-            Self::Enum { variants } => {
-                ConcreteCompositeType::Enum { variants: variants.iter().map(|var| var.monomorphize(&binding)).collect()}
-            }
-        }
-    }
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
@@ -59,7 +19,7 @@ pub enum GenericType {
 
 impl GenericType {
     
-    pub fn monomorphize(&self, bindings: &Binding) -> ConcreteType {
+    pub fn monomorphize(&self, bindings: &BTreeMap<String, ConcreteType>) -> ConcreteType {
         match self {
             Self::Prim(prim_typ) => ConcreteType::Prim(*prim_typ),
             Self::NewType(id, gen_params) => {
@@ -69,67 +29,35 @@ impl GenericType {
             }
             Self::Reference(typ) => ConcreteType::Reference(Box::new(typ.monomorphize(bindings))),
             Self::TypeVar(id) => {
-                bindings.resolve(&id)
+                bindings[id].clone()
             }
         }
     }
 }
 
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct GenericTypeDef {
+pub type GenericTypeDef = NewtypeDef<GenericType>;
+pub type ConcreteTypeDef = NewtypeDef<ConcreteType>;
+
+
+#[derive(Clone, Debug)]
+pub struct NewtypeDef<T> {
     pub type_params: Vec<String>,
-    pub defn: GenericCompositeType,
+    pub defn: NewtypeShape<T>,
 }
 
-impl GenericTypeDef {
-
-    pub fn bind(&self, concrete_types: Vec<ConcreteType>) -> ConcreteCompositeType {
-        let type_param_map: BTreeMap<String, ConcreteType> = self.type_params
-            .iter()
-            .cloned()
-            .zip(concrete_types.into_iter())
-            .collect();
-        let bindings = Binding(type_param_map);
-        match self.defn.clone() {
-            GenericCompositeType::Struct { fields } => {
-                ConcreteCompositeType::Struct {
-                    fields: fields
-                        .iter()
-                        .map(|(fname, ftype)| (fname.clone(), ftype.monomorphize(&bindings)))
-                        .collect()
-                }
-            }
-
-            _ => {unimplemented!();}
-        }
-    }
-
-}
+pub type GenericShape = NewtypeShape<GenericType>;
+pub type ConcreteShape = NewtypeShape<ConcreteType>;
 
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum CompositeType<T>{
+pub enum NewtypeShape<T>{
     Struct {
         fields: BTreeMap<String, T>
     },
     Enum {
         variants: Vec<T>
     },
-}
-
-impl<T: Clone> CompositeType<T> {
-
-    pub fn field_type(&self, field_name: &String) -> T {
-        match self {
-            Self::Struct { fields } => {
-                fields.get(field_name).expect("Type doesn't have field").clone()
-            }
-            _ => {
-                unimplemented!();
-            }
-        }
-    }
 }
 
 

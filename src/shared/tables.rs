@@ -7,7 +7,6 @@ use crate::shared::typing::*;
 pub struct GenericTypetable {
     topo_order: Vec<NewtypeId>,
     pub defs: HashMap<NewtypeId, GenericTypeDef>,
-    monomorph_requests: Vec<(NewtypeId, Vec<ConcreteType>)>
 }
 
 impl GenericTypetable {
@@ -15,8 +14,7 @@ impl GenericTypetable {
     pub fn new(defs: HashMap<NewtypeId, GenericTypeDef>) -> Self {
         Self { 
             topo_order: toposort_depgraph(extract_newtype_dependencies(&defs)), 
-            defs,
-            monomorph_requests: Vec::new(),
+ defs,
         }
     }
 
@@ -24,22 +22,24 @@ impl GenericTypetable {
         self.topo_order.iter().map(|id| (id, &self.defs[&id]))
     }
 
-    pub fn eval(&self, id: NewtypeId, typ_var_vals: Vec<ConcreteType>) -> ConcreteType {
-        // Attempts to evaluate a generic newtype with some typing expression substituted, hoping to get a concrete type
-        let typedef = self.defs[&id].clone();
-        if typedef.type_params.len() != typ_var_vals.len() {
-            panic!("Number of supplied type parameters doesn't match the expected number");
+    pub fn monomorphize(&self, id: NewtypeId, typ_var_vals: Vec<ConcreteType>) -> ConcreteShape {
+        let def = self.defs[&id].clone();
+        let bindings: BTreeMap<String, ConcreteType> = def.type_params
+            .iter()
+            .cloned()
+            .zip(typ_var_vals.into_iter())
+            .collect();
+        match def.defn {
+            NewtypeShape::Struct { fields } => {
+                NewtypeShape::Struct { 
+                    fields: fields
+                        .into_iter()
+                        .map(|(name, typ)| (name, typ.monomorphize(&bindings)))
+                        .collect()
+                }
+            }
+            NewtypeShape::Enum { variants } => unimplemented!()
         }
-        let bindings = Binding(
-            typedef.type_params
-                .iter()
-                .cloned()
-                .zip(typ_var_vals.into_iter())
-                .collect::<BTreeMap<String, ConcreteType>>()
-        );
-
-        unimplemented!(); 
-
     }
 }
 
@@ -51,12 +51,12 @@ fn extract_newtype_dependencies(newtype_defs: &HashMap<NewtypeId, GenericTypeDef
     let mut dep_graph: HashMap<NewtypeId, Vec<NewtypeId>> = HashMap::new();
     for (type_id, newtype) in newtype_defs {
         let deps: Vec<NewtypeId> = match &newtype.defn {
-            CompositeType::Struct {fields} => fields
+            NewtypeShape::Struct {fields} => fields
                 .values()
                 .map(|ftyp| extract_type_id(&ftyp))
                 .flatten()
                 .collect(),
-            CompositeType::Enum { variants } => variants
+            NewtypeShape::Enum { variants } => variants
                 .iter()
                 .map(|vtyp| extract_type_id(&vtyp))
                 .flatten()
@@ -122,5 +122,3 @@ fn toposort_depgraph<T: Clone + Eq + PartialEq + Hash>(depgraph: HashMap<T, Vec<
     result.reverse();
     result
 }
-
-
