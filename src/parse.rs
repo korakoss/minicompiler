@@ -6,12 +6,12 @@ use crate::shared::tokens::*;
 use crate::shared::typing::*;
 use crate::stages::ast::*;
 use crate::shared::tables::*;
-
+use crate::shared::utils::*;
 
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
     new_types: HashMap<NewtypeId, GenericTypeDef>,
-    functions: HashMap<GenericFuncSignature, ASTFunction>,
+    functions: HashMap<ConcreteFuncSignature, ASTFunction>,
 }
 
 
@@ -49,14 +49,14 @@ impl Parser {
         while self.tokens.peek() != Some(&Token::RightBrace) { // TODO: update this to get rid of trail commas
             let field_name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
-            let field_type = self.expect_concrete_type_annotation();
+            let field_type = self.expect_generic_type_annotation(&type_params);
             self.expect_unparametric_token(Token::Comma);
             fields.insert(field_name, field_type);
         }
         self.expect_unparametric_token(Token::RightBrace);
         let typedef = GenericTypeDef {
             type_params,
-            defn: GenericCompositeType::Struct { fields},
+            defn: GenericShape::Struct { fields},
         };
         self.new_types.insert(struct_identifier, typedef); 
     }
@@ -142,7 +142,7 @@ impl Parser {
                 let var_name = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
                 let var_type = self.expect_concrete_type_annotation();
-                let var = GenTypeVariable {
+                let var = ConcreteVariable {
                     name: var_name, 
                     typ: var_type
                 };
@@ -384,8 +384,13 @@ impl Parser {
                 GenericType::Prim(PrimType::Bool)
             }
             Token::Identifier(type_id) => {
-                let bindings = self.expect_generic_bindings(scope_typevars);
-                GenericType::NewType(NewtypeId(type_id), bindings)
+                if scope_typevars.contains(&type_id) {
+                    GenericType::TypeVar(type_id)
+                }
+                else {
+                    let bindings = self.expect_generic_bindings(scope_typevars);
+                    GenericType::NewType(NewtypeId(type_id), bindings)
+                }
             }
             Token::Ref => {
                 let refd_type = self.expect_generic_type_annotation(scope_typevars);

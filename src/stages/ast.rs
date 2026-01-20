@@ -1,6 +1,7 @@
 use crate::shared::typing::*;
 use crate::shared::binops::*;
 use crate::shared::tables::*;
+use crate::shared::utils::*;
 
 use std::collections::HashMap;
 
@@ -15,7 +16,7 @@ pub struct ASTProgram {
 #[derive(Debug, Clone)]
 pub struct ASTFunction {
     pub name: String,
-    pub args: HashMap<String, ConcreteType>,
+    pub args: HashMap<String, ConcreteType>,    // Does this lose argument order?
     pub body: Vec<ASTStatement>,
     pub ret_type: ConcreteType,
 }
@@ -38,7 +39,7 @@ impl ASTFunction {
 #[derive(Debug, Clone)]
 pub enum ASTStatement {
     Let {
-        var: GenTypeVariable,
+        var: ConcreteVariable,
         value: ASTExpression,
     },
     Assign {
