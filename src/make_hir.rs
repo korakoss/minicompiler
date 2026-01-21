@@ -75,7 +75,7 @@ impl HIRBuilder {
         hir_func
     }
 
-    fn lower_lvalue(&self, lvalue: ASTLValue) -> Place {
+    fn lower_lvalue(&mut self, lvalue: ASTLValue) -> Place {
         match lvalue {
             ASTLValue::Variable(var_name) => {
                 let (id, typ) = self.scope_context.get_var_info(&var_name);
@@ -192,7 +192,7 @@ impl HIRBuilder {
         stmts
     }
 
-    fn lower_expression(&self, expr: ASTExpression) -> HIRExpression {
+    fn lower_expression(&mut self, expr: ASTExpression) -> HIRExpression {
         match expr {
             ASTExpression::IntLiteral(num) => HIRExpression {
                 typ: ConcreteType::Prim(PrimType::Integer),
@@ -304,7 +304,7 @@ impl HIRBuilder {
     }
 
     fn typecheck_struct_literal(
-        &self, 
+        &mut self, 
         typ: ConcreteType, 
         literal_fields: HashMap<String, HIRExpression>
     ) {
