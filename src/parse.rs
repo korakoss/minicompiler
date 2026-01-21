@@ -325,7 +325,7 @@ impl Parser {
                         let fields = self.parse_struct_literal_internals();
                         self.expect_unparametric_token(Token::RightBrace);
                         ASTExpression::StructLiteral {
-                            typ: (NewtypeId(name), bindings),
+                            typ: ConcreteType::NewType(NewtypeId(name), bindings),
                             fields
                         }
                     }

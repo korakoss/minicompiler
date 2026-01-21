@@ -190,7 +190,7 @@ impl MIRBuilder {
                fieldchain: Vec::new(),
             }, vec![]),
             PlaceKind::StructField { of, field } => {
-                let (MIRPlace { typ, base, fieldchain }, of_stmts) = self.lower_place(*of);
+                let (MIRPlace {typ: _,base, fieldchain }, of_stmts) = self.lower_place(*of);
                 (MIRPlace {
                     typ: hir_place.typ,
                     base,
@@ -225,7 +225,7 @@ impl MIRBuilder {
         match expr.expr {
             HIRExpressionKind::IntLiteral(num) => {
                 (MIRValue{
-                    typ: Type::Prim(PrimType::Integer),
+                    typ: ConcreteType::Prim(PrimType::Integer),
                     value: MIRValueKind::IntLiteral(num)
                 }, Vec::new())
             },
@@ -271,8 +271,8 @@ impl MIRBuilder {
                 let call_stmt = MIRStatement::Call { target: target.clone(), func: id, args: arg_vals};
                 (MIRValue{typ: expr.typ, value: MIRValueKind::Place(target)}, [arg_stmt_coll.into_iter().flatten().collect(), vec![call_stmt]].concat())
             },
-            HIRExpressionKind::BoolTrue => (MIRValue{typ: Type::Prim(PrimType::Bool) ,value: MIRValueKind::BoolTrue}, Vec::new()),
-            HIRExpressionKind::BoolFalse=> (MIRValue{typ: Type::Prim(PrimType::Bool) ,value: MIRValueKind::BoolFalse}, Vec::new()),
+            HIRExpressionKind::BoolTrue => (MIRValue{typ: ConcreteType::Prim(PrimType::Bool) ,value: MIRValueKind::BoolTrue}, Vec::new()),
+            HIRExpressionKind::BoolFalse=> (MIRValue{typ: ConcreteType::Prim(PrimType::Bool) ,value: MIRValueKind::BoolFalse}, Vec::new()),
             HIRExpressionKind::FieldAccess { expr: base_expr, field } => { 
                 let typ = expr.typ.clone();
                 let (expr_val, expr_stmts) = self.lower_expr(*base_expr);
@@ -293,7 +293,7 @@ impl MIRBuilder {
                 let (mir_refd, refd_stmts) = self.lower_expr(*refd);
                 match mir_refd.value {
                     MIRValueKind::Place(refd_place) => {
-                        (MIRValue{typ: Type::Reference(Box::new(mir_refd.typ)), value: MIRValueKind::Reference(refd_place)}, refd_stmts)
+                        (MIRValue{typ: ConcreteType::Reference(Box::new(mir_refd.typ)), value: MIRValueKind::Reference(refd_place)}, refd_stmts)
                     }
                     MIRValueKind::Reference(refd_ref) => {
                         let tempc = self.add_cell(Cell{typ: mir_refd.typ.clone(), kind: CellKind::Temp});
@@ -333,7 +333,7 @@ impl MIRBuilder {
         }
     }
 
-    fn lower_field_access(&self, of: MIRValue, field: String, typ: Type) -> MIRValue {
+    fn lower_field_access(&self, of: MIRValue, field: String, typ: ConcreteType) -> MIRValue {
         let MIRValueKind::Place(place) = of.value else {
            unreachable!(); 
         };

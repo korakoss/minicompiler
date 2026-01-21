@@ -1,4 +1,4 @@
-use crate::shared::binops::BinaryOperator;
+use crate::shared::{binops::BinaryOperator, tables::GenericTypetable};
 use crate::shared::typing::*;
 use crate::stages::common::*;
 
@@ -7,7 +7,7 @@ use std::{collections::HashMap};
 
 #[derive(Clone, Debug)]
 pub struct MIRProgram {
-    pub typetable: TypeTable,
+    pub typetable: GenericTypetable,
     pub functions: HashMap<FuncId, MIRFunction>,
     pub entry: FuncId,
 }
@@ -19,7 +19,7 @@ pub struct MIRFunction {
     pub cells: HashMap<CellId, Cell>,
     pub blocks: HashMap<BlockId, MIRBlock>,
     pub entry: BlockId,
-    pub ret_type: Type,
+    pub ret_type: ConcreteType,
 }
 
 #[derive(Clone, Debug)]
@@ -61,7 +61,7 @@ pub enum MIRTerminator {
 
 #[derive(Clone, Debug)]
 pub struct MIRValue {
-    pub typ: Type,
+    pub typ: ConcreteType,
     pub value: MIRValueKind,
 }
 
@@ -72,7 +72,7 @@ pub enum MIRValueKind {
     BoolTrue,
     BoolFalse,
     StructLiteral {
-        typ: Type,
+        typ: ConcreteType,
         fields: HashMap<String, MIRValue>,
     },
     Reference(MIRPlace),
@@ -81,7 +81,7 @@ pub enum MIRValueKind {
 
 #[derive(Clone, Debug)]
 pub struct MIRPlace {
-    pub typ: Type,
+    pub typ: ConcreteType,
     pub base: MIRPlaceBase,
     pub fieldchain: Vec<String>
 }
@@ -94,7 +94,7 @@ pub enum MIRPlaceBase {
 
 #[derive(Clone, Debug)]
 pub struct Cell {
-    pub typ: Type,
+    pub typ: ConcreteType,
     pub kind: CellKind,
 }
 

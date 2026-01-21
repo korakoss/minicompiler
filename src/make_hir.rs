@@ -4,6 +4,7 @@ use crate::stages::common::*;
 use crate::stages::ast::*;
 use crate::stages::hir::*;
 use crate::shared::binops::binop_typecheck;
+use crate::shared::utils::*;
 
 use std::{collections::HashMap};
 
@@ -12,7 +13,7 @@ use std::{collections::HashMap};
         
 pub struct HIRBuilder {
     scope_context: ScopeContext,
-    function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)>,
+    function_map: HashMap<ConcreteFuncSignature, (FuncId, ConcreteType)>,
     typetable: GenericTypetable
 }
 
@@ -21,7 +22,7 @@ impl HIRBuilder {
     pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
         let ASTProgram{typetable, functions} = ast;
 
-        let function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)> = functions
+        let function_map: HashMap<ConcreteFuncSignature, (FuncId, ConcreteType)> = functions
             .iter()
             .enumerate()
             .map(|(i, (sgn, func))| (sgn.clone(), (FuncId(i), func.ret_type.clone())))
@@ -60,7 +61,7 @@ impl HIRBuilder {
             .map(|arg| self.scope_context.add_var(Variable { name: arg.0, typ: arg.1}))
             .collect();
         let mut hir_body = self.lower_block(body, false);
-        if ret_type == GenericType::Prim(PrimType::None) {
+        if ret_type == ConcreteType::Prim(PrimType::None) {
             hir_body.push(HIRStatement::Return(None));
         }
         let hir_func = HIRFunction { 
@@ -83,24 +84,25 @@ impl HIRBuilder {
                     place: PlaceKind::Variable(id),
                 }
             }
-            ASTLValue::FieldAccess { of, field } => {
+            ASTLValue::FieldAccess { of, field: fname } => {
                 let hir_of = self.lower_lvalue(*of);
-                let GenericTypeDef { type_params, defn } = self.typetable.get_typedef
-                let TypeDef::NewType(TypeConstructor::Struct { fields }) = self.typetable.get_typedef(hir_of.typ.clone()) else {
+                let ConcreteType::NewType(id, typvars) = hir_of.typ.clone() else {unreachable!()};
+                let typdef = self.typetable.monomorphize(id, typvars);
+                let ConcreteShape::Struct{fields} = typdef else {
                     panic!("Expression in field access isn't a struct");
                 };
-                let field_type = fields.get(&field).expect("Field not found in struct").clone();
+                let field_type = fields.get(&fname).expect("Field not found in struct").clone();
                 Place {
                     typ: field_type,
                     place: PlaceKind::StructField { 
                         of: Box::new(hir_of), 
-                        field 
+                        field: fname 
                     }
                 }
             }
             ASTLValue::Deref(reference) => {
                 let hir_ref = self.lower_expression(reference);
-                let GenericType::Reference(refd_typ) = hir_ref.typ.clone() else {unreachable!()};
+                let ConcreteType::Reference(refd_typ) = hir_ref.typ.clone() else {unreachable!()};
                 Place {
                     typ: *refd_typ,
                     place: PlaceKind::Deref(hir_ref)
@@ -132,7 +134,7 @@ impl HIRBuilder {
             }
             ASTStatement::If { condition, if_body, else_body } => {
                 let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != GenericType::Prim(PrimType::Bool) {
+                if hir_condition.typ != ConcreteType::Prim(PrimType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::If {
@@ -146,7 +148,7 @@ impl HIRBuilder {
             }
             ASTStatement::While { condition, body } => {
                 let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != GenericType::Prim(PrimType::Bool) {
+                if hir_condition.typ != ConcreteType::Prim(PrimType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::While { 
@@ -193,7 +195,7 @@ impl HIRBuilder {
     fn lower_expression(&self, expr: ASTExpression) -> HIRExpression {
         match expr {
             ASTExpression::IntLiteral(num) => HIRExpression {
-                typ: GenericType::Prim(PrimType::Integer),
+                typ: ConcreteType::Prim(PrimType::Integer),
                 expr: HIRExpressionKind::IntLiteral(num),
             },
             ASTExpression::Variable(varname) => {
@@ -240,20 +242,20 @@ impl HIRBuilder {
                 } 
             }
             ASTExpression::BoolTrue => HIRExpression {
-                typ: GenericType::Prim(PrimType::Bool),
+                typ: ConcreteType::Prim(PrimType::Bool),
                 expr: HIRExpressionKind::BoolTrue,
             },
             ASTExpression::BoolFalse => HIRExpression {
-                typ: GenericType::Prim(PrimType::Bool),
+                typ: ConcreteType::Prim(PrimType::Bool),
                 expr: HIRExpressionKind::BoolFalse,
             },
             ASTExpression::FieldAccess{expr, field} => {
                 let hir_expr = self.lower_expression(*expr);
-                let GenericType::NewType(id, bindings) = hir_expr.typ.clone() else {
+                let ConcreteType::NewType(id, bindings) = hir_expr.typ.clone() else {
                     panic!("Expression in field access isn't a newtype");
                 };
-                let expr_typ = self.typetable.defs[&id].bind(bindings);
-                let TypeDef::NewType(TypeConstructor::Struct { fields }) = self.typetable.get_typedef(hir_expr.typ.clone()) else {
+                let expr_typ = self.typetable.monomorphize(id, bindings);
+                let ConcreteShape::Struct { fields } = expr_typ else {
                     panic!("Expression in field access isn't a struct");
                 };
                 let field_type = fields.get(&field)
@@ -267,14 +269,14 @@ impl HIRBuilder {
                      }
                 }
             }
-            ASTExpression::StructLiteral{typ: (typ_id, bindings), fields} => {
+            ASTExpression::StructLiteral{typ, fields} => {
                 let hir_fields: HashMap<String, HIRExpression> = fields 
                         .into_iter()
                         .map(|(fname, fexpr)| (fname, self.lower_expression(fexpr)))
                         .collect();
-                self.typecheck_struct(typ.clone(), hir_fields.clone());
+                self.typecheck_struct_literal(typ.clone(), hir_fields.clone());
                 HIRExpression {
-                    typ: GenericType::NewType(typ_id, bindings),
+                    typ, 
                     expr: HIRExpressionKind::StructLiteral { 
                         fields: hir_fields
                     }
@@ -283,13 +285,13 @@ impl HIRBuilder {
             ASTExpression::Reference(refd) => {
                 let hir_refd = self.lower_expression(*refd);
                 HIRExpression{
-                    typ: GenericType::Reference(Box::new(hir_refd.typ.clone())),
+                    typ: ConcreteType::Reference(Box::new(hir_refd.typ.clone())),
                     expr: HIRExpressionKind::Reference(Box::new(hir_refd)),
                 }
             }
             ASTExpression::Dereference(derefd) => {
                 let hir_derefd = self.lower_expression(*derefd);
-                let GenericType::Reference(deref_typ) = hir_derefd.typ.clone() else {
+                let ConcreteType::Reference(deref_typ) = hir_derefd.typ.clone() else {
                     unreachable!();
                 };
                 HIRExpression{
@@ -301,12 +303,18 @@ impl HIRBuilder {
         }
     }
 
-    fn typecheck_struct(&self, typ:GenericType , field_exprs: HashMap<String, HIRExpression>) {
-        let TypeDef::NewType(TypeConstructor::Struct { fields: expected_fields }) = self.typetable.get_typedef(typ) else {
-            panic!("Type annotation doesn't correspond to a struct newtype");
+    fn typecheck_struct_literal(
+        &self, 
+        typ: ConcreteType, 
+        literal_fields: HashMap<String, HIRExpression>
+    ) {
+        let ConcreteType::NewType(id, typvars) = typ.clone() else {unreachable!()};
+        let typdef = self.typetable.monomorphize(id, typvars);
+        let ConcreteShape::Struct{fields: expected_fields} = typdef else {
+            panic!("Expression in field access isn't a struct");
         };
         for (fname, exp_type) in expected_fields {
-            if exp_type != field_exprs.get(&fname).expect("Field not found").typ {
+            if exp_type != literal_fields.get(&fname).expect("Field not found").typ {
                 panic!("Field type doesn't match expected type");
             }
         }
@@ -318,10 +326,12 @@ impl HIRBuilder {
 struct ScopeContext {
     var_scope_stack: Vec<HashMap<String, VarId>>,
     loop_entrances: Vec<bool>,
-    var_map: HashMap<VarId, GenTypeVariable>,
+    var_map: HashMap<VarId, ConcreteVariable>,
     var_counter: usize,
-    ret_type: Option<GenericType>,
+    ret_type: Option<ConcreteType>,
 }
+
+
 
 impl ScopeContext {
 
@@ -335,7 +345,7 @@ impl ScopeContext {
         }
     }
 
-    fn reset(&mut self, new_ret_type: GenericType) {
+    fn reset(&mut self, new_ret_type: ConcreteType) {
         self.var_scope_stack = Vec::new();
         self.loop_entrances = Vec::new();
         self.var_map = HashMap::new();
@@ -356,7 +366,7 @@ impl ScopeContext {
         self.loop_entrances.pop();
     }
     
-    fn add_var(&mut self, var: GenTypeVariable) -> VarId {
+    fn add_var(&mut self, var: ConcreteVariable) -> VarId {
         let id = VarId(self.var_counter);
         self.var_counter = self.var_counter + 1;
         self.var_scope_stack.last_mut().unwrap().insert(var.name.clone(), id);
@@ -364,7 +374,7 @@ impl ScopeContext {
         id
     }
 
-    fn get_var_info(&mut self, name: &String) -> (VarId, GenericType) {
+    fn get_var_info(&self, name: &String) -> (VarId, ConcreteType) {
         let id = **self.var_scope_stack
             .iter()
             .flatten()

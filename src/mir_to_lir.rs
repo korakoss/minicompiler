@@ -4,15 +4,16 @@ use crate::stages::common::*;
 use crate::stages::lir::*;
 use crate::stages::mir::*;
 use crate::shared::typing::*;
+use crate::shared::tables::*;
 
 
 pub struct LIRBuilder {
-    cell_chunk_map: HashMap<CellId, (ChunkId, Type)>,
+    cell_chunk_map: HashMap<CellId, (ChunkId, ConcreteType)>,
     curr_chunks: HashMap<ChunkId, Chunk>,
     curr_vregs: Vec<VRegId>,
     layouts: LayoutTable,
     chunk_counter: usize,
-    typetable: TypeTable,
+    typetable: GenericTypetable,
 }
 
 impl LIRBuilder {
@@ -196,7 +197,7 @@ impl LIRBuilder {
                 vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::BoolFalse}}]
             }
             MIRValueKind::StructLiteral { typ, fields } => {
-                let LayoutInfo::Struct { size, field_offsets } = self.layouts.get_layout(typ) else {
+                let LayoutInfo::Struct { size: _, field_offsets } = self.layouts.get_layout(typ) else {
                     unreachable!();
                 };
                 let mut stmts: Vec<LIRStatement> = Vec::new();
@@ -225,7 +226,7 @@ impl LIRBuilder {
             MIRPlaceBase::Cell(c_id) => {
 
                 let base_type = self.cell_chunk_map[&c_id].1.clone();
-                let (final_offset, final_type) = self.lower_fieldchain(base_type, place.fieldchain);
+                let (final_offset, _) = self.lower_fieldchain(base_type, place.fieldchain);
                 LIRPlace {
                     size,
                     place: LIRPlaceKind::Local{
@@ -236,8 +237,8 @@ impl LIRBuilder {
             },
             MIRPlaceBase::Deref(c_id) => {
                 let ref_type = self.cell_chunk_map[&c_id].1.clone();
-                let Type::Reference(deref_type) = ref_type else {unreachable!()};
-                let (final_offset, final_type) = self.lower_fieldchain(*deref_type, place.fieldchain);
+                let ConcreteType::Reference(deref_type) = ref_type else {unreachable!()};
+                let (final_offset, _) = self.lower_fieldchain(*deref_type, place.fieldchain);
                 LIRPlace {
                     size,
                     place: LIRPlaceKind::Deref { 
@@ -249,7 +250,11 @@ impl LIRBuilder {
         }
     }
 
-    fn lower_fieldchain(&self, base_type: Type, chain: Vec<String>) -> (usize, Type) {
+    fn lower_fieldchain(
+        &self, 
+        base_type: ConcreteType, 
+        chain: Vec<String>
+    ) -> (usize, ConcreteType) {
         let mut curr_typ = base_type;
         let mut curr_offset = 0;
         
@@ -258,9 +263,8 @@ impl LIRBuilder {
 
             match curr_typ_layout {
                 LayoutInfo::Struct { size, field_offsets } => {
-                    let TypeDef::NewType(TypeConstructor::Struct { fields }) = self.typetable.get_typedef(curr_typ) else {
-                        unreachable!();
-                    };
+                    let ConcreteType::NewType(id, tvars) = curr_typ else {panic!("Type in field chain not struct");};
+                    let ConcreteShape::Struct { fields } = self.typetable.get_mono(id, tvars) else {unreachable!()};
                     curr_typ = fields[&field].clone();
                     curr_offset = curr_offset + field_offsets[&field];
                 } 
@@ -318,50 +322,51 @@ impl LayoutInfo {
 
 #[derive(Clone, Debug)]
 pub struct LayoutTable {
-    newtype_layouts: HashMap<PolyTypeIdentifier, LayoutInfo>
+    newtype_layouts: HashMap<ConcreteType, LayoutInfo>
 }
 
 impl LayoutTable {
 
-    pub fn make(typetable: TypeTable) -> LayoutTable {
+    pub fn make(typetable: GenericTypetable) -> LayoutTable {
         let mut table = LayoutTable{newtype_layouts: HashMap::new()};
-        for tp_id in typetable.topo_order {
-            let tp_constr = typetable.newtype_map[&tp_id].clone();
-            table.newtype_layouts.insert(tp_id, table.make_newtype_layout(tp_constr));
+        for (id, tvars, shape) in typetable.topo_mono_iter() {
+            table.newtype_layouts
+                .insert(ConcreteType::NewType(id, tvars), table.lay_out_newtype(shape));
         }
         table
     }   
 
-    pub fn get_layout(&self, typ: Type) -> LayoutInfo {
+    pub fn get_layout(&self, typ: ConcreteType) -> LayoutInfo {
         match typ {
-            Type::Prim(prim_tp) => self.get_primitive_layout(prim_tp),
-            Type::NewType(tp_constr) => self.newtype_layouts[&tp_constr].clone(),
-            Type::Reference(..) => LayoutInfo::Primitive(8)
+            ConcreteType::Prim(prim_tp) => self.get_primitive_layout(prim_tp),
+            ConcreteType::NewType(..) => self.newtype_layouts[&typ].clone(),
+            ConcreteType::Reference(..) => LayoutInfo::Primitive(8)
         }
     }
 
-    fn get_primitive_layout(&self, prim_tp: PrimType) -> LayoutInfo {
+    fn get_primitive_layout(&self, _prim_tp: PrimType) -> LayoutInfo {
         LayoutInfo::Primitive(8)        // Temporarily so; update later
     }
     
-    fn make_newtype_layout(&self, deriv_typ: TypeConstructor) -> LayoutInfo {
+    fn lay_out_newtype(&self, shape: ConcreteShape) -> LayoutInfo {
         
-        let TypeConstructor::Struct{fields} = deriv_typ else {
-            unimplemented!();
-        };
-
-        let mut f_offsets: HashMap<String, usize> = HashMap::new();
-
-        let mut curr_offset = 0;
-for (fname, ftype) in fields {
-            f_offsets.insert(fname, curr_offset);
-            let fsize = self.get_layout(ftype).size(); 
-            curr_offset = curr_offset + fsize;
-        }
-
-        LayoutInfo::Struct { 
-            size: curr_offset, 
-            field_offsets: f_offsets 
+        match shape {
+            ConcreteShape::Struct { fields } => {
+                let mut f_offsets: HashMap<String, usize> = HashMap::new();
+                let mut curr_offset = 0;
+                for (fname, ftype) in fields {
+                    f_offsets.insert(fname, curr_offset);
+                    let fsize = self.get_layout(ftype).size(); 
+                    curr_offset = curr_offset + fsize;
+                }
+                LayoutInfo::Struct { 
+                    size: curr_offset, 
+                    field_offsets: f_offsets 
+                }
+            }
+            ConcreteShape::Enum { variants: _} => {
+                unimplemented!();
+            }
         }
     }
 }
