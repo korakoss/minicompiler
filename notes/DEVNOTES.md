@@ -2,6 +2,10 @@
 > Currently trying to add generics. 
 If that finishes, clean up a bit, especially the infrastructure around running. Add more test programs, and also add Rust unit tests where possible. Improve documentation as well
 
+> (I.21) I think it might be finishing up. Weaved ConcreteType though most of the layers. The codebase compiles but fails on tests. The reason is an innocent change in parsing, where I got rid of branching on whether an identifier was a newtype or not (so we can have more flexible ordering of typedefs in code). But this leads to a parsing problem – for example it seems to me it parses some 
+```[identifier] {```
+pattern (which is meant to start a code block) as a struct literal. Solving this requires a lookahead parser. I think I should instead revert the relevant parsing for now, so we can see what's up with generics, debug, finish. Also, I did *concrete* types in the lower layers. Which is fine for the moment, not having generic funcs, but we should add those next.
+
 
 # Generics
 Typing, parsing and AST maybe done. HIR and HIR lowering are next. We need to decide where to monomorphize. And I need a better sense of what needs to be done.
