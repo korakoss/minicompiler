@@ -10,12 +10,12 @@ pub enum BinaryOperator {
     Modulo
 }
 
-pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type) -> Option<Type> {
+pub fn binop_typecheck(op: &BinaryOperator, left_type: &ConcreteType, right_type: &ConcreteType) -> Option<ConcreteType> {
     
     match op {
         &BinaryOperator::Add | &BinaryOperator::Sub | &BinaryOperator::Mul| &BinaryOperator::Modulo=>{
-            if left_type == &Type::Prim(PrimType::Integer) && right_type == &Type::Prim(PrimType::Integer){
-                Some(Type::Prim(PrimType::Integer))
+            if left_type == &ConcreteType::Prim(PrimType::Integer) && right_type == &ConcreteType::Prim(PrimType::Integer){
+                Some(ConcreteType::Prim(PrimType::Integer))
             } else {
                 None
             }
@@ -23,14 +23,14 @@ pub fn binop_typecheck(op: &BinaryOperator, left_type: &Type, right_type: &Type)
         &BinaryOperator::Equals => {
             if left_type == right_type {
                 // TODO: careful later
-                Some(Type::Prim(PrimType::Bool))
+                Some(ConcreteType::Prim(PrimType::Bool))
             } else {
                 None
             }
         }
         &BinaryOperator::Less => {
-            if left_type == &Type::Prim(PrimType::Integer) && right_type == &Type::Prim(PrimType::Integer){
-                Some(Type::Prim(PrimType::Bool))
+            if left_type == &ConcreteType::Prim(PrimType::Integer) && right_type == &ConcreteType::Prim(PrimType::Integer){
+                Some(ConcreteType::Prim(PrimType::Bool))
             } else {
                 None
             }
