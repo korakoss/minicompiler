@@ -322,11 +322,15 @@ impl Parser {
                         ASTExpression::FuncCall { funcname: name, args: args}
                     }
                     &Token::LeftBrace => {                                                  
-                        let fields = self.parse_struct_literal_internals();
-                        self.expect_unparametric_token(Token::RightBrace);
-                        ASTExpression::StructLiteral {
-                            typ: ConcreteType::NewType(NewtypeId(name), bindings),
-                            fields
+                        if self.new_types.contains_key(&NewtypeId(name.clone())) {
+                            let fields = self.parse_struct_literal_internals();
+                            self.expect_unparametric_token(Token::RightBrace);
+                            ASTExpression::StructLiteral {
+                                typ: ConcreteType::NewType(NewtypeId(name), bindings),
+                                fields
+                            }
+                        } else {
+                            ASTExpression::Variable(name)
                         }
                     }
                     _ => ASTExpression::Variable(name)
