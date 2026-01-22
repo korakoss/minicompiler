@@ -29,13 +29,38 @@ impl GenericTypetable {
         self.topo_order
             .iter()
             .flat_map(move |id| {
-                monomorphizations.remove(&id)
+            monomorphizations.remove(&id)
                     .unwrap_or_default()
                     .into_iter()
                     .map(move |(tvars, shape)| (id.clone(), tvars, shape))
             })
     }
-
+    
+    pub fn bind(
+        &mut self, 
+        id: NewtypeId, 
+        typ_var_vals: Vec<GenericType>
+    ) -> GenericShape {
+        let def = self.defs[&id].clone();
+        let type_params: BTreeMap<String, GenericType> = def.type_params
+            .iter()
+            .cloned()
+            .zip(typ_var_vals.iter().cloned())
+            .collect();
+        match def.defn {
+            GenericShape::Struct { fields } => {
+                GenericShape::Struct { 
+                    fields: fields
+                        .into_iter()
+                        .map(|(name, typ)| (name, typ.bind(&type_params)))
+                        .collect()
+                }
+            }
+            GenericShape::Enum {..} => {
+                unimplemented!();
+            }
+        }
+    }
 
     pub fn monomorphize(
         &mut self, 
@@ -43,21 +68,23 @@ impl GenericTypetable {
         typ_var_vals: Vec<ConcreteType>
     ) -> ConcreteShape {
         let def = self.defs[&id].clone();
-        let bindings: BTreeMap<String, ConcreteType> = def.type_params
+        let type_params: BTreeMap<String, ConcreteType> = def.type_params
             .iter()
             .cloned()
             .zip(typ_var_vals.iter().cloned())
             .collect();
         let monomorph = match def.defn {
-            NewtypeShape::Struct { fields } => {
-                NewtypeShape::Struct { 
+            GenericShape::Struct { fields } => {
+                ConcreteShape::Struct { 
                     fields: fields
                         .into_iter()
-                        .map(|(name, typ)| (name, typ.monomorphize(&bindings)))
+                        .map(|(name, typ)| (name, typ.monomorphize(&type_params)))
                         .collect()
                 }
             }
-            NewtypeShape::Enum { variants } => unimplemented!()
+            GenericShape::Enum { variants } => {
+                unimplemented!();
+            }
         };
         self.monomorphizations.get_mut(&id).unwrap().insert(typ_var_vals,monomorph.clone());
         monomorph

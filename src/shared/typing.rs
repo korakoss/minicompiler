@@ -18,18 +18,43 @@ pub enum GenericType {
 }
 
 impl GenericType {
+
+    pub fn bind(&self, bindings: &BTreeMap<String, GenericType>) -> GenericType {
+        match self {
+            Self::Prim(prim_typ) => GenericType::Prim(*prim_typ),
+            Self::NewType(id, gen_params) => {
+                let resolved_params = gen_params
+                    .iter()
+                    .map(|p| p.bind(bindings))
+                    .collect();
+                GenericType::NewType(id.clone(), resolved_params)
+                
+            }
+            Self::Reference(typ) => {
+                GenericType::Reference(Box::new(typ.bind(bindings)))
+            }
+            Self::TypeVar(id) => {
+                bindings[id].clone()
+            }
+        }
+    }
     
-    pub fn monomorphize(&self, bindings: &BTreeMap<String, ConcreteType>) -> ConcreteType {
+    pub fn monomorphize(&self, type_params: &BTreeMap<String, ConcreteType>) -> ConcreteType {
         match self {
             Self::Prim(prim_typ) => ConcreteType::Prim(*prim_typ),
             Self::NewType(id, gen_params) => {
-                let resolved_params = gen_params.iter().map(|p| p.monomorphize(bindings)).collect();
+                let resolved_params = gen_params
+                    .iter()
+                    .map(|p| p.monomorphize(type_params))
+                    .collect();
                 ConcreteType::NewType(id.clone(), resolved_params)
                 
             }
-            Self::Reference(typ) => ConcreteType::Reference(Box::new(typ.monomorphize(bindings))),
+            Self::Reference(typ) => {
+                ConcreteType::Reference(Box::new(typ.monomorphize(type_params)))
+            }
             Self::TypeVar(id) => {
-                bindings[id].clone()
+                type_params[id].clone()
             }
         }
     }

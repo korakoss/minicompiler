@@ -155,13 +155,13 @@ impl Parser {
                     typ: var_type
                 };
                 self.expect_unparametric_token(Token::Assign);
-                let value = self.parse_expression();
+                let value = self.parse_expression(scope_typevars);
                 self.expect_unparametric_token(Token::Semicolon);
                 ASTStatement::Let{var, value}
             }
             &Token::If => {
                 self.tokens.next();
-                let condition = self.parse_expression();
+                let condition = self.parse_expression(scope_typevars);
                 let if_body = self.parse_statement_block(scope_typevars);
                 let else_body =  if matches!(self.tokens.peek(), Some(Token::Else)) {
                     self.tokens.next();
@@ -171,7 +171,7 @@ impl Parser {
             }
             &Token::While => {
                 self.tokens.next();
-                let cond = self.parse_expression();
+                let cond = self.parse_expression(scope_typevars);
                 let body = self.parse_statement_block(scope_typevars);
                 ASTStatement::While { 
                     condition: cond, 
@@ -190,14 +190,14 @@ impl Parser {
             }
             &Token::Return => {
                 self.tokens.next();
-                let return_expr = self.parse_expression();
+                let return_expr = self.parse_expression(scope_typevars);
                 self.expect_unparametric_token(Token::Semicolon);
                 ASTStatement::Return(return_expr)
             }
             &Token::Print => {
                 self.tokens.next();
                 self.expect_unparametric_token(Token::LeftParen);
-                let expr = self.parse_expression();
+                let expr = self.parse_expression(scope_typevars);
                 self.expect_unparametric_token(Token::RightParen);
                 self.expect_unparametric_token(Token::Semicolon);        
                 ASTStatement::Print(expr)
@@ -205,9 +205,9 @@ impl Parser {
             _ => {                                      
                 // We assume it's an assignment 
                 // TODO: this is not actually correct, it might be a funccall
-                let target = self.parse_lvalue();
+                let target = self.parse_lvalue(scope_typevars);
                 self.expect_unparametric_token(Token::Assign);
-                let assign_value = self.parse_expression();
+                let assign_value = self.parse_expression(scope_typevars);
                 self.expect_unparametric_token(Token::Semicolon);
                 ASTStatement::Assign { 
                     target,
@@ -217,11 +217,11 @@ impl Parser {
         }
     } 
 
-    fn parse_lvalue(&mut self) -> ASTLValue {
+    fn parse_lvalue(&mut self, scope_typevars: &Vec<String>) -> ASTLValue {
         let mut curr_lvalue = match self.tokens.peek().unwrap() {
             &Token::Deref => {
                 self.tokens.next();
-                ASTLValue::Deref(self.parse_expression())
+                ASTLValue::Deref(self.parse_expression(scope_typevars))
             },
             _ => {
                 let root_var = self.expect_identifier();
@@ -240,12 +240,12 @@ impl Parser {
 
     }
 
-    fn parse_expression(&mut self) -> ASTExpression {
-        self.parse_expression_with_precedence(0)
+    fn parse_expression(&mut self, scope_typevars: &Vec<String>) -> ASTExpression {
+        self.parse_expression_with_precedence(0, scope_typevars)
     }
               
-    fn parse_expression_with_precedence(&mut self, current_level: usize) -> ASTExpression {
-        let mut current_expr = self.parse_unary();
+    fn parse_expression_with_precedence(&mut self, current_level: usize, scope_typevars: &Vec<String>) -> ASTExpression {
+        let mut current_expr = self.parse_unary(scope_typevars);
         loop {
             let token = self.tokens.peek().unwrap();
             let prec = match token {
@@ -268,7 +268,7 @@ impl Parser {
                 }
                 _ => {
                     let op = map_binop_token(&conn_token);
-                    let next_expr = self.parse_expression_with_precedence(prec + 1);
+                    let next_expr = self.parse_expression_with_precedence(prec + 1, scope_typevars);
                     ASTExpression::BinOp { op, left: Box::new(current_expr), right: Box::new(next_expr) }
                 }
             };
@@ -276,24 +276,24 @@ impl Parser {
         current_expr
     }
 
-    fn parse_unary(&mut self) -> ASTExpression {
+    fn parse_unary(&mut self, scope_typevars: &Vec<String>) -> ASTExpression {
         match self.tokens.peek().unwrap() {
             &Token::Ref => {
                 self.tokens.next();
-                let refd = self.parse_unary();
+                let refd = self.parse_unary(scope_typevars);
                 ASTExpression::Reference(Box::new(refd))
             }
             &Token::Deref => {
                 self.tokens.next();
-                let derefd = self.parse_unary();
+                let derefd = self.parse_unary(scope_typevars);
                 ASTExpression::Dereference(Box::new(derefd))
             }
-            _ => self.parse_postfix(),
+            _ => self.parse_postfix(scope_typevars),
         }
     }
 
-    fn parse_postfix(&mut self) -> ASTExpression {
-        let mut curr_expr = self.parse_expression_atom();
+    fn parse_postfix(&mut self, scope_typevars: &Vec<String>) -> ASTExpression {
+        let mut curr_expr = self.parse_expression_atom(scope_typevars);
         while self.tokens.peek().unwrap() == &Token::Dot {
             self.tokens.next();
             let field = self.expect_identifier();
@@ -305,12 +305,11 @@ impl Parser {
         curr_expr
     }
     
-    fn parse_expression_atom(&mut self) -> ASTExpression {
+    fn parse_expression_atom(&mut self, scope_typevars: &Vec<String>) -> ASTExpression {
         let token = self.tokens.next().unwrap();  
         match token {
             Token::IntLiteral(int) => ASTExpression::IntLiteral(int),
             Token::Identifier(name) => {
-                let bindings = self.expect_concrete_bindings(); // TODO: add later for funccall case, reject properly for variables
                 match self.tokens.peek().unwrap() {
                     &Token::LeftParen => {                                                      // FuncCall
                         self.tokens.next();
@@ -318,10 +317,10 @@ impl Parser {
                             &Token::RightParen => Vec::new(),
                             _ => {
                                 let mut collected_args: Vec<ASTExpression> = Vec::new();
-                                collected_args.push(self.parse_expression());
+                                collected_args.push(self.parse_expression(scope_typevars));
                                 while self.tokens.peek().unwrap() == &Token::Comma {
                                     self.tokens.next();
-                                    collected_args.push(self.parse_expression());
+                                    collected_args.push(self.parse_expression(scope_typevars));
                                 }
                                 collected_args
                             }
@@ -331,10 +330,11 @@ impl Parser {
                     }
                     &Token::LeftBrace => {                                                  
                         if self.new_types.contains_key(&NewtypeId(name.clone())) {
-                            let fields = self.parse_struct_literal_internals();
+                            let bindings = self.expect_generic_bindings(scope_typevars);
+                            let fields = self.parse_struct_literal_internals(scope_typevars);
                             self.expect_unparametric_token(Token::RightBrace);
                             ASTExpression::StructLiteral {
-                                typ: ConcreteType::NewType(NewtypeId(name), bindings),
+                                typ: GenericType::NewType(NewtypeId(name), bindings),
                                 fields
                             }
                         } else {
@@ -345,7 +345,7 @@ impl Parser {
                 }
             },
             Token::LeftParen => {
-                let paren_expr = self.parse_expression();
+                let paren_expr = self.parse_expression(scope_typevars);
                 self.expect_unparametric_token(Token::RightParen);
                 paren_expr
             },
@@ -357,13 +357,13 @@ impl Parser {
         }
     }
     
-    fn parse_struct_literal_internals(&mut self) -> HashMap<String, ASTExpression>{
+    fn parse_struct_literal_internals(&mut self, scope_typevars: &Vec<String>) -> HashMap<String, ASTExpression>{
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = HashMap::new();
         while self.tokens.peek() != Some(&Token::RightBrace) { // TODO: change (trail comma issue)
             let field_name = self.expect_identifier();
             self.expect_unparametric_token(Token::Colon);
-            let field_value = self.parse_expression();
+            let field_value = self.parse_expression(scope_typevars);
             self.expect_unparametric_token(Token::Comma);
             fields.insert(field_name, field_value);
         }

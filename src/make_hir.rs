@@ -86,9 +86,11 @@ impl HIRBuilder {
             }
             ASTLValue::FieldAccess { of, field: fname } => {
                 let hir_of = self.lower_lvalue(*of);
-                let GenericType::NewType(id, typvars) = hir_of.typ.clone() else {unreachable!()};
-                let typdef = self.typetable.monomorphize(id, typvars);
-                let ConcreteShape::Struct{fields} = typdef else {
+                let GenericType::NewType(id, typvars) = hir_of.typ.clone() else {
+                    unreachable!()
+                };
+                let typdef = self.typetable.bind(id, typvars);
+                let GenericShape::Struct{fields} = typdef else {
                     panic!("Expression in field access isn't a struct");
                 };
                 let field_type = fields.get(&fname).expect("Field not found in struct").clone();
@@ -254,9 +256,8 @@ impl HIRBuilder {
                 let GenericType::NewType(id, bindings) = hir_expr.typ.clone() else {
                     panic!("Expression in field access isn't a newtype");
                 };
-                let expr_typ = self.typetable.defs[&id]
-                let expr_typ = self.typetable.monomorphize(id, bindings);
-                let ConcreteShape::Struct { fields } = expr_typ else {
+                let expr_typ = self.typetable.bind(id, bindings);
+                let GenericShape::Struct { fields } = expr_typ else {
                     panic!("Expression in field access isn't a struct");
                 };
                 let field_type = fields.get(&field)
@@ -306,12 +307,12 @@ impl HIRBuilder {
 
     fn typecheck_struct_literal(
         &mut self, 
-        typ: ConcreteType, 
+        typ: GenericType, 
         literal_fields: HashMap<String, HIRExpression>
     ) {
-        let ConcreteType::NewType(id, typvars) = typ.clone() else {unreachable!()};
-        let typdef = self.typetable.monomorphize(id, typvars);
-        let ConcreteShape::Struct{fields: expected_fields} = typdef else {
+        let GenericType::NewType(id, typvars) = typ.clone() else {unreachable!()};
+        let typdef = self.typetable.bind(id, typvars);
+        let GenericShape::Struct{fields: expected_fields} = typdef else {
             panic!("Expression in field access isn't a struct");
         };
         for (fname, exp_type) in expected_fields {
