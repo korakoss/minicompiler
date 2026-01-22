@@ -19,7 +19,7 @@ pub struct MIRFunction {
     pub cells: HashMap<CellId, Cell>,
     pub blocks: HashMap<BlockId, MIRBlock>,
     pub entry: BlockId,
-    pub ret_type: ConcreteType,
+    pub ret_type: GenericType,
 }
 
 #[derive(Clone, Debug)]
@@ -61,7 +61,7 @@ pub enum MIRTerminator {
 
 #[derive(Clone, Debug)]
 pub struct MIRValue {
-    pub typ: ConcreteType,
+    pub typ: GenericType,
     pub value: MIRValueKind,
 }
 
@@ -72,7 +72,7 @@ pub enum MIRValueKind {
     BoolTrue,
     BoolFalse,
     StructLiteral {
-        typ: ConcreteType,
+        typ: GenericType,
         fields: HashMap<String, MIRValue>,
     },
     Reference(MIRPlace),
@@ -81,7 +81,7 @@ pub enum MIRValueKind {
 
 #[derive(Clone, Debug)]
 pub struct MIRPlace {
-    pub typ: ConcreteType,
+    pub typ: GenericType,
     pub base: MIRPlaceBase,
     pub fieldchain: Vec<String>
 }
@@ -94,7 +94,7 @@ pub enum MIRPlaceBase {
 
 #[derive(Clone, Debug)]
 pub struct Cell {
-    pub typ: ConcreteType,
+    pub typ: GenericType,
     pub kind: CellKind,
 }
 

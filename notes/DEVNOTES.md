@@ -7,6 +7,9 @@ If that finishes, clean up a bit, especially the infrastructure around running. 
 pattern (which is meant to start a code block) as a struct literal. Solving this requires a lookahead parser. I think I should instead revert the relevant parsing for now, so we can see what's up with generics, debug, finish. Also, I did *concrete* types in the lower layers. Which is fine for the moment, not having generic funcs, but we should add those next.
 
 
+> *!!!* Okay, generic typing seems to work. Now, onto generic functions. The plan is, first weave things through the IRs (mostly MIR left, hopefully). I want to first just achieve that, don't think about function monomorphization yet, just wire up a quick "monomorphization" in MIR->LIR (or someplace) that assumes functions are not generic yet. Test it that way. Then, wire up the monomorphization.
+
+
 # Generics
 Typing, parsing and AST maybe done. HIR and HIR lowering are next. We need to decide where to monomorphize. And I need a better sense of what needs to be done.
 
