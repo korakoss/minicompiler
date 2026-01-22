@@ -13,7 +13,7 @@ use std::{collections::HashMap};
         
 pub struct HIRBuilder {
     scope_context: ScopeContext,
-    function_map: HashMap<ConcreteFuncSignature, (FuncId, ConcreteType)>,
+    function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)>,
     typetable: GenericTypetable
 }
 
@@ -22,7 +22,7 @@ impl HIRBuilder {
     pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
         let ASTProgram{typetable, functions} = ast;
 
-        let function_map: HashMap<ConcreteFuncSignature, (FuncId, ConcreteType)> = functions
+        let function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)> = functions
             .iter()
             .enumerate()
             .map(|(i, (sgn, func))| (sgn.clone(), (FuncId(i), func.ret_type.clone())))
@@ -54,14 +54,14 @@ impl HIRBuilder {
     }
 
     fn lower_function(&mut self, func: ASTFunction) -> HIRFunction {
-        let ASTFunction { name, args, body, ret_type } = func;
+        let ASTFunction { name, typvars, args, body, ret_type } = func;
         self.scope_context.reset(ret_type.clone());
         let arg_ids: Vec<VarId>  = args
             .into_iter()
             .map(|arg| self.scope_context.add_var(Variable { name: arg.0, typ: arg.1}))
             .collect();
         let mut hir_body = self.lower_block(body, false);
-        if ret_type == ConcreteType::Prim(PrimType::None) {
+        if ret_type == GenericType::Prim(PrimType::None) {
             hir_body.push(HIRStatement::Return(None));
         }
         let hir_func = HIRFunction { 
@@ -86,7 +86,7 @@ impl HIRBuilder {
             }
             ASTLValue::FieldAccess { of, field: fname } => {
                 let hir_of = self.lower_lvalue(*of);
-                let ConcreteType::NewType(id, typvars) = hir_of.typ.clone() else {unreachable!()};
+                let GenericType::NewType(id, typvars) = hir_of.typ.clone() else {unreachable!()};
                 let typdef = self.typetable.monomorphize(id, typvars);
                 let ConcreteShape::Struct{fields} = typdef else {
                     panic!("Expression in field access isn't a struct");
@@ -102,7 +102,7 @@ impl HIRBuilder {
             }
             ASTLValue::Deref(reference) => {
                 let hir_ref = self.lower_expression(reference);
-                let ConcreteType::Reference(refd_typ) = hir_ref.typ.clone() else {unreachable!()};
+                let GenericType::Reference(refd_typ) = hir_ref.typ.clone() else {unreachable!()};
                 Place {
                     typ: *refd_typ,
                     place: PlaceKind::Deref(hir_ref)
@@ -134,7 +134,7 @@ impl HIRBuilder {
             }
             ASTStatement::If { condition, if_body, else_body } => {
                 let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != ConcreteType::Prim(PrimType::Bool) {
+                if hir_condition.typ != GenericType::Prim(PrimType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::If {
@@ -148,7 +148,7 @@ impl HIRBuilder {
             }
             ASTStatement::While { condition, body } => {
                 let hir_condition = self.lower_expression(condition);
-                if hir_condition.typ != ConcreteType::Prim(PrimType::Bool) {
+                if hir_condition.typ != GenericType::Prim(PrimType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::While { 
@@ -195,7 +195,7 @@ impl HIRBuilder {
     fn lower_expression(&mut self, expr: ASTExpression) -> HIRExpression {
         match expr {
             ASTExpression::IntLiteral(num) => HIRExpression {
-                typ: ConcreteType::Prim(PrimType::Integer),
+                typ: GenericType::Prim(PrimType::Integer),
                 expr: HIRExpressionKind::IntLiteral(num),
             },
             ASTExpression::Variable(varname) => {
@@ -242,18 +242,19 @@ impl HIRBuilder {
                 } 
             }
             ASTExpression::BoolTrue => HIRExpression {
-                typ: ConcreteType::Prim(PrimType::Bool),
+                typ: GenericType::Prim(PrimType::Bool),
                 expr: HIRExpressionKind::BoolTrue,
             },
             ASTExpression::BoolFalse => HIRExpression {
-                typ: ConcreteType::Prim(PrimType::Bool),
+                typ: GenericType::Prim(PrimType::Bool),
                 expr: HIRExpressionKind::BoolFalse,
             },
             ASTExpression::FieldAccess{expr, field} => {
                 let hir_expr = self.lower_expression(*expr);
-                let ConcreteType::NewType(id, bindings) = hir_expr.typ.clone() else {
+                let GenericType::NewType(id, bindings) = hir_expr.typ.clone() else {
                     panic!("Expression in field access isn't a newtype");
                 };
+                let expr_typ = self.typetable.defs[&id]
                 let expr_typ = self.typetable.monomorphize(id, bindings);
                 let ConcreteShape::Struct { fields } = expr_typ else {
                     panic!("Expression in field access isn't a struct");
@@ -285,13 +286,13 @@ impl HIRBuilder {
             ASTExpression::Reference(refd) => {
                 let hir_refd = self.lower_expression(*refd);
                 HIRExpression{
-                    typ: ConcreteType::Reference(Box::new(hir_refd.typ.clone())),
+                    typ: GenericType::Reference(Box::new(hir_refd.typ.clone())),
                     expr: HIRExpressionKind::Reference(Box::new(hir_refd)),
                 }
             }
             ASTExpression::Dereference(derefd) => {
                 let hir_derefd = self.lower_expression(*derefd);
-                let ConcreteType::Reference(deref_typ) = hir_derefd.typ.clone() else {
+                let GenericType::Reference(deref_typ) = hir_derefd.typ.clone() else {
                     unreachable!();
                 };
                 HIRExpression{
@@ -326,9 +327,9 @@ impl HIRBuilder {
 struct ScopeContext {
     var_scope_stack: Vec<HashMap<String, VarId>>,
     loop_entrances: Vec<bool>,
-    var_map: HashMap<VarId, ConcreteVariable>,
+    var_map: HashMap<VarId, GenTypeVariable>,
     var_counter: usize,
-    ret_type: Option<ConcreteType>,
+    ret_type: Option<GenericType>,
 }
 
 
@@ -345,7 +346,7 @@ impl ScopeContext {
         }
     }
 
-    fn reset(&mut self, new_ret_type: ConcreteType) {
+    fn reset(&mut self, new_ret_type: GenericType) {
         self.var_scope_stack = vec![HashMap::new()];
         self.loop_entrances = vec![false];
         self.var_map = HashMap::new();
@@ -366,7 +367,7 @@ impl ScopeContext {
         self.loop_entrances.pop();
     }
     
-    fn add_var(&mut self, var: ConcreteVariable) -> VarId {
+    fn add_var(&mut self, var: GenTypeVariable) -> VarId {
         let id = VarId(self.var_counter);
         self.var_counter = self.var_counter + 1;
         self.var_scope_stack.last_mut().unwrap().insert(var.name.clone(), id);
@@ -374,7 +375,7 @@ impl ScopeContext {
         id
     }
 
-    fn get_var_info(&self, name: &String) -> (VarId, ConcreteType) {
+    fn get_var_info(&self, name: &String) -> (VarId, GenericType) {
         let id = **self.var_scope_stack
             .iter()
             .flatten()

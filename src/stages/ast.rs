@@ -94,7 +94,7 @@ pub enum ASTExpression {
     },
 
     StructLiteral {
-        typ: ConcreteType,
+        typ: GenericType,
         fields: HashMap<String, ASTExpression>,
     },
 

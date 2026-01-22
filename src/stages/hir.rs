@@ -18,9 +18,9 @@ pub struct HIRProgram {
 pub struct HIRFunction {
     pub name: String,
     pub args: Vec<VarId>,
-    pub variables: HashMap<VarId, ConcreteVariable>,
+    pub variables: HashMap<VarId, GenTypeVariable>,
     pub body: Vec<HIRStatement>,
-    pub ret_type: ConcreteType,
+    pub ret_type: GenericType,
 }
 
 
@@ -42,16 +42,17 @@ pub enum HIRStatement {
     While {
         condition: HIRExpression, 
         body: Vec<HIRStatement>,
-},
+    },
     Break,
     Continue,
     Return(Option<HIRExpression>),
     Print(HIRExpression),
 }
 
+
 #[derive(Debug, Clone)]
 pub struct HIRExpression {
-    pub typ: ConcreteType,
+    pub typ: GenericType,
     pub expr: HIRExpressionKind,
 }
 
@@ -85,7 +86,7 @@ pub enum HIRExpressionKind {
 
 #[derive(Clone, Debug)]
 pub struct Place {
-    pub typ: ConcreteType,
+    pub typ: GenericType,
     pub place: PlaceKind,
 }
 

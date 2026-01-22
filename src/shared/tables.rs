@@ -36,6 +36,7 @@ impl GenericTypetable {
             })
     }
 
+
     pub fn monomorphize(
         &mut self, 
         id: NewtypeId, 
