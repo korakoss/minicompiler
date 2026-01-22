@@ -337,8 +337,8 @@ impl ScopeContext {
 
     fn new() -> Self {
         ScopeContext {
-            var_scope_stack: Vec::new(),
-            loop_entrances: Vec::new(),
+            var_scope_stack: vec![HashMap::new()],
+            loop_entrances: vec![false],
             var_map: HashMap::new(),
             var_counter: 0,
             ret_type: None,
@@ -346,8 +346,8 @@ impl ScopeContext {
     }
 
     fn reset(&mut self, new_ret_type: ConcreteType) {
-        self.var_scope_stack = Vec::new();
-        self.loop_entrances = Vec::new();
+        self.var_scope_stack = vec![HashMap::new()];
+        self.loop_entrances = vec![false];
         self.var_map = HashMap::new();
         self.ret_type = Some(new_ret_type);
     }
