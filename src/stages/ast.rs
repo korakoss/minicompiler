@@ -9,21 +9,22 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct ASTProgram {
     pub typetable: GenericTypetable,
-    pub functions: HashMap<ConcreteFuncSignature, ASTFunction>,
+    pub functions: HashMap<GenericFuncSignature, ASTFunction>,
 }
 
 
 #[derive(Debug, Clone)]
 pub struct ASTFunction {
     pub name: String,
-    pub args: HashMap<String, ConcreteType>,    // Does this lose argument order?
+    pub typvars: Vec<String>,
+    pub args: HashMap<String, GenericType>,    // TODO: Does this lose argument order?
     pub body: Vec<ASTStatement>,
-    pub ret_type: ConcreteType,
+    pub ret_type: GenericType,
 }
 
 impl ASTFunction {
    
-    pub fn get_signature(&self) -> ConcreteFuncSignature {
+    pub fn get_signature(&self) -> GenericFuncSignature {
         FuncSignature { 
             name: self.name.clone(), 
             argtypes: self.args
@@ -39,7 +40,7 @@ impl ASTFunction {
 #[derive(Debug, Clone)]
 pub enum ASTStatement {
     Let {
-        var: ConcreteVariable,
+        var: GenTypeVariable,
         value: ASTExpression,
     },
     Assign {

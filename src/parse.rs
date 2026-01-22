@@ -11,7 +11,7 @@ use crate::shared::utils::*;
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
     new_types: HashMap<NewtypeId, GenericTypeDef>,
-    functions: HashMap<ConcreteFuncSignature, ASTFunction>,
+    functions: HashMap<GenericFuncSignature, ASTFunction>,
 }
 
 
@@ -83,15 +83,17 @@ impl Parser {
         self.expect_unparametric_token(Token::Function);
         let funcname = self.expect_identifier(); 
 
+        let type_vars = self.collect_type_vars();
+
         self.expect_unparametric_token(Token::LeftParen);
-        let args:HashMap<String, ConcreteType> = match self.tokens.peek().unwrap() {
+        let args:HashMap<String, GenericType> = match self.tokens.peek().unwrap() {
             &Token::RightParen => {
                 HashMap::new()
             }
             &Token::Identifier(_) => {
                 let name1 = self.expect_identifier();
                 self.expect_unparametric_token(Token::Colon);
-                let typ1 = self.expect_concrete_type_annotation();
+                let typ1 = self.expect_generic_type_annotation(&type_vars);
                 let mut args = HashMap::new();
                 args.insert(name1, typ1);
 
@@ -99,7 +101,7 @@ impl Parser {
                     self.tokens.next();
                     let arg_name = self.expect_identifier();
                     self.expect_unparametric_token(Token::Colon);
-                    let arg_type = self.expect_concrete_type_annotation();
+                    let arg_type = self.expect_generic_type_annotation(&type_vars);
                     args.insert(arg_name, arg_type);
                 }
                 args
@@ -113,36 +115,42 @@ impl Parser {
         let ret_type_id = match self.tokens.peek().unwrap() {
             Token::RightArrow => {
                 self.tokens.next();
-                self.expect_concrete_type_annotation()
+                self.expect_generic_type_annotation(&type_vars)
             },
             _ => {
-                ConcreteType::Prim(PrimType::None)
+                GenericType::Prim(PrimType::None)
             }
         };
-        let body = self.parse_statement_block();
-        let func = ASTFunction {name: funcname, args: args, body: body, ret_type: ret_type_id};
+        let body = self.parse_statement_block(&type_vars);
+        let func = ASTFunction {
+            name: funcname, 
+            typvars: type_vars,
+            args: args, 
+            body: body, 
+            ret_type: ret_type_id
+        };
         let sgn = func.get_signature();
         self.functions.insert(sgn, func);
     }
     
-    fn parse_statement_block(&mut self) -> Vec<ASTStatement> {
+    fn parse_statement_block(&mut self, scope_typevars: &Vec<String>) -> Vec<ASTStatement> {
         let mut statements = Vec::new();
         self.expect_unparametric_token(Token::LeftBrace);
         while !matches!(self.tokens.peek(), Some(Token::RightBrace)){
-            statements.push(self.parse_statement());
+            statements.push(self.parse_statement(scope_typevars));
         }
         self.expect_unparametric_token(Token::RightBrace);
         statements
     }
     
-    fn parse_statement(&mut self) -> ASTStatement {
+    fn parse_statement(&mut self, scope_typevars: &Vec<String>) -> ASTStatement {
         match self.tokens.peek().unwrap() {           
             &Token::Let => {
                 self.tokens.next();
                 let var_name = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
-                let var_type = self.expect_concrete_type_annotation();
-                let var = ConcreteVariable {
+                let var_type = self.expect_generic_type_annotation(scope_typevars);
+                let var = GenTypeVariable {
                     name: var_name, 
                     typ: var_type
                 };
@@ -154,17 +162,17 @@ impl Parser {
             &Token::If => {
                 self.tokens.next();
                 let condition = self.parse_expression();
-                let if_body = self.parse_statement_block();
+                let if_body = self.parse_statement_block(scope_typevars);
                 let else_body =  if matches!(self.tokens.peek(), Some(Token::Else)) {
                     self.tokens.next();
-                    Some(self.parse_statement_block())
+                    Some(self.parse_statement_block(scope_typevars))
                 } else {None};
                 ASTStatement::If {condition, if_body, else_body}
             }
             &Token::While => {
                 self.tokens.next();
                 let cond = self.parse_expression();
-                let body = self.parse_statement_block();
+                let body = self.parse_statement_block(scope_typevars);
                 ASTStatement::While { 
                     condition: cond, 
                     body: body,
@@ -443,7 +451,6 @@ impl Parser {
             }
         }
     }
-
 
     fn expect_concrete_bindings(&mut self) -> Vec<ConcreteType> {
         if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
