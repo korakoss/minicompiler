@@ -11,7 +11,9 @@ There are other branches open for working on the pointer-based ABI rewrite as we
 The items below are roughly in planned chronological order of implementation. Some reasoning for this order.
 So, first, we do only generic types and then concretely instantiated variables. This is a much more tractable problem than monomorphizing functions, but lets us test a lot of the infrastructure for generics. Much of the parsing is the same, the type system is the same. 
 Then, we add generic functions. This adds some complication to tracking the scoping of the type variables, and then also in lower stages, where we now have to monomorphize functions too.
+Afterwards, we might start work on methods. I'm not entirely sure whether we want to add methods or infras first – decide that.
 Then, we start preparation for infras, by implementing enums and methods. It's clear why methods should be implemented before infras: the point of infras are the inheritance of methods to subtypes. Enums, on the other hand, are helpful for infras (I think), because both are basically concerned with subtyping in different forms, so if we work out some kind of subtyping infrastructure in the easier case of enums, that can set us up for infras to some degree.  
+There are also a number of problems coming up that seem to necessitate a fundamentally better lookahead parser. That should be done soon too.
 Finally, we add heap. This must clearly come after generics, generic functions and methods, if we want to do them in a correctly typed manner. They are, a priori, fairly interchangeable with infras (and potentially even enums), but I want to do those first because they seem more disruptive to the overall pipeline.
 
 

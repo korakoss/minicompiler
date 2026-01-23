@@ -1,13 +1,7 @@
 
-> Currently trying to add generics. 
-If that finishes, clean up a bit, especially the infrastructure around running. Add more test programs, and also add Rust unit tests where possible. Improve documentation as well
+Generic struct definitions, and then monomorphized usage for variables seems to work (on the _generics_ branch, at least). 
+On the current branch, right now, I'm trying to make the modifications necessary throughout pipeline stages. First, not even actually supporting generic functions is enough, the point is just to get things in generic form to MIR and so on. So fix the bugs necessary for that. Then, implement generic functions Then, implement generic methods.
 
-> (I.21) I think it might be finishing up. Weaved ConcreteType though most of the layers. The codebase compiles but fails on tests. The reason is an innocent change in parsing, where I got rid of branching on whether an identifier was a newtype or not (so we can have more flexible ordering of typedefs in code). But this leads to a parsing problem – for example it seems to me it parses some 
-```[identifier] {```
-pattern (which is meant to start a code block) as a struct literal. Solving this requires a lookahead parser. I think I should instead revert the relevant parsing for now, so we can see what's up with generics, debug, finish. Also, I did *concrete* types in the lower layers. Which is fine for the moment, not having generic funcs, but we should add those next.
-
-
-> *!!!* Okay, generic typing seems to work. Now, onto generic functions. The plan is, first weave things through the IRs (mostly MIR left, hopefully). I want to first just achieve that, don't think about function monomorphization yet, just wire up a quick "monomorphization" in MIR->LIR (or someplace) that assumes functions are not generic yet. Test it that way. Then, wire up the monomorphization.
 
 
 # Generics

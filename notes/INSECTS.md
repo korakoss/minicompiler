@@ -24,6 +24,12 @@ It currently typechecks any a==b expression as valid if the two types are the sa
 ## Struct moves
 Moves on large types currently don't work.
 
+## Parser limitations
+Due to the parser being based on 1-lookahead, there are a number of things it can't really do cleanly in its current for. For example, the
+``` *identifier* {```
+pattern might be starting a struct literal, or a statement block. The current approach solves this by checking the identifier against a list of newtype names. This is fine for now, but it assumes that type definitions come before any usage, which is not desirable. Handling it correctly would require more sophisticated lookahead parsing. So work that parsing out. 
+
+
 # Could be done nicer
 
 ## Hashmap things
