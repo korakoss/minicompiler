@@ -92,7 +92,7 @@ impl LIRBuilder {
                 let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();
 
                 for arg in args {
-                    let arg_size = self.layouts.get_layout(arg.typ.clone()).size();
+                    let arg_size = self.layouts.get_layout(arg.typ.coerce_concrete()).size();
                     let arg_chunk = self.add_chunk(Chunk { size: arg_size});
                     let arg_place = LIRPlace {
                         size: arg_size, 
@@ -144,7 +144,7 @@ impl LIRBuilder {
     }
 
     fn lower_value_into_operand(&mut self, value: MIRValue) -> (LIRValue, Vec<LIRStatement>) {
-        let size = self.layouts.get_layout(value.typ.clone()).size();
+        let size = self.layouts.get_layout(value.typ.coerce_concrete()).size();
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
@@ -161,7 +161,7 @@ impl LIRBuilder {
             }
             MIRValueKind::StructLiteral {..} => {
                 let temp_chunk = Chunk {
-                    size: self.layouts.get_layout(value.typ.clone()).size(),
+                    size: self.layouts.get_layout(value.typ.coerce_concrete()).size(),
                 };
                 let temp_id = self.add_chunk(temp_chunk);
                 let temp_place = LIRPlace {
@@ -181,7 +181,7 @@ impl LIRBuilder {
     }
 
     fn lower_value_into_place(&self, value: MIRValue, target: LIRPlace) -> Vec<LIRStatement> {
-        let size = self.layouts.get_layout(value.typ.clone()).size();
+        let size = self.layouts.get_layout(value.typ.coerce_concrete()).size();
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
@@ -197,12 +197,13 @@ impl LIRBuilder {
                 vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::BoolFalse}}]
             }
             MIRValueKind::StructLiteral { typ, fields } => {
-                let LayoutInfo::Struct { size: _, field_offsets } = self.layouts.get_layout(typ) else {
-                    unreachable!();
+                let LayoutInfo::Struct { size: _, field_offsets } = self.layouts
+                    .get_layout(typ.coerce_concrete()) else {
+                        unreachable!();
                 };
                 let mut stmts: Vec<LIRStatement> = Vec::new();
                 for (fname, fexpr) in fields {
-                    let fsize = self.layouts.get_layout(fexpr.typ.clone()).size();
+                    let fsize = self.layouts.get_layout(fexpr.typ.coerce_concrete()).size();
                     let f_target = LIRPlace {
                         size: fsize,
                         place: increment_place_offset(target.place.clone(), field_offsets[&fname]),
@@ -221,7 +222,7 @@ impl LIRBuilder {
 
     fn lower_place(&self, place: MIRPlace) -> LIRPlace {
         // TODO: weird solution, change it
-        let size = self.layouts.get_layout(place.typ).size();
+        let size = self.layouts.get_layout(place.typ.coerce_concrete()).size();
         match place.base {
             MIRPlaceBase::Cell(c_id) => {
 
@@ -278,9 +279,9 @@ impl LIRBuilder {
     
     fn lower_cell(&mut self, id: CellId, cell: Cell) {
         // TODO: This should lower into LIRPlace. I think?
-        let chunk = Chunk {size: self.layouts.get_layout(cell.typ.clone()).size()};
+        let chunk = Chunk {size: self.layouts.get_layout(cell.typ.coerce_concrete()).size()};
         let chunk_id = self.add_chunk(chunk);
-        self.cell_chunk_map.insert(id, (chunk_id, cell.typ));
+        self.cell_chunk_map.insert(id, (chunk_id, cell.typ.coerce_concrete()));
     }
 
     fn add_chunk(&mut self, chunk: Chunk) -> ChunkId {

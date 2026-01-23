@@ -19,6 +19,24 @@ pub enum GenericType {
 
 impl GenericType {
 
+    // NOTE: this method is an utility for development purposes
+    pub fn coerce_concrete(&self) -> ConcreteType {
+        match self {
+            Self::Prim(prim_typ) => ConcreteType::Prim(*prim_typ),
+            Self::NewType(id, type_params) => {
+                ConcreteType::NewType(id.clone(), type_params
+                    .iter()
+                    .map(|p| p.coerce_concrete())
+                    .collect()
+                )
+            },
+            Self::Reference(typ) => {
+                ConcreteType::Reference(Box::new(typ.coerce_concrete()))
+            },
+            Self::TypeVar(..) => {panic!("Typevars cannot be coerced");}
+        }
+    }
+
     pub fn bind(&self, bindings: &BTreeMap<String, GenericType>) -> GenericType {
         match self {
             Self::Prim(prim_typ) => GenericType::Prim(*prim_typ),

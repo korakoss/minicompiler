@@ -330,15 +330,23 @@ impl Parser {
                     }
                     &Token::LeftBrace => {                                                  
                         if self.new_types.contains_key(&NewtypeId(name.clone())) {
-                            let bindings = self.expect_generic_bindings(scope_typevars);
                             let fields = self.parse_struct_literal_internals(scope_typevars);
                             self.expect_unparametric_token(Token::RightBrace);
                             ASTExpression::StructLiteral {
-                                typ: GenericType::NewType(NewtypeId(name), bindings),
+                                typ: GenericType::NewType(NewtypeId(name), vec![]),
                                 fields
                             }
                         } else {
                             ASTExpression::Variable(name)
+                        }
+                    }
+                    &Token::LeftSqBracket => {      // TODO: for now, we assume this is a struct literal with generic parameters, later it can be indexing, etc however
+                        let bindings = self.expect_generic_bindings(scope_typevars);
+                        let fields = self.parse_struct_literal_internals(scope_typevars);
+                        self.expect_unparametric_token(Token::RightBrace);
+                        ASTExpression::StructLiteral {
+                            typ: GenericType::NewType(NewtypeId(name), bindings),
+                            fields
                         }
                     }
                     _ => ASTExpression::Variable(name)
