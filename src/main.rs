@@ -24,7 +24,7 @@ use lir_codegen::*;
 
 
 mod mmir;
-
+mod monom_mir;
 
 fn main() {
     
