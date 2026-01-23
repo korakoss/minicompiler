@@ -329,6 +329,7 @@ pub struct LayoutTable {
 impl LayoutTable {
 
     pub fn make(typetable: GenericTypetable) -> LayoutTable {
+        println!("TypeTable: {:#?}", typetable);
         let mut table = LayoutTable{newtype_layouts: HashMap::new()};
         for (id, tvars, shape) in typetable.topo_mono_iter() {
             table.newtype_layouts
@@ -338,6 +339,8 @@ impl LayoutTable {
     }   
 
     pub fn get_layout(&self, typ: ConcreteType) -> LayoutInfo {
+        println!("LayoutTable: {:#?}", self.newtype_layouts );
+        println!("Getting layout for {:#?}", typ);
         match typ {
             ConcreteType::Prim(prim_tp) => self.get_primitive_layout(prim_tp),
             ConcreteType::NewType(..) => self.newtype_layouts[&typ].clone(),

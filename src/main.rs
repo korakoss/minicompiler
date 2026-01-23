@@ -23,6 +23,9 @@ mod lir_codegen;
 use lir_codegen::*;
 
 
+mod mmir;
+
+
 fn main() {
     
     let args: Vec<String> = env::args().collect();
