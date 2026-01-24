@@ -3,24 +3,13 @@ use std::env;
 
 mod shared;
 mod stages;
-
-mod lex;
-use lex::*;
-
-mod parse;
-use parse::*;
-
-mod make_hir;
-use make_hir::*;
-
-mod hir_to_mir;
-use hir_to_mir::*;
-
-mod mir_to_lir;
-use mir_to_lir::*;
-
-mod lir_codegen;
-use lir_codegen::*;
+mod passes;
+use passes::preproc::lex::*;
+use passes::preproc::parse::*;
+use passes::make_hir::*;
+use passes::hir_to_mir::*;
+use passes::mir_to_lir::*;
+use passes::lir_codegen::*;
 
 
 fn main() {

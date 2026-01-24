@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::iter::Peekable;
 
-use crate::shared::tokens::*;
+use crate::passes::preproc::tokens::*;
 use crate::shared::typing::*;
 use crate::stages::ast::*;
 use crate::shared::tables::*;
