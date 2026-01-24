@@ -64,7 +64,7 @@ impl LIRBuilder {
             statements.extend(lowered);
         }
         let (terminator, term_stmts) = self.lower_terminator(block.terminator);
-        statements.extend(term_stmts.into_iter());
+        statements.extend(term_stmts);
         LIRBlock { statements, terminator }
     }
 

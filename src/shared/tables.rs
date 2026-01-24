@@ -99,11 +99,11 @@ fn extract_newtype_dependencies(newtype_defs: &HashMap<NewtypeId, GenericTypeDef
         let deps: Vec<NewtypeId> = match &newtype.defn {
             NewtypeShape::Struct {fields} => fields
                 .values()
-                .flat_map(|ftyp| extract_type_id(ftyp))
+                .flat_map(extract_type_id)
                 .collect(),
             NewtypeShape::Enum { variants } => variants
                 .iter()
-                .flat_map(|vtyp| extract_type_id(&vtyp))
+                .flat_map(extract_type_id)
                 .collect(),
         };
         dep_graph.insert(type_id.clone(), deps);
@@ -118,7 +118,7 @@ fn extract_type_id(t: &GenericType) -> Vec<NewtypeId> {
         GenericType::NewType(id, t_params) => {
             let mut deps: Vec<NewtypeId> = t_params
                 .iter()
-                .flat_map(|p| extract_type_id(p))
+                .flat_map(extract_type_id)
                 .collect::<Vec<_>>();
             deps.push(id.clone());
             deps

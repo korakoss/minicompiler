@@ -277,13 +277,13 @@ impl Parser {
     }
 
     fn parse_unary(&mut self, scope_typevars: &Vec<String>) -> ASTExpression {
-        match self.tokens.peek().unwrap() {
-            &Token::Ref => {
+        match *self.tokens.peek().unwrap() {
+            Token::Ref => {
                 self.tokens.next();
                 let refd = self.parse_unary(scope_typevars);
                 ASTExpression::Reference(Box::new(refd))
             }
-            &Token::Deref => {
+            Token::Deref => {
                 self.tokens.next();
                 let derefd = self.parse_unary(scope_typevars);
                 ASTExpression::Dereference(Box::new(derefd))

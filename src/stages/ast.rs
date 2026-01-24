@@ -27,10 +27,7 @@ impl ASTFunction {
     pub fn get_signature(&self) -> GenericFuncSignature {
         FuncSignature { 
             name: self.name.clone(), 
-            argtypes: self.args
-                .values()
-                .map(|argt| argt.clone())
-                .collect()
+            argtypes: self.args.values().cloned().collect()
         }
     }
 }
