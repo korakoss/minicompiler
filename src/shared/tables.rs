@@ -21,18 +21,6 @@ impl GenericTypetable {
             defs,
         }
     }
-
-    pub fn topo_mono_iter(&self) -> impl Iterator<Item = (NewtypeId, Vec<ConcreteType>, ConcreteShape)> {
-        let mut monomorphizations = self.monomorphizations.clone();
-        self.topo_order
-            .iter()
-            .flat_map(move |id| {
-            monomorphizations.remove(id)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(move |(tvars, shape)| (id.clone(), tvars, shape))
-            })
-    }
     
     pub fn bind(
         &mut self, 
