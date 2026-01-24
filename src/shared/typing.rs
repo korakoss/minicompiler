@@ -4,7 +4,7 @@ use std::collections::{BTreeMap};
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
     Prim(PrimType),
-    NewType(NewtypeId, Vec<ConcreteType>),
+    NewType(NewtypeId, Vec<ConcreteType>),  // Should we separate it out in its own (gen) struct?
     Reference(Box<ConcreteType>),
 }
 

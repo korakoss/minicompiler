@@ -19,7 +19,7 @@ pub struct LIRBuilder {
 impl LIRBuilder {
     
     pub fn lower_mir(program: MIRProgram) -> LIRProgram {
-        let layouts = LayoutTable::make(program.typetable.clone());
+        let layouts = LayoutTable::new(program.typetable.clone());
         let mut builder = LIRBuilder {
             cell_chunk_map: HashMap::new(),
             curr_chunks: HashMap::new(),
@@ -180,7 +180,11 @@ impl LIRBuilder {
         }
     }
 
-    fn lower_value_into_place(&self, value: MIRValue, target: LIRPlace) -> Vec<LIRStatement> {
+    fn lower_value_into_place(
+        &mut self, 
+        value: MIRValue, 
+        target: LIRPlace
+    ) -> Vec<LIRStatement> {
         let size = self.layouts.get_layout(value.typ.coerce_concrete()).size();
         match value.value {
             MIRValueKind::Place(val_place) => {
@@ -220,7 +224,7 @@ impl LIRBuilder {
         }
     }
 
-    fn lower_place(&self, place: MIRPlace) -> LIRPlace {
+    fn lower_place(&mut self, place: MIRPlace) -> LIRPlace {
         // TODO: weird solution, change it
         let size = self.layouts.get_layout(place.typ.coerce_concrete()).size();
         match place.base {
@@ -252,7 +256,7 @@ impl LIRBuilder {
     }
 
     fn lower_fieldchain(
-        &self, 
+        &mut self, 
         base_type: ConcreteType, 
         chain: Vec<String>
     ) -> (usize, ConcreteType) {
@@ -265,7 +269,7 @@ impl LIRBuilder {
             match curr_typ_layout {
                 LayoutInfo::Struct { size, field_offsets } => {
                     let ConcreteType::NewType(id, tvars) = curr_typ else {panic!("Type in field chain not struct");};
-                    let ConcreteShape::Struct { fields } = self.typetable.get_mono(id, tvars) else {unreachable!()};
+                    let ConcreteShape::Struct { fields } = self.typetable.monomorphize(id, tvars) else {unreachable!()};
                     curr_typ = fields[&field].clone();
                     curr_offset = curr_offset + field_offsets[&field];
                 } 
@@ -323,25 +327,32 @@ impl LayoutInfo {
 
 #[derive(Clone, Debug)]
 pub struct LayoutTable {
+    typetable: GenericTypetable,
     newtype_layouts: HashMap<ConcreteType, LayoutInfo>
 }
 
+
 impl LayoutTable {
 
-    pub fn make(typetable: GenericTypetable) -> LayoutTable {
-        let mut table = LayoutTable{newtype_layouts: HashMap::new()};
-        for (id, tvars, shape) in typetable.topo_mono_iter() {
-            table.newtype_layouts
-                .insert(ConcreteType::NewType(id, tvars), table.lay_out_newtype(shape));
+    pub fn new(typetable: GenericTypetable) -> Self {
+        Self {
+            typetable,
+            newtype_layouts: HashMap::new(),
         }
-        table
-    }   
+    }
 
-    pub fn get_layout(&self, typ: ConcreteType) -> LayoutInfo {
+    pub fn get_layout(&mut self, typ: ConcreteType) -> LayoutInfo {
         match typ {
             ConcreteType::Prim(prim_tp) => self.get_primitive_layout(prim_tp),
-            ConcreteType::NewType(..) => self.newtype_layouts[&typ].clone(),
-            ConcreteType::Reference(..) => LayoutInfo::Primitive(8)
+            ConcreteType::Reference(..) => LayoutInfo::Primitive(8),
+            ConcreteType::NewType(..) => {
+                if let Some(layout) = self.newtype_layouts.get(&typ) {
+                    layout.clone()
+                } else {
+                    self.lay_out_newtype(typ)
+                }
+            }
+        
         }
     }
 
@@ -349,9 +360,12 @@ impl LayoutTable {
         LayoutInfo::Primitive(8)        // Temporarily so; update later
     }
     
-    fn lay_out_newtype(&self, shape: ConcreteShape) -> LayoutInfo {
-        
-        match shape {
+    fn lay_out_newtype(&mut self, ntyp: ConcreteType) -> LayoutInfo { 
+        let ConcreteType::NewType(id, tparams) = ntyp.clone() else {
+            unreachable!();
+        };
+        let shape = self.typetable.monomorphize(id, tparams);
+        let layout = match shape {
             ConcreteShape::Struct { fields } => {
                 let mut f_offsets: HashMap<String, usize> = HashMap::new();
                 let mut curr_offset = 0;
@@ -368,7 +382,9 @@ impl LayoutTable {
             ConcreteShape::Enum { variants: _} => {
                 unimplemented!();
             }
-        }
+        };
+        self.newtype_layouts.insert(ntyp, layout.clone());
+        layout
     }
 }
 

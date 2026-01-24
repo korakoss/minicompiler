@@ -20,10 +20,6 @@ impl GenericTypetable {
         }
     }
 
-    pub fn get_mono(&self, id: NewtypeId, tvars: Vec<ConcreteType>) -> ConcreteShape {
-        self.monomorphizations[&id][&tvars].clone()
-    }
-
     pub fn topo_mono_iter(&self) -> impl Iterator<Item = (NewtypeId, Vec<ConcreteType>, ConcreteShape)> {
         let mut monomorphizations = self.monomorphizations.clone();
         self.topo_order
