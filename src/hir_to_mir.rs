@@ -57,7 +57,7 @@ impl MIRBuilder {
         
         let arg_cells: Vec<CellId> = func.args
             .iter()
-            .map(|arg_id| self.var_map[&arg_id].clone())
+            .map(|arg_id| self.var_map[arg_id])
             .collect();
         MIRFunction {
             name: func.name,
@@ -110,7 +110,7 @@ impl MIRBuilder {
             HIRStatement::Let { var, value } => {
                 let cell_id = &self.var_map[&var];
                 let target = MIRPlace {
-                    typ: self.current_cells[&cell_id].typ.clone(),
+                    typ: self.current_cells[cell_id].typ.clone(),
                     base: MIRPlaceBase::Cell(*cell_id),
                     fieldchain: Vec::new()
                 };
@@ -186,7 +186,7 @@ impl MIRBuilder {
        match hir_place.place {
             PlaceKind::Variable(var_id) => (MIRPlace { 
                typ: hir_place.typ, 
-               base: MIRPlaceBase::Cell(self.var_map[&var_id].clone()), 
+               base: MIRPlaceBase::Cell(self.var_map[&var_id]), 
                fieldchain: Vec::new(),
             }, vec![]),
             PlaceKind::StructField { of, field } => {
@@ -234,7 +234,7 @@ impl MIRBuilder {
                     typ: expr.typ.clone(),
                     value: MIRValueKind::Place(MIRPlace { 
                         typ: expr.typ, 
-                        base: MIRPlaceBase::Cell(self.var_map[&var_id].clone()),
+                        base: MIRPlaceBase::Cell(self.var_map[&var_id]),
                         fieldchain: Vec::new(),
                     }),
                 };
@@ -344,12 +344,12 @@ impl MIRBuilder {
             base: place.base,
             fieldchain 
         };
-        MIRValue{typ: typ, value: MIRValueKind::Place(access_place)}
+        MIRValue{typ, value: MIRValueKind::Place(access_place)}
     }
     
     fn push_to_current_block(&mut self, stmts: Vec<MIRStatement>) {
         let curr_id = self.get_current_wip_id().unwrap();
-        self.wip_blocks.get_mut(&curr_id).unwrap().extend(stmts.into_iter());
+        self.wip_blocks.get_mut(&curr_id).unwrap().extend(stmts);
     }
 
     fn add_new_block(&mut self) -> BlockId {
@@ -383,14 +383,14 @@ impl MIRBuilder {
         
     fn get_new_blockid(&mut self) -> BlockId {
         let block_id = BlockId(self.block_counter); 
-        self.block_counter = self.block_counter + 1;
+        self.block_counter += 1;
         block_id 
     }
 
     fn add_cell(&mut self, cell: Cell) -> CellId {
         let new_id = CellId(self.cell_counter);
-        self.cell_counter = self.cell_counter + 1;
-        self.current_cells.insert(new_id.clone(), cell);
+        self.cell_counter += 1;
+        self.current_cells.insert(new_id, cell);
         new_id
     }
 }

@@ -93,7 +93,7 @@ pub enum MIRPlaceBase {
 }
 
 #[derive(Clone, Debug)]
-pub struct Cell {
+pub struct Cell {       // Could drop kind?
     pub typ: GenericType,
     pub kind: CellKind,
 }

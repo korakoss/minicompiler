@@ -52,7 +52,7 @@ impl LIRBuilder {
             chunks: self.curr_chunks.clone(), 
             args: func.args
                 .into_iter()
-                .map(|cell_id| self.cell_chunk_map[&cell_id].0.clone())
+                .map(|cell_id| self.cell_chunk_map[&cell_id].0)
                 .collect()
         }
     }
@@ -61,7 +61,7 @@ impl LIRBuilder {
         let mut statements: Vec<LIRStatement> = Vec::new();
         for stmt in block.statements {
             let lowered = self.lower_stmt(stmt);
-            statements.extend(lowered.into_iter());
+            statements.extend(lowered);
         }
         let (terminator, term_stmts) = self.lower_terminator(block.terminator);
         statements.extend(term_stmts.into_iter());
@@ -80,7 +80,7 @@ impl LIRBuilder {
                 let (right_opnd, right_stmts) = self.lower_value_into_operand(right);
                 let bin_stmt = LIRStatement::BinOp { 
                     dest: lir_target, 
-                    op: op, 
+                    op,
                     left: left_opnd, 
                     right: right_opnd 
                 };
@@ -165,7 +165,7 @@ impl LIRBuilder {
                 };
                 let temp_id = self.add_chunk(temp_chunk);
                 let temp_place = LIRPlace {
-                    size: size,
+                    size,
                     place: LIRPlaceKind::Local { base: temp_id, offset: 0}
                 };
 
@@ -271,7 +271,7 @@ impl LIRBuilder {
                     let ConcreteType::NewType(id, tvars) = curr_typ else {panic!("Type in field chain not struct");};
                     let ConcreteShape::Struct { fields } = self.typetable.monomorphize(id, tvars) else {unreachable!()};
                     curr_typ = fields[&field].clone();
-                    curr_offset = curr_offset + field_offsets[&field];
+                    curr_offset += field_offsets[&field];
                 } 
                 LayoutInfo::Primitive(..) => {
                     panic!("This is primitive, shouldn't have a field");
@@ -290,7 +290,7 @@ impl LIRBuilder {
 
     fn add_chunk(&mut self, chunk: Chunk) -> ChunkId {
         let chunk_id = ChunkId(self.chunk_counter);
-        self.chunk_counter = self.chunk_counter + 1;
+        self.chunk_counter += 1;
         self.curr_chunks.insert(chunk_id, chunk);
         chunk_id
     }
@@ -317,9 +317,9 @@ pub enum LayoutInfo {
 
 impl LayoutInfo {
     pub fn size(&self) -> usize {
-        match self {
-            &LayoutInfo::Primitive(size) => size,
-            &LayoutInfo::Struct{size, ..} => size,
+        match *self {
+            LayoutInfo::Primitive(size) => size,
+            LayoutInfo::Struct{size, ..} => size,
         }
     }
 }
@@ -372,7 +372,7 @@ impl LayoutTable {
                 for (fname, ftype) in fields {
                     f_offsets.insert(fname, curr_offset);
                     let fsize = self.get_layout(ftype).size(); 
-                    curr_offset = curr_offset + fsize;
+                    curr_offset += fsize;
                 }
                 LayoutInfo::Struct { 
                     size: curr_offset, 

@@ -28,8 +28,8 @@ impl ASTFunction {
         FuncSignature { 
             name: self.name.clone(), 
             argtypes: self.args
-                .iter()
-                .map(|(_, argt)| argt.clone())
+                .values()
+                .map(|argt| argt.clone())
                 .collect()
         }
     }

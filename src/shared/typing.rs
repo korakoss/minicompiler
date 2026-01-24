@@ -111,14 +111,6 @@ pub enum PrimType {
     None,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Binding(pub BTreeMap<String, ConcreteType>);
-
-impl Binding {
-    pub fn resolve(&self, symbol: &String) -> ConcreteType {
-        self.0.get(symbol).unwrap().clone()
-    }
-}
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct NewtypeId(pub String); 

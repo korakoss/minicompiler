@@ -142,10 +142,7 @@ impl HIRBuilder {
                 HIRStatement::If {
                     condition: hir_condition, 
                     if_body: self.lower_block(if_body, false), 
-                    else_body: match else_body {
-                        None => None,
-                        Some(block) => Some(self.lower_block(block, false)),
-                    }
+                    else_body: else_body.map(|block| self.lower_block(block, false)),
                 }
             }
             ASTStatement::While { condition, body } => {
@@ -203,7 +200,7 @@ impl HIRBuilder {
             ASTExpression::Variable(varname) => {
                 let (id, typ) = self.scope_context.get_var_info(&varname);
                 HIRExpression {
-                    typ: typ,
+                    typ,
                     expr: HIRExpressionKind::Variable(id)
                 }
             }
@@ -370,7 +367,7 @@ impl ScopeContext {
     
     fn add_var(&mut self, var: GenTypeVariable) -> VarId {
         let id = VarId(self.var_counter);
-        self.var_counter = self.var_counter + 1;
+        self.var_counter += 1;
         self.var_scope_stack.last_mut().unwrap().insert(var.name.clone(), id);
         self.var_map.insert(id, var);
         id

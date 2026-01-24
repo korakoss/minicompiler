@@ -15,7 +15,9 @@ impl GenericTypetable {
     pub fn new(defs: HashMap<NewtypeId, GenericTypeDef>) -> Self {
         Self { 
             topo_order: toposort_depgraph(extract_newtype_dependencies(&defs)), 
-            monomorphizations: defs.iter().map(|(id, _)| (id.clone(), HashMap::new())).collect(),
+            monomorphizations: defs.keys()
+                .map(|id| (id.clone(), HashMap::new()))
+                .collect(),
             defs,
         }
     }
@@ -25,7 +27,7 @@ impl GenericTypetable {
         self.topo_order
             .iter()
             .flat_map(move |id| {
-            monomorphizations.remove(&id)
+            monomorphizations.remove(id)
                     .unwrap_or_default()
                     .into_iter()
                     .map(move |(tvars, shape)| (id.clone(), tvars, shape))
@@ -78,7 +80,7 @@ impl GenericTypetable {
                         .collect()
                 }
             }
-            GenericShape::Enum { variants } => {
+            GenericShape::Enum {..} => {
                 unimplemented!();
             }
         };
@@ -97,13 +99,11 @@ fn extract_newtype_dependencies(newtype_defs: &HashMap<NewtypeId, GenericTypeDef
         let deps: Vec<NewtypeId> = match &newtype.defn {
             NewtypeShape::Struct {fields} => fields
                 .values()
-                .map(|ftyp| extract_type_id(&ftyp))
-                .flatten()
+                .flat_map(|ftyp| extract_type_id(ftyp))
                 .collect(),
             NewtypeShape::Enum { variants } => variants
                 .iter()
-                .map(|vtyp| extract_type_id(&vtyp))
-                .flatten()
+                .flat_map(|vtyp| extract_type_id(&vtyp))
                 .collect(),
         };
         dep_graph.insert(type_id.clone(), deps);
@@ -116,11 +116,14 @@ fn extract_type_id(t: &GenericType) -> Vec<NewtypeId> {
     match t {
         GenericType::Prim(..) => vec![],
         GenericType::NewType(id, t_params) => {
-            let mut deps: Vec<NewtypeId> = t_params.iter().map(|p| extract_type_id(p)).flatten().collect::<Vec<_>>();
+            let mut deps: Vec<NewtypeId> = t_params
+                .iter()
+                .flat_map(|p| extract_type_id(p))
+                .collect::<Vec<_>>();
             deps.push(id.clone());
             deps
         }
-        GenericType::Reference(typ) => extract_type_id(&typ),
+        GenericType::Reference(typ) => extract_type_id(typ),
         GenericType::TypeVar(..) => vec![] 
     }
 }

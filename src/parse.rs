@@ -23,12 +23,12 @@ impl Parser {
             new_types: HashMap::new(),
             functions: HashMap::new(),              
         };
-        while !parser.tokens.peek().is_none() {
-            match parser.tokens.peek().unwrap() {
-                &Token::Struct => {
+        while parser.tokens.peek().is_some() {
+            match *parser.tokens.peek().unwrap() {
+                Token::Struct => {
                     parser.process_struct_typedef(); 
                 }
-                &Token::Function => {
+                Token::Function => {
                     parser.process_function_definition();
                 }
                 _ => {panic!("Invalid token, expected struct or func def");}
@@ -86,11 +86,11 @@ impl Parser {
         let type_vars = self.collect_type_vars();
 
         self.expect_unparametric_token(Token::LeftParen);
-        let args:HashMap<String, GenericType> = match self.tokens.peek().unwrap() {
-            &Token::RightParen => {
+        let args:HashMap<String, GenericType> = match *self.tokens.peek().unwrap() {
+            Token::RightParen => {
                 HashMap::new()
             }
-            &Token::Identifier(_) => {
+            Token::Identifier(_) => {
                 let name1 = self.expect_identifier();
                 self.expect_unparametric_token(Token::Colon);
                 let typ1 = self.expect_generic_type_annotation(&type_vars);
@@ -125,8 +125,8 @@ impl Parser {
         let func = ASTFunction {
             name: funcname, 
             typvars: type_vars,
-            args: args, 
-            body: body, 
+            args,
+            body,
             ret_type: ret_type_id
         };
         let sgn = func.get_signature();
@@ -145,7 +145,7 @@ impl Parser {
     
     fn parse_statement(&mut self, scope_typevars: &Vec<String>) -> ASTStatement {
         match self.tokens.peek().unwrap() {           
-            &Token::Let => {
+            Token::Let => {
                 self.tokens.next();
                 let var_name = self.expect_identifier();         
                 self.expect_unparametric_token(Token::Colon);
@@ -159,7 +159,7 @@ impl Parser {
                 self.expect_unparametric_token(Token::Semicolon);
                 ASTStatement::Let{var, value}
             }
-            &Token::If => {
+            Token::If => {
                 self.tokens.next();
                 let condition = self.parse_expression(scope_typevars);
                 let if_body = self.parse_statement_block(scope_typevars);
@@ -169,32 +169,32 @@ impl Parser {
                 } else {None};
                 ASTStatement::If {condition, if_body, else_body}
             }
-            &Token::While => {
+            Token::While => {
                 self.tokens.next();
-                let cond = self.parse_expression(scope_typevars);
+                let condition = self.parse_expression(scope_typevars);
                 let body = self.parse_statement_block(scope_typevars);
                 ASTStatement::While { 
-                    condition: cond, 
-                    body: body,
+                    condition, 
+                    body,
                 }
             }
-            &Token::Break => {         
+            Token::Break => {         
                 self.tokens.next();
                 self.expect_unparametric_token(Token::Semicolon);
                 ASTStatement::Break
             }
-            &Token::Continue => {         
+            Token::Continue => {         
                 self.tokens.next();
                 self.expect_unparametric_token(Token::Semicolon);
                 ASTStatement::Continue
             }
-            &Token::Return => {
+            Token::Return => {
                 self.tokens.next();
                 let return_expr = self.parse_expression(scope_typevars);
                 self.expect_unparametric_token(Token::Semicolon);
                 ASTStatement::Return(return_expr)
             }
-            &Token::Print => {
+            Token::Print => {
                 self.tokens.next();
                 self.expect_unparametric_token(Token::LeftParen);
                 let expr = self.parse_expression(scope_typevars);
@@ -310,8 +310,8 @@ impl Parser {
         match token {
             Token::IntLiteral(int) => ASTExpression::IntLiteral(int),
             Token::Identifier(name) => {
-                match self.tokens.peek().unwrap() {
-                    &Token::LeftParen => {                                                      // FuncCall
+                match *self.tokens.peek().unwrap() {
+                    Token::LeftParen => {                                                      // FuncCall
                         self.tokens.next();
                         let args: Vec<ASTExpression> = match self.tokens.peek().unwrap() {
                             &Token::RightParen => Vec::new(),
@@ -326,9 +326,9 @@ impl Parser {
                             }
                         };
                         self.expect_unparametric_token(Token::RightParen);
-                        ASTExpression::FuncCall { funcname: name, args: args}
+                        ASTExpression::FuncCall { funcname: name, args}
                     }
-                    &Token::LeftBrace => {                                                  
+                    Token::LeftBrace => {                                                  
                         if self.new_types.contains_key(&NewtypeId(name.clone())) {
                             let fields = self.parse_struct_literal_internals(scope_typevars);
                             self.expect_unparametric_token(Token::RightBrace);
@@ -340,7 +340,7 @@ impl Parser {
                             ASTExpression::Variable(name)
                         }
                     }
-                    &Token::LeftSqBracket => {      // TODO: for now, we assume this is a struct literal with generic parameters, later it can be indexing, etc however
+                    Token::LeftSqBracket => {      // TODO: for now, we assume this is a struct literal with generic parameters, later it can be indexing, etc however
                         let bindings = self.expect_generic_bindings(scope_typevars);
                         let fields = self.parse_struct_literal_internals(scope_typevars);
                         self.expect_unparametric_token(Token::RightBrace);

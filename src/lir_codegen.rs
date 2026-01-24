@@ -16,7 +16,7 @@ impl StackFrame {
         let mut curr_offset = 8;
         for (id, chunk) in chunks {
             offsets.insert(id, curr_offset);
-            curr_offset = curr_offset + chunk.size; 
+            curr_offset += chunk.size; 
         }
         StackFrame {
             size: curr_offset,
@@ -81,7 +81,7 @@ impl LIRCompiler {
         self.emit(&format!("    sub sp, sp, #{}", frame.size)); 
 
         for (i,arg) in args.iter().enumerate() {
-            let arg_offset = frame.offsets[&arg];
+            let arg_offset = frame.offsets[arg];
             self.emit(&format!("    str r{}, [fp, #-{}]", i+1, arg_offset));
 }
 
@@ -233,10 +233,10 @@ impl LIRCompiler {
                 self.emit(&format!("     ldr r0, ={}", num));
             }
             LIRValueKind::BoolTrue => {
-                self.emit(&"    ldr r0, =1");   
+                self.emit("    ldr r0, =1");   
             }
             LIRValueKind::BoolFalse => {
-                self.emit(&"    ldr r0, =0");   
+                self.emit("    ldr r0, =0");   
             }
             LIRValueKind::Reference(refd) => {
                 match refd.place {
@@ -244,7 +244,7 @@ impl LIRCompiler {
                         let place_offset = frame.offsets[&base] + offset;
                         self.emit(&format!("    sub r0, fp, #{}", place_offset));  
                     }
-                    LIRPlaceKind::Deref { pointer, offset } => {
+                    LIRPlaceKind::Deref {..} => {
                         unimplemented!();       // Shouldn't really happen, maybe refactor stuff
                     }
                 }

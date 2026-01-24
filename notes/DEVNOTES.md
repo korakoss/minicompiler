@@ -1,4 +1,7 @@
 
+
+> Main todo: replace String newtype-IDs with something better
+
 Generic struct definitions, and then monomorphized usage for variables seems to work (on the _generics_ branch, at least). 
 On the current branch, right now, I'm trying to make the modifications necessary throughout pipeline stages. First, not even actually supporting generic functions is enough, the point is just to get things in generic form to MIR and so on. So fix the bugs necessary for that. Then, implement generic functions Then, implement generic methods.
 
