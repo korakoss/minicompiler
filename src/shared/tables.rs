@@ -90,7 +90,28 @@ impl GenericTypetable {
 }
 
 
+pub type GenericTypeDef = NewtypeDef<GenericType>;
+pub type GenericShape = NewtypeShape<GenericType>;
 
+pub type ConcreteShape = NewtypeShape<ConcreteType>;
+pub type ConcreteTypeDef = NewtypeDef<ConcreteType>;
+
+
+#[derive(Clone, Debug)]
+pub struct NewtypeDef<T> {
+    pub type_params: Vec<String>,
+    pub defn: NewtypeShape<T>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum NewtypeShape<T>{
+    Struct {
+        fields: BTreeMap<String, T>
+    },
+    Enum {
+        variants: Vec<T>
+    },
+}
 
 
 fn extract_newtype_dependencies(newtype_defs: &HashMap<NewtypeId, GenericTypeDef>) -> HashMap<NewtypeId, Vec<NewtypeId>> {

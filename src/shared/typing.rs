@@ -79,31 +79,6 @@ impl GenericType {
 }
 
 
-pub type GenericTypeDef = NewtypeDef<GenericType>;
-pub type ConcreteTypeDef = NewtypeDef<ConcreteType>;
-
-
-#[derive(Clone, Debug)]
-pub struct NewtypeDef<T> {
-    pub type_params: Vec<String>,
-    pub defn: NewtypeShape<T>,
-}
-
-pub type GenericShape = NewtypeShape<GenericType>;
-pub type ConcreteShape = NewtypeShape<ConcreteType>;
-
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum NewtypeShape<T>{
-    Struct {
-        fields: BTreeMap<String, T>
-    },
-    Enum {
-        variants: Vec<T>
-    },
-}
-
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub enum PrimType {
     Integer,
