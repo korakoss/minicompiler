@@ -1,10 +1,10 @@
 use crate::shared::typing::*;
 use crate::shared::binops::*;
-use crate::stages::common::FuncId;
 use crate::shared::tables::*;
 use crate::shared::utils::*;
 
 use std::{collections::HashMap};
+
 
 #[derive(Clone, Debug)]
 pub struct HIRProgram {

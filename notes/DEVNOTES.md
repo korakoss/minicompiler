@@ -1,6 +1,7 @@
 
 
 > Main todo: replace String newtype-IDs with something better
+    - no this is wrong. The _newtype_ IDs (ie names) are good. The _typevar_ ID-s are the deal.
 > Add NewType struct?
 > Do we actually need topo ordering? For circularity detection I suppose, but otherwise?
 

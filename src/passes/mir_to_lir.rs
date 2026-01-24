@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::stages::common::*;
 use crate::stages::lir::*;
 use crate::stages::mir::*;
 use crate::shared::typing::*;
 use crate::shared::tables::*;
+use crate::shared::utils::*;
 
 
 pub struct LIRBuilder {

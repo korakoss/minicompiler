@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use crate::stages::common::*;
 use crate::stages::lir::*;
 use crate::shared::binops::BinaryOperator;
-
+use crate::shared::utils::*;
 
 struct StackFrame {
     size: usize,

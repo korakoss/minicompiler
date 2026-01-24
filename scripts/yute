@@ -17,9 +17,9 @@ rsync -av --exclude "target" "$MAC_YUM/" "$PI_YUM/"
 
 if [[ "$(hostname)" == "mac" ]]; then
     if $BUILD; then
-        ssh pi -t "source ~/.zshrc && cd ~/programming_projects/minicompiler && cargo build && ./scripts/yute -n && exec \$SHELL"
+        ssh pir -t "source ~/.zshrc && cd ~/programming_projects/minicompiler && cargo build && ./scripts/yute -n && exec \$SHELL"
     else
-        ssh pi -t "source ~/.zshrc && cd ~/programming_projects/minicompiler && ./scripts/yute -n && exec \$SHELL"
+        ssh pir -t "source ~/.zshrc && cd ~/programming_projects/minicompiler && ./scripts/yute -n && exec \$SHELL"
     fi
 else
     PROJECT=~/programming_projects/minicompiler

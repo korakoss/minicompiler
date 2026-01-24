@@ -1,14 +1,11 @@
 use crate::shared::typing::*;
 use crate::shared::tables::*;
-use crate::stages::common::*;
 use crate::stages::ast::*;
 use crate::stages::hir::*;
 use crate::shared::binops::binop_typecheck;
 use crate::shared::utils::*;
 
 use std::{collections::HashMap};
-
-
        
         
 pub struct HIRBuilder {

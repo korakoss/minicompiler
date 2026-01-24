@@ -1,6 +1,6 @@
 use crate::shared::{binops::BinaryOperator, tables::GenericTypetable};
 use crate::shared::typing::*;
-use crate::stages::common::*;
+use crate::shared::utils::*;
 
 use std::{collections::HashMap};
 
