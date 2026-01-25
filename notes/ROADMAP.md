@@ -2,81 +2,55 @@
 # Current status & recent past 
 
 Added structs and pointers, currently working on generics. 
+Generic types are implemented, but generic functions aren't yet.
 Testing has been improved too, now enabling "negative" tests and overall more convenience. 
 There are other branches open for working on the pointer-based ABI rewrite as well as adding x86 backends. There is a collection of known current bugs. 
 
 
 # Next steps
 
-The items below are roughly in planned chronological order of implementation. Some reasoning for this order.
-So, first, we do only generic types and then concretely instantiated variables. This is a much more tractable problem than monomorphizing functions, but lets us test a lot of the infrastructure for generics. Much of the parsing is the same, the type system is the same. 
-Then, we add generic functions. This adds some complication to tracking the scoping of the type variables, and then also in lower stages, where we now have to monomorphize functions too.
-Afterwards, we might start work on methods. I'm not entirely sure whether we want to add methods or infras first – decide that.
-Then, we start preparation for infras, by implementing enums and methods. It's clear why methods should be implemented before infras: the point of infras are the inheritance of methods to subtypes. Enums, on the other hand, are helpful for infras (I think), because both are basically concerned with subtyping in different forms, so if we work out some kind of subtyping infrastructure in the easier case of enums, that can set us up for infras to some degree.  
-There are also a number of problems coming up that seem to necessitate a fundamentally better lookahead parser. That should be done soon too.
-Finally, we add heap. This must clearly come after generics, generic functions and methods, if we want to do them in a correctly typed manner. They are, a priori, fairly interchangeable with infras (and potentially even enums), but I want to do those first because they seem more disruptive to the overall pipeline.
+In roughly chronological order, the short/medium-term next steps:
+- function return typecheck
+- generic functions
+- lookahead parser
+- enums and matching
+    - simplest summing, no namespacing complications
+    - simple matching, just handling subtypes
+- infras
+- methods
+- heap
+    - goal: Vec<T> working. roll an allocator
 
 
-## Finish generics
-The current, v1 implementation with no bounds on type variables, etc. Further, we are only making types generic, not functions yet. Propagate generics through the AST and (some) IRs, decide where and how to monomorphize. 
-
-## Generic functions
-Type variables in function definitions, monomorphization of functions, etc. 
-
-## Enums
-Implement the basics of enums, simple summing. No namespacing complications yet. Basic matching for them.
-
-## Methods
-Add methods callable on types. Decide whether we want _self_ on concrete types, or omit it like on infras. Implement generic functions here if not already.
-
-## Infras
-Implement infras and the basic conformance model. 
-
-## Heap
-Implement Vec<T>. Use a bump allocator, _malloc_, or roll own malloc. 
+# Orthogonal-ish improvements to do sometime:
+- bug fixes (from INSECTS.md and so on)
+- ABI on argument-passing
+    - tentative plan:
+        - functions (monomorphized concrete variants, in LIR) determine an "argument layout"
+            - basically a uniform mapping of arguments to offsets in some chunk
+            - at a given slot, it may contain values or pointers (uniformly for a slot)
+        - the caller constructs such a chunk in its frame and passes a pointer to it
+        - the callee then reads it, chases pointers, etc. to get the argument values
+- x86 backend
+- handling compiler errors nicely and informatively, improving compile/testing scripts, etc
 
 
+# Later projects
 
-# Loose ends
-
-## Bug fixes
-See INSECTS.md. Most of the _Bugs/issues_ sections should be fixed.
-
-## Argument-passing ABI
-Support arbitrary number of arguments. Implement the planned ABI which passes a pointer into the caller frame. Or something.
-Currently planned ABI:
-    - each function determines a "callee layout" -- basically offsets in a struct-like memory chunk that they expect argument info in
-    - this "struct" will contain the actual pointers to argument values (in the caller frame or wherever)
-    - the caller then passesa single pointer to this "struct"
-    - the callee chases down the pointers to get the real argument values
-
-
-# Later steps (substantive)
-
-## Type inference
-
-## More sophisticated pattern-matching
-Implement "matching out the fields", like "S{a,b} => {//..}". Implement nested versions for this. And so on. At each step, maintain exhaustiveness (and overlap?) checking.
-
-## Sophisticated memory allocator
-
-## Borrow checking or something
-Add mutability/immutability. Make the type system affine (tracking moves/ownership). Then eventually, add borrow checking.
-
-## The _above_ keyword, the self-referentiality stuff
-Needs the borrow checker.
-
-
-# Later steps (professionalness)
-
-## More backends
-Add x86 backends. Figure out alignment stuff and what else needs to be generalized in the current pipeline. 
-
-## Compiler usability
-Improve running and testing scripts (sort out the "internal stage dump" approach). Add more informative errors.
-
-## Classic optimization
-Dead code elimination, register allocation, constant propagation, the stuff.
+These are larger, often fairly mutually orthogonal project to do after the language core is finished:
+- type inference
+    - probably limited to intra-function-bodies, explicit signatures required
+- sophisticated pattern-matching
+    - eg Rust-style deconstruction, doing it recursively, etc.
+    - at each step, maintain exhaustiveness and overlap checking
+- rolling my own memory allocator in a sophisticated way
+- classic optimizations (DCE, register allocation, constant propagation)
+- affine typing
+    - ownership/move checking first
+    - mutability
+    - borrow checking eventually
+- self-referentiality, _above_, etc.
+    - dependent on borrow checking
 
 
 # Notes on quitting 
