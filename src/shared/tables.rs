@@ -2,6 +2,10 @@ use std::{collections::{BTreeMap, HashMap, VecDeque}, hash::Hash};
 use crate::shared::typing::*;
 
 
+#[cfg(test)]
+#[path = "../tests/test_tables.rs"]
+mod tests;
+
 
 #[derive(Debug, Clone)]
 pub struct GenericTypetable {
@@ -74,6 +78,31 @@ impl GenericTypetable {
         };
         self.monomorphizations.get_mut(&id).unwrap().insert(typ_var_vals,monomorph.clone());
         monomorph
+    }
+
+    pub fn get_genericity_rank(
+        &mut self,
+        typ: &ConcreteType,
+    ) -> usize {
+        match typ {
+            ConcreteType::Prim(..) => 0,
+            ConcreteType::Reference(ref_typ) => self.get_genericity_rank(ref_typ) + 1,
+            ConcreteType::NewType(id, type_params) => {
+                let type_shape = self.monomorphize(id.clone(), type_params.clone());
+                match type_shape {
+                    ConcreteShape::Struct { fields } => {
+                        fields
+                            .values()
+                            .map(|typ| self.get_genericity_rank(typ))
+                            .max()
+                            .unwrap() + 1
+                    },
+                    ConcreteShape::Enum { .. } => {
+                        unimplemented!();
+                    }
+                }
+            }
+        }
     }
 }
 

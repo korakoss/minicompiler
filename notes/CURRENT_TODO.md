@@ -14,6 +14,7 @@ Desiderata:
 # STEPS
 
 - implement generiticity rank calculation
+- add some check for Type operations (checking the number of type parameters?)
 
 Plan after: MIR-> MMIR (monomorphic MIR) -> LIR. 
 In the meantime, make refactors and cleanups on the current codebase.

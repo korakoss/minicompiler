@@ -11,7 +11,6 @@ use passes::hir_to_mir::*;
 use passes::mir_to_lir::*;
 use passes::lir_codegen::*;
 
-
 fn main() {
     
     let args: Vec<String> = env::args().collect();
