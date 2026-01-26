@@ -12,15 +12,18 @@ Desiderata:
 
 
 # STEPS
-Implement func return typechecks.
-Then, implement the abstract logic for the proposed monomorphization algorithm and test it.
+
+- implement generiticity rank calculation
+
+Plan after: MIR-> MMIR (monomorphic MIR) -> LIR. 
 In the meantime, make refactors and cleanups on the current codebase.
 
 
 # IMPLEMENTATION NOTES
 
 # Function return typechecking
-
+We might do this in AST->HIR or some intermediate. 
+It might be set up by as a check on statement blocks. Each block has a type it evaluates to.
 
 
 # Monomorphization
@@ -38,3 +41,9 @@ In two separate stages:
 # UNCLEAR STUFF
 - do we need topo ordering? when? laying out?
 - add a NewType struct?
+
+
+
+# DEFERRED LATER
+
+Implement func return typechecks.

@@ -23,6 +23,7 @@ In roughly chronological order, the short/medium-term next steps:
 
 
 # Orthogonal-ish improvements to do sometime:
+- merge, sort structure out
 - bug fixes (from INSECTS.md and so on)
 - ABI on argument-passing
     - tentative plan:
