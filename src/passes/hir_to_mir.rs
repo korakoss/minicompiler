@@ -287,7 +287,7 @@ impl MIRBuilder {
                     stmts.extend(f_stmts.into_iter());
                     mir_fields.insert(fname, f_val);
                 }
-                (MIRValue{typ: expr.typ.clone(), value: MIRValueKind::StructLiteral{ typ: expr.typ,fields: mir_fields}}, stmts)
+                (MIRValue{typ: expr.typ, value: MIRValueKind::StructLiteral{fields: mir_fields}}, stmts)
             },
             HIRExpressionKind::Reference(refd) => {
                 let (mir_refd, refd_stmts) = self.lower_expr(*refd);

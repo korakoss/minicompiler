@@ -60,19 +60,18 @@ pub enum MIRTerminator {
 }
 
 #[derive(Clone, Debug)]
-pub struct MIRValue {
+pub struct MIRValue {   
     pub typ: GenericType,
     pub value: MIRValueKind,
 }
 
 #[derive(Clone, Debug)]
 pub enum MIRValueKind {
-    Place(MIRPlace), 
+    Place(MIRPlace),        // Possible rename: stored
     IntLiteral(i32),
     BoolTrue,
     BoolFalse,
     StructLiteral {
-        typ: GenericType,
         fields: HashMap<String, MIRValue>,
     },
     Reference(MIRPlace),

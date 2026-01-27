@@ -185,7 +185,8 @@ impl LIRBuilder {
         value: MIRValue, 
         target: LIRPlace
     ) -> Vec<LIRStatement> {
-        let size = self.layouts.get_layout(value.typ.coerce_concrete()).size();
+        let typ = value.typ.coerce_concrete();
+        let size = self.layouts.get_layout(typ.clone()).size();
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
@@ -200,9 +201,9 @@ impl LIRBuilder {
             MIRValueKind::BoolFalse => {
                 vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::BoolFalse}}]
             }
-            MIRValueKind::StructLiteral { typ, fields } => {
+            MIRValueKind::StructLiteral { fields } => {
                 let LayoutInfo::Struct { size: _, field_offsets } = self.layouts
-                    .get_layout(typ.coerce_concrete()) else {
+                    .get_layout(typ) else {
                         unreachable!();
                 };
                 let mut stmts: Vec<LIRStatement> = Vec::new();
