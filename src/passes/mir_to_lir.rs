@@ -92,7 +92,7 @@ impl LIRBuilder {
                 let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();
 
                 for arg in args {
-                    let arg_size = self.layouts.get_layout(arg.typ.coerce_concrete()).size();
+                    let arg_size = self.layouts.get_layout(&arg.typ.coerce_concrete()).size();
                     let arg_chunk = self.add_chunk(Chunk { size: arg_size});
                     let arg_place = LIRPlace {
                         size: arg_size, 
@@ -144,7 +144,7 @@ impl LIRBuilder {
     }
 
     fn lower_value_into_operand(&mut self, value: MIRValue) -> (LIRValue, Vec<LIRStatement>) {
-        let size = self.layouts.get_layout(value.typ.coerce_concrete()).size();
+        let size = self.layouts.get_layout(&value.typ.coerce_concrete()).size();
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
@@ -161,7 +161,7 @@ impl LIRBuilder {
             }
             MIRValueKind::StructLiteral {..} => {
                 let temp_chunk = Chunk {
-                    size: self.layouts.get_layout(value.typ.coerce_concrete()).size(),
+                    size: self.layouts.get_layout(&value.typ.coerce_concrete()).size(),
                 };
                 let temp_id = self.add_chunk(temp_chunk);
                 let temp_place = LIRPlace {
@@ -186,7 +186,7 @@ impl LIRBuilder {
         target: LIRPlace
     ) -> Vec<LIRStatement> {
         let typ = value.typ.coerce_concrete();
-        let size = self.layouts.get_layout(typ.clone()).size();
+        let size = self.layouts.get_layout(&typ).size();
         match value.value {
             MIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
@@ -203,12 +203,12 @@ impl LIRBuilder {
             }
             MIRValueKind::StructLiteral { fields } => {
                 let LayoutInfo::Struct { size: _, field_offsets } = self.layouts
-                    .get_layout(typ) else {
+                    .get_layout(&typ) else {
                         unreachable!();
                 };
                 let mut stmts: Vec<LIRStatement> = Vec::new();
                 for (fname, fexpr) in fields {
-                    let fsize = self.layouts.get_layout(fexpr.typ.coerce_concrete()).size();
+                    let fsize = self.layouts.get_layout(&fexpr.typ.coerce_concrete()).size();
                     let f_target = LIRPlace {
                         size: fsize,
                         place: increment_place_offset(target.place.clone(), field_offsets[&fname]),
@@ -227,7 +227,7 @@ impl LIRBuilder {
 
     fn lower_place(&mut self, place: MIRPlace) -> LIRPlace {
         // TODO: weird solution, change it
-        let size = self.layouts.get_layout(place.typ.coerce_concrete()).size();
+        let size = self.layouts.get_layout(&place.typ.coerce_concrete()).size();
         match place.base {
             MIRPlaceBase::Cell(c_id) => {
 
@@ -265,7 +265,7 @@ impl LIRBuilder {
         let mut curr_offset = 0;
         
         for field in chain {
-            let curr_typ_layout = self.layouts.get_layout(curr_typ.clone());
+            let curr_typ_layout = self.layouts.get_layout(&curr_typ);
 
             match curr_typ_layout {
                 LayoutInfo::Struct { size, field_offsets } => {
@@ -284,7 +284,7 @@ impl LIRBuilder {
     
     fn lower_cell(&mut self, id: CellId, cell: Cell) {
         // TODO: This should lower into LIRPlace. I think?
-        let chunk = Chunk {size: self.layouts.get_layout(cell.typ.coerce_concrete()).size()};
+        let chunk = Chunk {size: self.layouts.get_layout(&cell.typ.coerce_concrete()).size()};
         let chunk_id = self.add_chunk(chunk);
         self.cell_chunk_map.insert(id, (chunk_id, cell.typ.coerce_concrete()));
     }
@@ -342,7 +342,7 @@ impl LayoutTable {
         }
     }
 
-    pub fn get_layout(&mut self, typ: ConcreteType) -> LayoutInfo {
+    pub fn get_layout(&mut self, typ: &ConcreteType) -> LayoutInfo {
         match typ {
             ConcreteType::Prim(prim_tp) => self.get_primitive_layout(prim_tp),
             ConcreteType::Reference(..) => LayoutInfo::Primitive(8),
@@ -357,11 +357,11 @@ impl LayoutTable {
         }
     }
 
-    fn get_primitive_layout(&self, _prim_tp: PrimType) -> LayoutInfo {
+    fn get_primitive_layout(&self, _prim_tp: &PrimType) -> LayoutInfo {
         LayoutInfo::Primitive(8)        // Temporarily so; update later
     }
     
-    fn lay_out_newtype(&mut self, ntyp: ConcreteType) -> LayoutInfo { 
+    fn lay_out_newtype(&mut self, ntyp: &ConcreteType) -> LayoutInfo { 
         let ConcreteType::NewType(id, tparams) = ntyp.clone() else {
             unreachable!();
         };
@@ -372,7 +372,7 @@ impl LayoutTable {
                 let mut curr_offset = 0;
                 for (fname, ftype) in fields {
                     f_offsets.insert(fname, curr_offset);
-                    let fsize = self.get_layout(ftype).size(); 
+                    let fsize = self.get_layout(&ftype).size(); 
                     curr_offset += fsize;
                 }
                 LayoutInfo::Struct { 
@@ -384,7 +384,7 @@ impl LayoutTable {
                 unimplemented!();
             }
         };
-        self.newtype_layouts.insert(ntyp, layout.clone());
+        self.newtype_layouts.insert(ntyp.clone(), layout.clone());
         layout
     }
 }

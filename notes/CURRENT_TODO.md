@@ -19,6 +19,8 @@ Desiderata:
 Plan after: MIR-> MMIR (monomorphic MIR) -> LIR. 
 In the meantime, make refactors and cleanups on the current codebase.
 
+Introduce numeric IDs for newtypes instead of strings for ease of copy and so on.
+
 
 # IMPLEMENTATION NOTES
 
