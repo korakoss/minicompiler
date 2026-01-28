@@ -89,3 +89,6 @@ pub enum PrimType {
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct NewtypeId(pub String); 
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub struct TypevarId(pub usize);

@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::iter::Peekable;
+use std::{collections::{BTreeMap, HashMap}, iter::Peekable};
 
 use crate::passes::preproc::tokens::*;
 use crate::shared::typing::*;

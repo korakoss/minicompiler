@@ -8,7 +8,6 @@ use crate::shared::{
 };
 
 
-
 #[derive(Debug, Clone)]
 pub struct ASTProgram {
     pub typetable: GenericTypetable,
@@ -101,6 +100,5 @@ pub enum ASTExpression {
     Reference(Box<ASTExpression>),
     Dereference(Box<ASTExpression>)
 }
-
 
 
