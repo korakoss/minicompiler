@@ -116,7 +116,7 @@ pub type ConcreteTypeDef = NewtypeDef<ConcreteType>;
 
 #[derive(Clone, Debug)]
 pub struct NewtypeDef<T> {
-    pub type_params: Vec<String>,
+    pub type_params: Vec<TypevarId>,
     pub defn: NewtypeShape<T>,
 }
 

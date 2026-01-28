@@ -10,6 +10,7 @@ pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
     new_types: HashMap<NewtypeId, GenericTypeDef>,
     functions: HashMap<GenericFuncSignature, ASTFunction>,
+    typevar_counter: usize,
 }
 
 
@@ -20,6 +21,7 @@ impl Parser {
             tokens: tokens.into_iter().peekable(),
             new_types: HashMap::new(),
             functions: HashMap::new(),              
+            typevar_counter: 0,
         };
         while parser.tokens.peek().is_some() {
             match *parser.tokens.peek().unwrap() {
@@ -53,24 +55,30 @@ impl Parser {
         }
         self.expect_unparametric_token(Token::RightBrace);
         let typedef = GenericTypeDef {
-            type_params,
+            type_params: type_params.into_values().collect(),
             defn: GenericShape::Struct { fields},
         };
         self.new_types.insert(struct_identifier, typedef); 
     }
 
+    fn assign_typevar_id(&mut self) -> TypevarId {
+        let id = self.typevar_counter;
+        self.typevar_counter += 1;
+        TypevarId(id)
+    }
 
-    fn collect_type_vars(&mut self) -> Vec<String> {
+
+    fn collect_type_vars(&mut self) -> HashMap<String, TypevarId> {
         if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
-            return vec![]
+            return HashMap::new();
         } else {
             self.tokens.next();
         }
-        let mut type_params: Vec<String> = Vec::new();
-        type_params.push(self.expect_identifier());
+        let mut type_params: HashMap<String, TypevarId> = HashMap::new();
+        type_params.insert(self.expect_identifier(), self.assign_typevar_id());
         while self.tokens.peek().unwrap() == &Token::Comma {
             self.tokens.next();
-            type_params.push(self.expect_identifier());
+            type_params.insert(self.expect_identifier(), self.assign_typevar_id());
         }
         self.expect_unparametric_token(Token::RightSqBracket);
         type_params
@@ -122,7 +130,7 @@ impl Parser {
         let body = self.parse_statement_block(&type_vars);
         let func = ASTFunction {
             name: funcname, 
-            typvars: type_vars,
+            typvars: type_vars.into_values().collect(),
             args,
             body,
             ret_type: ret_type_id
@@ -131,7 +139,7 @@ impl Parser {
         self.functions.insert(sgn, func);
     }
     
-    fn parse_statement_block(&mut self, scope_typevars: &Vec<String>) -> Vec<ASTStatement> {
+    fn parse_statement_block(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> Vec<ASTStatement> {
         let mut statements = Vec::new();
         self.expect_unparametric_token(Token::LeftBrace);
         while !matches!(self.tokens.peek(), Some(Token::RightBrace)){
@@ -141,7 +149,7 @@ impl Parser {
         statements
     }
     
-    fn parse_statement(&mut self, scope_typevars: &Vec<String>) -> ASTStatement {
+    fn parse_statement(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> ASTStatement {
         match self.tokens.peek().unwrap() {           
             Token::Let => {
                 self.tokens.next();
@@ -215,7 +223,7 @@ impl Parser {
         }
     } 
 
-    fn parse_lvalue(&mut self, scope_typevars: &Vec<String>) -> ASTLValue {
+    fn parse_lvalue(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> ASTLValue {
         let mut curr_lvalue = match self.tokens.peek().unwrap() {
             &Token::Deref => {
                 self.tokens.next();
@@ -238,11 +246,11 @@ impl Parser {
 
     }
 
-    fn parse_expression(&mut self, scope_typevars: &Vec<String>) -> ASTExpression {
+    fn parse_expression(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> ASTExpression {
         self.parse_expression_with_precedence(0, scope_typevars)
     }
               
-    fn parse_expression_with_precedence(&mut self, current_level: usize, scope_typevars: &Vec<String>) -> ASTExpression {
+    fn parse_expression_with_precedence(&mut self, current_level: usize, scope_typevars: &HashMap<String, TypevarId>) -> ASTExpression {
         let mut current_expr = self.parse_unary(scope_typevars);
         loop {
             let token = self.tokens.peek().unwrap();
@@ -274,7 +282,7 @@ impl Parser {
         current_expr
     }
 
-    fn parse_unary(&mut self, scope_typevars: &Vec<String>) -> ASTExpression {
+    fn parse_unary(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> ASTExpression {
         match *self.tokens.peek().unwrap() {
             Token::Ref => {
                 self.tokens.next();
@@ -290,7 +298,7 @@ impl Parser {
         }
     }
 
-    fn parse_postfix(&mut self, scope_typevars: &Vec<String>) -> ASTExpression {
+    fn parse_postfix(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> ASTExpression {
         let mut curr_expr = self.parse_expression_atom(scope_typevars);
         while self.tokens.peek().unwrap() == &Token::Dot {
             self.tokens.next();
@@ -303,7 +311,7 @@ impl Parser {
         curr_expr
     }
     
-    fn parse_expression_atom(&mut self, scope_typevars: &Vec<String>) -> ASTExpression {
+    fn parse_expression_atom(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> ASTExpression {
         let token = self.tokens.next().unwrap();  
         match token {
             Token::IntLiteral(int) => ASTExpression::IntLiteral(int),
@@ -363,7 +371,7 @@ impl Parser {
         }
     }
     
-    fn parse_struct_literal_internals(&mut self, scope_typevars: &Vec<String>) -> HashMap<String, ASTExpression>{
+    fn parse_struct_literal_internals(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> HashMap<String, ASTExpression>{
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = HashMap::new();
         while self.tokens.peek() != Some(&Token::RightBrace) { // TODO: change (trail comma issue)
@@ -393,7 +401,7 @@ impl Parser {
         name
     }
 
-    fn expect_generic_type_annotation(&mut self, scope_typevars: &Vec<String>) -> GenericType {
+    fn expect_generic_type_annotation(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> GenericType {
         match self.tokens.next().unwrap() {
             Token::Int => {
                 GenericType::Prim(PrimType::Integer)
@@ -402,8 +410,8 @@ impl Parser {
                 GenericType::Prim(PrimType::Bool)
             }
             Token::Identifier(type_id) => {
-                if scope_typevars.contains(&type_id) {
-                    GenericType::TypeVar(type_id)
+                if scope_typevars.contains_key(&type_id) {
+                    GenericType::TypeVar(scope_typevars[&type_id])
                 }
                 else {
                     let bindings = self.expect_generic_bindings(scope_typevars);
@@ -420,7 +428,7 @@ impl Parser {
         }
     }
     
-    fn expect_generic_bindings(&mut self, scope_typevars: &Vec<String>) -> Vec<GenericType> {
+    fn expect_generic_bindings(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> Vec<GenericType> {
         if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
             return vec![]
         } else {

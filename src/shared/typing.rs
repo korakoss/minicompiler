@@ -14,7 +14,7 @@ pub enum GenericType {
     Prim(PrimType),
     NewType(NewtypeId, Vec<GenericType>),
     Reference(Box<GenericType>),
-    TypeVar(String)
+    TypeVar(TypevarId),
 }
 
 impl GenericType {
@@ -37,7 +37,7 @@ impl GenericType {
         }
     }
 
-    pub fn bind(&self, bindings: &BTreeMap<String, GenericType>) -> GenericType {
+    pub fn bind(&self, bindings: &BTreeMap<TypevarId, GenericType>) -> GenericType {
         match self {
             Self::Prim(prim_typ) => GenericType::Prim(*prim_typ),
             Self::NewType(id, gen_params) => {
@@ -57,7 +57,7 @@ impl GenericType {
         }
     }
     
-    pub fn monomorphize(&self, type_params: &BTreeMap<String, ConcreteType>) -> ConcreteType {
+    pub fn monomorphize(&self, type_params: &BTreeMap<TypevarId, ConcreteType>) -> ConcreteType {
         match self {
             Self::Prim(prim_typ) => ConcreteType::Prim(*prim_typ),
             Self::NewType(id, gen_params) => {
@@ -90,5 +90,5 @@ pub enum PrimType {
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct NewtypeId(pub String); 
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
 pub struct TypevarId(pub usize);

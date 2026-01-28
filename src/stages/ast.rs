@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use crate::shared::{
-    typing::{GenericType},
-    binops::BinaryOperator,
-    tables::{GenericTypetable},
-    utils::*,
+    binops::BinaryOperator, tables::GenericTypetable, typing::{GenericType, TypevarId}, utils::*
 };
 
 
@@ -18,7 +15,7 @@ pub struct ASTProgram {
 #[derive(Debug, Clone)]
 pub struct ASTFunction {
     pub name: String,
-    pub typvars: Vec<String>,
+    pub typvars: Vec<TypevarId>,
     pub args: HashMap<String, GenericType>,    // TODO: Does this lose argument order?
     pub body: Vec<ASTStatement>,
     pub ret_type: GenericType,

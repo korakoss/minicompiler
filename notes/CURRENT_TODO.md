@@ -12,8 +12,8 @@ Plan after: MIR-> MMIR (monomorphic MIR) -> LIR.
 In the meantime, make refactors and cleanups on the current codebase.
 
 > Propagate typevars down from AST
-
->? Introduce numeric IDs for newtypes instead of strings for ease of copy and so on.
+> clean deprecated architecture from Typetable
+>? Introduce numeric IDs for typevars instead of strings for ease of copy and so on.
 
 Also typevars, resolved correctly per scope. Or is that done?
 
