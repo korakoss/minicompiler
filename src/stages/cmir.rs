@@ -23,70 +23,69 @@ pub struct CMIRFunction {
 
 #[derive(Clone, Debug)]
 pub struct CMIRBlock {
-    pub statements: Vec<MIRStatement>,
-    pub terminator: MIRTerminator,
+    pub statements: Vec<CMIRStatement>,
+    pub terminator: CMIRTerminator,
 }
 
 #[derive(Clone, Debug)]
-pub enum MIRStatement {
+pub enum CMIRStatement {
     Assign {
-        target: MIRPlace,
-        value: MIRValue, 
+        target: CMIRPlace,
+        value: CMIRValue, 
     },
     BinOp {
-        target: MIRPlace,
+        target: CMIRPlace,
         op: BinaryOperator,
-        left: MIRValue,
-        right: MIRValue,
+        left: CMIRValue,
+        right: CMIRValue,
     },
     Call {
-        target: MIRPlace,
+        target: CMIRPlace,
         func: FuncId,
-        args: Vec<MIRValue>,
+        args: Vec<CMIRValue>,
     },
-    Print(MIRValue),
+    Print(CMIRValue),
 }
 
 #[derive(Clone, Debug)]
-pub enum MIRTerminator {
+pub enum CMIRTerminator {
     Goto(BlockId),
     Branch {
-        condition: MIRValue,
+        condition: CMIRValue,
         then_: BlockId,
         else_: BlockId,
     },
-    Return(Option<MIRValue>),      
+    Return(Option<CMIRValue>),      
 }
 
 #[derive(Clone, Debug)]
-pub struct MIRValue {
-    pub typ: GenericType,
-    pub value: MIRValueKind,
+pub struct CMIRValue {
+    pub typ: ConcreteType,
+    pub value: CMIRValueKind,
 }
 
 #[derive(Clone, Debug)]
-pub enum MIRValueKind {
-    Place(MIRPlace), 
+pub enum CMIRValueKind {
+    Place(CMIRPlace), 
     IntLiteral(i32),
     BoolTrue,
     BoolFalse,
     StructLiteral {
-        typ: GenericType,
-        fields: HashMap<String, MIRValue>,
+        fields: HashMap<String, CMIRValue>,
     },
-    Reference(MIRPlace),
+    Reference(CMIRPlace),
 }
 
 
 #[derive(Clone, Debug)]
-pub struct MIRPlace {
-    pub typ: GenericType,
-    pub base: MIRPlaceBase,
+pub struct CMIRPlace {
+    pub typ: ConcreteType,
+    pub base: CMIRPlaceBase,
     pub fieldchain: Vec<String>
 }
 
 #[derive(Clone, Debug)]
-pub enum MIRPlaceBase {
+pub enum CMIRPlaceBase {
     Cell(CellId),
     Deref(CellId),
 }
