@@ -1,9 +1,9 @@
-use crate::shared::typing::*;
-use crate::shared::binops::*;
-use crate::shared::tables::*;
-use crate::shared::utils::*;
-
 use std::{collections::HashMap};
+
+use crate::shared::typing::GenericType;
+use crate::shared::binops::BinaryOperator;
+use crate::shared::tables::{GenericTypetable};
+use crate::shared::utils::{FuncId, GenTypeVariable};
 
 
 #[derive(Clone, Debug)]

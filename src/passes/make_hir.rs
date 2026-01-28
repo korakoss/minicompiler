@@ -1,11 +1,13 @@
-use crate::shared::typing::*;
-use crate::shared::tables::*;
+use std::{collections::HashMap};
+
 use crate::stages::ast::*;
 use crate::stages::hir::*;
-use crate::shared::binops::binop_typecheck;
-use crate::shared::utils::*;
-
-use std::{collections::HashMap};
+use crate::shared::{
+    typing::{GenericType, PrimType},
+    tables::{GenericTypetable, GenericShape},
+    binops::binop_typecheck,
+    utils::{FuncId, GenTypeVariable, GenericFuncSignature,FuncSignature, Variable},
+};
        
         
 pub struct HIRBuilder {
@@ -49,7 +51,6 @@ impl HIRBuilder {
             entry, 
         }
     }
-
     fn lower_function(&mut self, func: ASTFunction) -> HIRFunction {
         let ASTFunction { name, typvars, args, body, ret_type } = func;
         self.scope_context.reset(ret_type.clone());

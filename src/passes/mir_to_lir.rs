@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use crate::stages::lir::*;
-use crate::stages::mir::*;
-use crate::shared::typing::*;
-use crate::shared::tables::*;
-use crate::shared::utils::*;
+use crate::stages::{lir::*, mir::*};
+use crate::shared::{
+    typing::{GenericType, ConcreteType, PrimType},
+    tables::{GenericTypetable, ConcreteShape},
+    utils::{CellId},
+};
 
 
 pub struct LIRBuilder {

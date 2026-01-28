@@ -1,8 +1,10 @@
-use crate::shared::{binops::BinaryOperator, tables::GenericTypetable};
-use crate::shared::typing::*;
-use crate::shared::utils::*;
-
 use std::{collections::HashMap};
+
+use crate::shared::{
+    binops::BinaryOperator, tables::GenericTypetable,
+    typing::{GenericType},
+    utils::{CellId, BlockId, FuncId},
+};
 
 
 #[derive(Clone, Debug)]
@@ -90,7 +92,3 @@ pub enum MIRPlaceBase {
     Cell(CellId),
     Deref(CellId),
 }
-
-#[derive(Clone, Debug)]
-pub struct Cell(pub GenericType); 
-

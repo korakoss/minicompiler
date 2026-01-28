@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use crate::stages::lir::*;
 use crate::shared::binops::BinaryOperator;
-use crate::shared::utils::*;
+use crate::shared::utils::{FuncId, BlockId};
+
 
 struct StackFrame {
     size: usize,

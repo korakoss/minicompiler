@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use crate::stages::hir::*;
-use crate::stages::mir::*;
-use crate::shared::typing::*;
-use crate::shared::utils::*;
+use crate::stages::{hir::*, mir::*};
+use crate::shared::{
+    typing::{GenericType, PrimType},
+    utils::{CellId, BlockId},
+};
 
 
 pub struct MIRBuilder {
