@@ -40,8 +40,8 @@ impl LIRBuilder {
     fn lower_function(&mut self, func: MIRFunction) -> LIRFunction {
         self.cell_chunk_map = HashMap::new();
         self.curr_vregs = Vec::new();
-        for (id, cell) in func.cells {
-            self.lower_cell(id, cell);
+        for (id, cell_type) in func.cells {
+            self.lower_cell(id, cell_type);
         }
         LIRFunction {
             blocks: func.blocks
@@ -282,11 +282,12 @@ impl LIRBuilder {
         (curr_offset, curr_typ)
     }
     
-    fn lower_cell(&mut self, id: CellId, cell: Cell) {
+    fn lower_cell(&mut self, id: CellId, cell_type: GenericType) {
         // TODO: This should lower into LIRPlace. I think?
-        let chunk = Chunk {size: self.layouts.get_layout(&cell.typ.coerce_concrete()).size()};
+        let coerced_type = cell_type.coerce_concrete();
+        let chunk = Chunk {size: self.layouts.get_layout(&coerced_type).size()};
         let chunk_id = self.add_chunk(chunk);
-        self.cell_chunk_map.insert(id, (chunk_id, cell.typ.coerce_concrete()));
+        self.cell_chunk_map.insert(id, (chunk_id, coerced_type));
     }
 
     fn add_chunk(&mut self, chunk: Chunk) -> ChunkId {

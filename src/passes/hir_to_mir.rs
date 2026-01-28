@@ -8,7 +8,7 @@ use crate::shared::utils::*;
 
 pub struct MIRBuilder {
     var_map: HashMap<VarId, CellId>,
-    current_cells: HashMap<CellId, Cell>,
+    current_cells: HashMap<CellId, GenericType>,
     cell_counter: usize,
     block_counter: usize,
     loop_start_stack: Vec<BlockId>,
@@ -49,7 +49,7 @@ impl MIRBuilder {
         self.current_cells = HashMap::new();
 
         for (var_id, var) in func.variables.into_iter() {
-            let cell_id = self.add_cell(Cell { typ: var.typ, kind: CellKind::Var { name: var.name}});
+            let cell_id = self.add_cell(var.typ);
             self.var_map.insert(var_id, cell_id);
         }
         
@@ -110,7 +110,7 @@ impl MIRBuilder {
             HIRStatement::Let { var, value } => {
                 let cell_id = &self.var_map[&var];
                 let target = MIRPlace {
-                    typ: self.current_cells[cell_id].typ.clone(),
+                    typ: self.current_cells[cell_id].clone(),
                     base: MIRPlaceBase::Cell(*cell_id),
                     fieldchain: Vec::new()
                 };
@@ -200,10 +200,7 @@ impl MIRBuilder {
             PlaceKind::Deref(reference) => {
                 let (ref_val, ref_stmts) = self.lower_expr(reference); 
 
-                let ref_val_cell = self.add_cell(Cell { 
-                    typ:  ref_val.typ.clone(),
-                    kind: CellKind::Temp 
-                });
+                let ref_val_cell = self.add_cell(ref_val.typ.clone());
                 let ref_assign_stmt = MIRStatement::Assign { 
                     target: MIRPlace { 
                         typ: ref_val.typ.clone(), 
@@ -243,7 +240,7 @@ impl MIRBuilder {
             HIRExpressionKind::BinOp { op, left, right } => {
                 let (l_val, l_stmts) = self.lower_expr(*left);
                 let (r_val, r_stmts) = self.lower_expr(*right);
-                let resc_id = self.add_cell(Cell{typ: expr.typ.clone(), kind: CellKind::Temp});
+                let resc_id = self.add_cell(expr.typ.clone());
                 let target = MIRPlace { 
                     typ: expr.typ.clone(), 
                     base: MIRPlaceBase::Cell(resc_id), 
@@ -262,7 +259,7 @@ impl MIRBuilder {
                     .into_iter()
                     .map(|arg| self.lower_expr(arg))
                     .unzip();
-                let resc_id = self.add_cell(Cell{typ: expr.typ.clone(), kind: CellKind::Temp});
+                let resc_id = self.add_cell(expr.typ.clone());
                 let target = MIRPlace { 
                     typ: expr.typ.clone(), 
                     base: MIRPlaceBase::Cell(resc_id), 
@@ -296,7 +293,7 @@ impl MIRBuilder {
                         (MIRValue{typ: GenericType::Reference(Box::new(mir_refd.typ)), value: MIRValueKind::Reference(refd_place)}, refd_stmts)
                     }
                     MIRValueKind::Reference(refd_ref) => {
-                        let tempc = self.add_cell(Cell{typ: mir_refd.typ.clone(), kind: CellKind::Temp});
+                        let tempc = self.add_cell(mir_refd.typ.clone());
                         let temp_place = MIRPlace{typ: mir_refd.typ.clone(), base: MIRPlaceBase::Cell(tempc), fieldchain: vec![]};
                         let assign_stmt = MIRStatement::Assign { target: temp_place.clone(), value: MIRValue { typ: mir_refd.typ.clone(), value: MIRValueKind::Reference(refd_ref)}};
                         (MIRValue{typ: expr.typ, value: MIRValueKind::Reference(temp_place)}, [refd_stmts, vec![assign_stmt]].concat())
@@ -308,10 +305,7 @@ impl MIRBuilder {
             HIRExpressionKind::Dereference(reference) => {
                 let (ref_val, ref_stmts) = self.lower_expr(*reference); 
 
-                let ref_val_cell = self.add_cell(Cell { 
-                    typ:  ref_val.typ.clone(),
-                    kind: CellKind::Temp
-                });
+                let ref_val_cell = self.add_cell(ref_val.typ.clone());
                 let ref_assign_stmt = MIRStatement::Assign { 
                     target: MIRPlace { 
                         typ: ref_val.typ.clone(), 
@@ -387,10 +381,10 @@ impl MIRBuilder {
         block_id 
     }
 
-    fn add_cell(&mut self, cell: Cell) -> CellId {
+    fn add_cell(&mut self, typ: GenericType) -> CellId {
         let new_id = CellId(self.cell_counter);
         self.cell_counter += 1;
-        self.current_cells.insert(new_id, cell);
+        self.current_cells.insert(new_id, typ);
         new_id
     }
 }

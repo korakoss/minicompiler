@@ -16,7 +16,7 @@ pub struct MIRProgram {
 pub struct MIRFunction {
     pub name: String,
     pub args: Vec<CellId>,
-    pub cells: HashMap<CellId, Cell>,
+    pub cells: HashMap<CellId, GenericType>,
     pub blocks: HashMap<BlockId, MIRBlock>,
     pub entry: BlockId,
     pub ret_type: GenericType,
@@ -80,7 +80,7 @@ pub enum MIRValueKind {
 
 #[derive(Clone, Debug)]
 pub struct MIRPlace {
-    pub typ: GenericType,
+    pub typ: GenericType,   // Type actually doesn't need to be stored here, maybe?
     pub base: MIRPlaceBase,
     pub fieldchain: Vec<String>
 }
@@ -92,17 +92,5 @@ pub enum MIRPlaceBase {
 }
 
 #[derive(Clone, Debug)]
-pub struct Cell {       // Could drop kind?
-    pub typ: GenericType,
-    pub kind: CellKind,
-}
-
-#[derive(Clone, Debug)]
-pub enum CellKind {
-    Var {
-        name: String
-    },
-    Temp,
-}
-
+pub struct Cell(pub GenericType); 
 
