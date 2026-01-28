@@ -1,7 +1,6 @@
 use std::{collections::HashMap};
 
-use crate::stages::ast::*;
-use crate::stages::hir::*;
+use crate::stages::{ast::*, hir::*};
 use crate::shared::{
     typing::{GenericType, PrimType},
     tables::{GenericTypetable, GenericShape},

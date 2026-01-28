@@ -1,9 +1,11 @@
 use std::{collections::HashMap};
 
-use crate::shared::typing::GenericType;
-use crate::shared::binops::BinaryOperator;
-use crate::shared::tables::{GenericTypetable};
-use crate::shared::utils::{FuncId, GenTypeVariable};
+use crate::shared::{
+    typing::GenericType,
+    binops::BinaryOperator,
+    tables::{GenericTypetable},
+    utils::{FuncId, GenTypeVariable},
+};
 
 
 #[derive(Clone, Debug)]
@@ -71,12 +73,10 @@ pub enum HIRExpressionKind {
     },
     BoolTrue,
     BoolFalse,
-    
     FieldAccess {
         expr: Box<HIRExpression>,
         field: String,
     },
-
     StructLiteral {
         fields: HashMap<String, HIRExpression>,
     },

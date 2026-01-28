@@ -11,12 +11,14 @@ Have generic functions.
 Plan after: MIR-> MMIR (monomorphic MIR) -> LIR. 
 In the meantime, make refactors and cleanups on the current codebase.
 
-Introduce numeric IDs for newtypes instead of strings for ease of copy and so on.
+> Propagate typevars down from AST
+
+>? Introduce numeric IDs for newtypes instead of strings for ease of copy and so on.
+
 Also typevars, resolved correctly per scope. Or is that done?
 
 Do we need a ConcreteTypetable? Or how to do that part?
 
-Clarify imports: only import what's used, not *
 
 ## NOTES
 
