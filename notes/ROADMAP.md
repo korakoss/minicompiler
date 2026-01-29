@@ -10,8 +10,8 @@ There are other branches open for working on the pointer-based ABI rewrite as we
 # Next steps
 
 In roughly chronological order, the short/medium-term next steps:
-- function return typecheck
 - generic functions
+- function return typecheck
 - lookahead parser
 - enums and matching
     - simplest summing, no namespacing complications
@@ -20,6 +20,33 @@ In roughly chronological order, the short/medium-term next steps:
 - methods
 - heap
     - goal: Vec<T> working. roll an allocator
+
+
+# Short-medium term generic function notes
+
+## Function return typechecking
+We might do this in AST->HIR or some intermediate. 
+It might be set up by as a check on statement blocks. Each block has a type it evaluates to.
+
+
+## Monomorphization
+In two separate stages:
+- *semimorphization*: collecting top functions (those called by main), and then symbolically "monomorphizing" with their typevars. This is where divergence would be found too
+    - should happen between HIR (needs types everywhere) and MIR (shouldn't be CFG probably)
+        - probably just insert a new stage in between
+        - it's basically like HIR, but type params are mostly concrete except main callees
+    - requires building a "call graph"
+- *monomorphization*: then just stamping in concrete types from main
+    - we need to be able to do that easily with a top-down recursion. how?
+
+
+## Open questions 
+- do we need topo ordering? when? laying out?
+- add a NewType struct?
+
+## Deferred for a bit later 
+Implement func return typechecks.
+
 
 
 # Orthogonal-ish improvements to do sometime:
