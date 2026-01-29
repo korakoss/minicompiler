@@ -334,7 +334,7 @@ impl Parser {
                         self.expect_unparametric_token(Token::RightParen);
                         ASTExpression::FuncCall { funcname: name, args}
                     }
-                    Token::LeftBrace => {                                                  
+                    Token::LeftBrace => {                                                   // StructLiteral                                             
                         if self.new_types.contains_key(&NewtypeId(name.clone())) {
                             let fields = self.parse_struct_literal_internals(scope_typevars);
                             self.expect_unparametric_token(Token::RightBrace);

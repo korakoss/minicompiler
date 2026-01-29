@@ -79,6 +79,7 @@ pub enum ASTExpression {
     },
     FuncCall {
         funcname: String,
+        type_params: Vec<GenericType>,
         args: Vec<ASTExpression>,
     },
     BoolTrue,
