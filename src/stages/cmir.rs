@@ -15,7 +15,7 @@ pub struct CMIRProgram {
 pub struct CMIRFunction {
     pub name: String,
     pub args: Vec<CellId>,
-    pub cells: HashMap<CellId, Cell>,
+    pub cells: HashMap<CellId, ConcreteType>,
     pub blocks: HashMap<BlockId, CMIRBlock>,
     pub entry: BlockId,
     pub ret_type: ConcreteType,
@@ -88,20 +88,6 @@ pub struct CMIRPlace {
 pub enum CMIRPlaceBase {
     Cell(CellId),
     Deref(CellId),
-}
-
-#[derive(Clone, Debug)]
-pub struct Cell {       // Could drop kind?
-    pub typ: GenericType,
-    pub kind: CellKind,
-}
-
-#[derive(Clone, Debug)]
-pub enum CellKind {
-    Var {
-        name: String
-    },
-    Temp,
 }
 
 
