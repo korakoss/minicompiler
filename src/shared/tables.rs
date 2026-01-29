@@ -32,7 +32,7 @@ impl GenericTypetable {
         typ_var_vals: Vec<GenericType>
     ) -> GenericShape {
         let def = self.defs[&id].clone();
-        let type_params: BTreeMap<String, GenericType> = def.type_params
+        let type_params: BTreeMap<TypevarId, GenericType> = def.type_params
             .iter()
             .cloned()
             .zip(typ_var_vals.iter().cloned())
@@ -58,7 +58,7 @@ impl GenericTypetable {
         typ_var_vals: Vec<ConcreteType>
     ) -> ConcreteShape {
         let def = self.defs[&id].clone();
-        let type_params: BTreeMap<String, ConcreteType> = def.type_params
+        let type_params: BTreeMap<TypevarId, ConcreteType> = def.type_params
             .iter()
             .cloned()
             .zip(typ_var_vals.iter().cloned())
