@@ -9,21 +9,13 @@ mod tests;
 
 #[derive(Debug, Clone)]
 pub struct GenericTypetable {
-    topo_order: Vec<NewtypeId>,
-    monomorphizations: HashMap<NewtypeId, HashMap<Vec<ConcreteType>,ConcreteShape>>, // Change for a HashMap to avoid duplicates
     pub defs: HashMap<NewtypeId, GenericTypeDef>,
 }
 
 impl GenericTypetable {
 
     pub fn new(defs: HashMap<NewtypeId, GenericTypeDef>) -> Self {
-        Self { 
-            topo_order: toposort_depgraph(extract_newtype_dependencies(&defs)), 
-            monomorphizations: defs.keys()
-                .map(|id| (id.clone(), HashMap::new()))
-                .collect(),
-            defs,
-        }
+        Self { defs}
     }
     
     pub fn bind(
@@ -63,7 +55,7 @@ impl GenericTypetable {
             .cloned()
             .zip(typ_var_vals.iter().cloned())
             .collect();
-        let monomorph = match def.defn {
+        match def.defn {
             GenericShape::Struct { fields } => {
                 ConcreteShape::Struct { 
                     fields: fields
@@ -75,9 +67,7 @@ impl GenericTypetable {
             GenericShape::Enum {..} => {
                 unimplemented!();
             }
-        };
-        self.monomorphizations.get_mut(&id).unwrap().insert(typ_var_vals,monomorph.clone());
-        monomorph
+        }
     }
 
     pub fn get_genericity_rank(
