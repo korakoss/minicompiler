@@ -215,7 +215,7 @@ impl HIRBuilder {
                     }
                 }
             }
-            ASTExpression::FuncCall { funcname, args } => {
+            ASTExpression::FuncCall { funcname, type_params, args } => {        // TODO: propagate type params
                 let hir_args: Vec<HIRExpression> = args
                     .into_iter()
                     .map(|arg| self.lower_expression(arg))

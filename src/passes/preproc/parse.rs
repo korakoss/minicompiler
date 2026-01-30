@@ -316,7 +316,14 @@ impl Parser {
         match token {
             Token::IntLiteral(int) => ASTExpression::IntLiteral(int),
             Token::Identifier(name) => {
+                
+                if !matches!(*self.tokens.peek().unwrap(), Token::LeftParen | Token::LeftBrace | Token::LeftSqBracket) {
+                    return ASTExpression::Variable(name);
+                }
+                let type_params = self.expect_generic_type_params(scope_typevars);
+
                 match *self.tokens.peek().unwrap() {
+                    
                     Token::LeftParen => {                                                      // FuncCall
                         self.tokens.next();
                         let args: Vec<ASTExpression> = match self.tokens.peek().unwrap() {
@@ -332,30 +339,23 @@ impl Parser {
                             }
                         };
                         self.expect_unparametric_token(Token::RightParen);
-                        ASTExpression::FuncCall { funcname: name, args}
+                        ASTExpression::FuncCall { funcname: name, type_params, args}
                     }
                     Token::LeftBrace => {                                                   // StructLiteral                                             
                         if self.new_types.contains_key(&NewtypeId(name.clone())) {
                             let fields = self.parse_struct_literal_internals(scope_typevars);
                             self.expect_unparametric_token(Token::RightBrace);
                             ASTExpression::StructLiteral {
-                                typ: GenericType::NewType(NewtypeId(name), vec![]),
+                                typ: GenericType::NewType(NewtypeId(name), type_params),
                                 fields
                             }
                         } else {
                             ASTExpression::Variable(name)
                         }
                     }
-                    Token::LeftSqBracket => {      // TODO: for now, we assume this is a struct literal with generic parameters, later it can be indexing, etc however
-                        let bindings = self.expect_generic_bindings(scope_typevars);
-                        let fields = self.parse_struct_literal_internals(scope_typevars);
-                        self.expect_unparametric_token(Token::RightBrace);
-                        ASTExpression::StructLiteral {
-                            typ: GenericType::NewType(NewtypeId(name), bindings),
-                            fields
-                        }
+                    _ => {
+                        panic!("Unexpected token encountered");
                     }
-                    _ => ASTExpression::Variable(name)
                 }
             },
             Token::LeftParen => {
@@ -414,7 +414,7 @@ impl Parser {
                     GenericType::TypeVar(scope_typevars[&type_id])
                 }
                 else {
-                    let bindings = self.expect_generic_bindings(scope_typevars);
+                    let bindings = self.expect_generic_type_params(scope_typevars);
                     GenericType::NewType(NewtypeId(type_id), bindings)
                 }
             }
@@ -428,7 +428,7 @@ impl Parser {
         }
     }
     
-    fn expect_generic_bindings(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> Vec<GenericType> {
+    fn expect_generic_type_params(&mut self, scope_typevars: &HashMap<String, TypevarId>) -> Vec<GenericType> {
         if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
             return vec![]
         } else {
