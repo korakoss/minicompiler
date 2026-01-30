@@ -87,7 +87,7 @@ impl LIRBuilder {
                 };
                 [left_stmts, right_stmts, vec![bin_stmt]].concat()
             }
-            MIRStatement::Call { target, func, args } => {
+            MIRStatement::Call { target, func, type_params, args } => {
                 let lir_target = self.lower_place(target);
                 let mut arg_places: Vec<LIRPlace> = Vec::new();
                 let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();

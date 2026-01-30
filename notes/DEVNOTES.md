@@ -9,9 +9,6 @@ Have generic functions.
 ## STEPS
 
 ### Current problem (start here) 
-Parsing is wrong and it's hard to integrate expecting type parameters for calls to generic functions. 
-In *parse.rs: parse_expression_atom()*, we assume that a "[" character starts a generic *structlit*, but now it can start a call to a generic function too. 
-So this needs to be sorted out first.
 Add test for the parsing!
 
 ### Next steps

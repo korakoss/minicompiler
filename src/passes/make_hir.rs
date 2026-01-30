@@ -63,6 +63,7 @@ impl HIRBuilder {
         }
         let hir_func = HIRFunction { 
             name, 
+            typvars,
             args: arg_ids,
             variables: self.scope_context.var_map.clone(),
             body: hir_body, 
@@ -233,6 +234,7 @@ impl HIRBuilder {
                     typ: ret_typ.clone(),
                     expr: HIRExpressionKind::FuncCall{ 
                         id: *func_id, 
+                        type_params,
                         args: hir_args
                     }
                 } 

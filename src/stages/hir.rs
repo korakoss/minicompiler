@@ -1,10 +1,7 @@
 use std::{collections::HashMap};
 
 use crate::shared::{
-    typing::GenericType,
-    binops::BinaryOperator,
-    tables::{GenericTypetable},
-    utils::{FuncId, GenTypeVariable},
+    binops::BinaryOperator, tables::GenericTypetable, typing::{GenericType, TypevarId}, utils::{FuncId, GenTypeVariable}
 };
 
 
@@ -19,6 +16,7 @@ pub struct HIRProgram {
 #[derive(Clone, Debug)]
 pub struct HIRFunction {
     pub name: String,
+    pub typvars: Vec<TypevarId>,
     pub args: Vec<VarId>,
     pub variables: HashMap<VarId, GenTypeVariable>,
     pub body: Vec<HIRStatement>,
@@ -69,6 +67,7 @@ pub enum HIRExpressionKind {
     },
     FuncCall {
         id: FuncId, 
+        type_params: Vec<GenericType>,
         args: Vec<HIRExpression>,
     },
     BoolTrue,

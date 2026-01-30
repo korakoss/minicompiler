@@ -62,6 +62,7 @@ impl MIRBuilder {
             .collect();
         MIRFunction {
             name: func.name,
+            typvars: func.typvars,
             args: arg_cells,
             cells: self.current_cells.clone(),
             blocks: self.curr_collected_blocks.clone(),
@@ -255,7 +256,7 @@ impl MIRBuilder {
                 };
                 (MIRValue{typ: expr.typ, value: MIRValueKind::Place(target)}, [l_stmts, r_stmts, vec![bin_stmt]].concat()) 
             },
-            HIRExpressionKind::FuncCall { id, args } => {
+            HIRExpressionKind::FuncCall { id, type_params, args } => {
                 let (arg_vals, arg_stmt_coll): (Vec<MIRValue>, Vec<Vec<MIRStatement>>) = args
                     .into_iter()
                     .map(|arg| self.lower_expr(arg))
@@ -266,7 +267,12 @@ impl MIRBuilder {
                     base: MIRPlaceBase::Cell(resc_id), 
                     fieldchain: Vec::new()
                 }; 
-                let call_stmt = MIRStatement::Call { target: target.clone(), func: id, args: arg_vals};
+                let call_stmt = MIRStatement::Call { 
+                    target: target.clone(), 
+                    func: id, 
+                    type_params,
+                    args: arg_vals
+                };
                 (MIRValue{typ: expr.typ, value: MIRValueKind::Place(target)}, [arg_stmt_coll.into_iter().flatten().collect(), vec![call_stmt]].concat())
             },
             HIRExpressionKind::BoolTrue => (MIRValue{typ: GenericType::Prim(PrimType::Bool) ,value: MIRValueKind::BoolTrue}, Vec::new()),

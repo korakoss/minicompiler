@@ -2,8 +2,8 @@ use std::{collections::HashMap};
 
 use crate::shared::{
     binops::BinaryOperator, tables::GenericTypetable,
-    typing::{GenericType},
-    utils::{CellId, BlockId, FuncId},
+    typing::{GenericType, TypevarId},
+    utils::{BlockId, CellId, FuncId},
 };
 
 
@@ -17,6 +17,7 @@ pub struct MIRProgram {
 #[derive(Clone, Debug)]
 pub struct MIRFunction {
     pub name: String,
+    pub typvars: Vec<TypevarId>, 
     pub args: Vec<CellId>,
     pub cells: HashMap<CellId, GenericType>,
     pub blocks: HashMap<BlockId, MIRBlock>,
@@ -45,6 +46,7 @@ pub enum MIRStatement {
     Call {
         target: MIRPlace,
         func: FuncId,
+        type_params: Vec<GenericType>,
         args: Vec<MIRValue>,
     },
     Print(MIRValue),
