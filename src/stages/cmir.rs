@@ -7,7 +7,7 @@ use crate::shared::{binops::BinaryOperator, tables::GenericTypetable};
 #[derive(Clone, Debug)]
 pub struct CMIRProgram {
     pub typetable: (),      // TODO
-    pub functions: HashMap<FuncId, CMIRFunction>,
+    pub functions: HashMap<(FuncId, Vec<ConcreteType>), CMIRFunction>,
     pub entry: FuncId,
 }
 
