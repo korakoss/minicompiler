@@ -12,7 +12,6 @@ pub struct LIRBuilder {
     cell_chunk_map: HashMap<CellId, (ChunkId, ConcreteType)>,
     curr_chunks: HashMap<ChunkId, Chunk>,
     curr_vregs: Vec<VRegId>,
-    layouts: LayoutTable,
     chunk_counter: usize,
     typetable: GenericTypetable,
 }
@@ -295,96 +294,5 @@ impl LIRBuilder {
         chunk_id
     }
 
-}
-
-
-fn increment_place_offset(place: LIRPlaceKind, increment: usize) -> LIRPlaceKind {
-    match place {
-        LIRPlaceKind::Local { base, offset } => LIRPlaceKind::Local { base, offset: offset + increment },
-        LIRPlaceKind::Deref { pointer, offset } => LIRPlaceKind::Deref { pointer, offset: offset + increment},
-    }
-}
-
-
-#[derive(Clone, Debug)]
-pub enum LayoutInfo {
-    Primitive(usize),               // Variable size
-    Struct {
-        size: usize,
-        field_offsets: HashMap<String, usize>
-    }
-}
-
-impl LayoutInfo {
-    pub fn size(&self) -> usize {
-        match *self {
-            LayoutInfo::Primitive(size) => size,
-            LayoutInfo::Struct{size, ..} => size,
-        }
-    }
-}
-
-
-#[derive(Clone, Debug)]
-pub struct LayoutTable {
-    typetable: GenericTypetable,
-    newtype_layouts: HashMap<ConcreteType, LayoutInfo>
-}
-
-
-impl LayoutTable {
-
-    pub fn new(typetable: GenericTypetable) -> Self {
-        Self {
-            typetable,
-            newtype_layouts: HashMap::new(),
-        }
-    }
-
-    pub fn get_layout(&mut self, typ: &ConcreteType) -> LayoutInfo {
-        match typ {
-            ConcreteType::Prim(prim_tp) => self.get_primitive_layout(prim_tp),
-            ConcreteType::Reference(..) => LayoutInfo::Primitive(8),
-            ConcreteType::NewType(..) => {
-                if let Some(layout) = self.newtype_layouts.get(&typ) {
-                    layout.clone()
-                } else {
-                    self.lay_out_newtype(typ)
-                }
-            }
-        
-        }
-    }
-
-    fn get_primitive_layout(&self, _prim_tp: &PrimType) -> LayoutInfo {
-        LayoutInfo::Primitive(8)        // Temporarily so; update later
-    }
-    
-    fn lay_out_newtype(&mut self, ntyp: &ConcreteType) -> LayoutInfo { 
-        let ConcreteType::NewType(id, tparams) = ntyp.clone() else {
-            unreachable!();
-        };
-        let shape = self.typetable.monomorphize(id, tparams);
-        let layout = match shape {
-            ConcreteShape::Struct { fields } => {
-                let mut f_offsets: HashMap<String, usize> = HashMap::new();
-                let mut curr_offset = 0;
-                for (fname, ftype) in fields {
-                    f_offsets.insert(fname, curr_offset);
-                    let fsize = self.get_layout(&ftype).size(); 
-                    curr_offset += fsize;
-                }
-                LayoutInfo::Struct { 
-                    size: curr_offset, 
-                    field_offsets: f_offsets 
-                }
-            }
-            ConcreteShape::Enum { variants: _} => {
-                unimplemented!();
-            }
-        };
-        self.newtype_layouts.insert(ntyp.clone(), layout.clone());
-        layout
-    }
 }
 
