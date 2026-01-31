@@ -35,7 +35,7 @@ impl  MIRLowerer {
         CMIRFunction {
             name: func.name,
             args: unimplemented!(),
-            cells: unimplemented!(),
+            cells: func.cells.map(|cell| self.typetable.bind(id, typ_var_vals)),
             blocks: unimplemented!(),
             entry: unimplemented!(),
             ret_type: unimplemented!(),

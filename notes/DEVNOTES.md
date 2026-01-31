@@ -11,34 +11,40 @@ Have generic functions.
 ### Current problem (start here) 
 Write _concretize_mir.rs_. 
 
-### Plan notes (concretize_mir)
-We want to do the following things in this pass:
-- lower from MIR to CMIR – mostly concretizing types, I guess
 
-Okay, but how do we do that? Here's where the call graph comes in, I think. 
-We'll start from main and recursively monomorphize from there. 
+### Implementation plan
+Iterate through functions recursively, in a DFS manner, like planned. Start from main.
 
-We want to register newtype monomorphizations so we'll know what needs to be laid out for LIR.
+Data we're tracking:
+- monomorphizations of functions
+    - both the monomorphized bodies and the parameter (or just rank) vectors for a FuncID
+- the current "monomorphization" stack
+- things to be monomorphized next 
+    - sort of as a stack of queues, maybe?
+- required monomorphizations of generic types
 
-### Plan details
-Start from main. It has no type params. We go through the body of the function, scanning for function calls. Since main isn't generic, all calls in it are parametrized by concrete types. 
-We iterate through the calls in the body, in a DFS manner. We also note down all newtype monomorphizations we encounter.
+Algorithm outline:
+- start at entry
+- pop the next monomorphization "request" off the to-process stack
+    - check if that monomorphization already exists, proceed if not
+- compute and note down the "rank vector"
+- monomorphize the function body
+    - go through the blocks in the body
+    - keep track of the "typevar binding" we're operating with
+    - monomorphize generic types in the blocks we encounter
+    - also collect function calls 
+        - noting down the typevar bindings 
+        - add these to the queue stack thing
+        - run the Pareto rank check as planned
+- add the monomorphized function body to monomorphizations
+- proceed with the queue stack
 
-Probably, the right flow in a step of the algorithm looks something like this:
-- (context):
-    - we have a "monomorphization stack" – basically a callstack in the DFS iteration we're doing, consisting of monomorphized functions calling each other
-    - we maintain some kind of "queue" to monomorphize next (function + typevars)
-- at a given iteration, we take the next item of the queue
-- we just create the monomorphization of the function all the way through 
-    - we note down all the function calls made in it. that will be the new queue/stack to process
-        - figure out the right data structure here. it has to be some kind of stack-ish things, we want to process "deeper" entries first, in line with DFS
-    - we also note down monomorphized types in the process
-        - careful not to duplicate
-- we add the function to the "processed" stack
-    - we probably calculate the Pareto rank vector thing for the halting criterion
-- then we continue with the "processable" stack/queue
 
-### Breakdown
+### Things we need to implement along the way, questions etc.
+- Clear up how to represent type variables in scope and bind concrete types to them ergonomically
+- Visitor patterns?
+- problems with Hashmap nondeterministic order?
+
 
 ### Later steps
 - add (Rust-)tests:
