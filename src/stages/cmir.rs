@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
+use crate::shared::ids::*;
 use crate::shared::typing::*;
-use crate::shared::utils::*;
-use crate::shared::{binops::BinaryOperator, tables::GenericTypetable};
+use crate::shared::{binops::BinaryOperator};
 
 #[derive(Clone, Debug)]
 pub struct CMIRProgram {

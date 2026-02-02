@@ -5,7 +5,8 @@ use crate::shared::{
     typing::{GenericType, PrimType},
     tables::{GenericTypetable, GenericShape},
     binops::binop_typecheck,
-    utils::{FuncId, GenTypeVariable, GenericFuncSignature,FuncSignature, Variable},
+    utils::{GenTypeVariable, GenericFuncSignature,FuncSignature, Variable},
+    ids::{FuncId, Id},
 };
        
         
@@ -23,7 +24,7 @@ impl HIRBuilder {
         let function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)> = functions
             .iter()
             .enumerate()
-            .map(|(i, (sgn, func))| (sgn.clone(), (FuncId(i), func.ret_type.clone())))
+            .map(|(i, (sgn, func))| (sgn.clone(), (FuncId::from_raw(i), func.ret_type.clone())))
             .collect();
         let entry = function_map
             .iter()

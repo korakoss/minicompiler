@@ -1,26 +1,25 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::shared::typing::{NewtypeId, TypevarId};
-use crate::shared::utils::{BlockId, FuncId};
 use crate::stages::{mir::*, cmir::*};
 use crate::shared::{
     typing::{ConcreteType},
     tables::{GenericTypetable},
-    utils::{CellId},
+    ids::{BlockId, CellId, FuncId, IdFactory}
 };
 
 
 pub struct MIRLowerer {
-    pub mono_funcs_map: HashMap<(FuncId, Vec<ConcreteType>), FuncId>, 
-    pub current_mono_stack: Vec<(FuncId, Vec<ConcreteType>)>,
-    pub mono_requests: Vec<(FuncId, Vec<ConcreteType>)>,
-    pub generic_functions: HashMap<FuncId, MIRFunction>,
-    pub mono_types: Vec<(NewtypeId, Vec<ConcreteType>)>,
-    pub typetable: GenericTypetable,
-    pub block_counter: usize,
-    pub cell_counter: usize,
-    pub func_counter: usize,
-}
+    mono_funcs_map: HashMap<(FuncId, Vec<ConcreteType>), FuncId>, 
+    current_mono_stack: Vec<(FuncId, Vec<ConcreteType>)>,
+    mono_requests: Vec<(FuncId, Vec<ConcreteType>)>,
+    generic_functions: HashMap<FuncId, MIRFunction>,
+    mono_types: Vec<(NewtypeId, Vec<ConcreteType>)>,
+    typetable: GenericTypetable,
+    blockid_factory: IdFactory<BlockId>,
+    cellid_factory: IdFactory<CellId>,
+    funcid_factory: IdFactory<FuncId>,
+ }
 
 impl  MIRLowerer {
     
@@ -32,9 +31,9 @@ impl  MIRLowerer {
             generic_functions: program.functions,
             mono_types: Vec::new(),
             typetable: program.typetable,
-            block_counter: 0,
-            cell_counter: 0,
-            func_counter: 0,
+            blockid_factory: IdFactory::new(),
+            cellid_factory: IdFactory::new(),
+            funcid_factory: IdFactory::new(),
         };
         let low_functions = lowerer.lower_functions(program.entry);
         CMIRProgram { 
@@ -45,7 +44,7 @@ impl  MIRLowerer {
 
     pub fn lower_functions(&mut self, entry: FuncId) -> HashMap<FuncId, CMIRFunction>{
         // TODO: finish this
-        let entry_id = self.get_new_func_id();
+        let _entry_id = self.blockid_factory.next_id();
         self.mono_requests.push((entry, vec![])); 
         let low_funcs: HashMap<FuncId, CMIRFunction> = HashMap::new();
         while let Some((id, type_params)) = self.mono_requests.pop() {
@@ -70,7 +69,7 @@ impl  MIRLowerer {
         let mut cell_map: HashMap<CellId, CellId> = HashMap::new();
 
         for (id, typ) in gen_func.cells {
-            let low_id = self.get_new_cell_id();
+            let low_id = self.cellid_factory.next_id();
             lowered_cells.insert(low_id, typ.monomorphize(&tparam_bindings));
             cell_map.insert(id, low_id);
         }
@@ -78,14 +77,16 @@ impl  MIRLowerer {
         let mut block_map: HashMap<BlockId, BlockId> = HashMap::new();
         
         for id in gen_func.blocks.keys() {
-            let low_id = self.get_new_block_id();
+            let low_id = self.blockid_factory.next_id();
             block_map.insert(*id, low_id);
         }
+        unimplemented!();
         
 
         // Pre-generate the lowered block IDs, then lower the blocks
         // Map in the args, entries, etc
         // Map ret-type
+        /*
         CMIRFunction {
             name: gen_func.name,
             args: gen_func.args.into_iter().map(|arg_cell| cell_map[&arg_cell]).collect(),
@@ -94,6 +95,7 @@ impl  MIRLowerer {
             entry: unimplemented!(),
             ret_type: gen_func.ret_type.monomorphize(&tparam_bindings),
         }
+        */
     }
 
     fn lower_block(
@@ -217,24 +219,5 @@ impl  MIRLowerer {
             fieldchain: place.fieldchain
         }
     }
-
-    fn get_new_cell_id(&mut self) -> CellId {
-        let id = CellId(self.cell_counter);
-        self.cell_counter += 1;
-        id
-    }
-    
-    fn get_new_block_id(&mut self) -> BlockId {
-        let id = BlockId(self.block_counter);
-        self.block_counter += 1;
-        id
-    }
-
-    fn get_new_func_id(&mut self) -> FuncId { 
-        let id = FuncId(self.block_counter);
-        self.block_counter += 1;
-        id
-    }
-
 }
 

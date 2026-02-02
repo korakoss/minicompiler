@@ -4,7 +4,7 @@ use crate::stages::{lir::*, mir::*};
 use crate::shared::{
     typing::{GenericType, ConcreteType, PrimType},
     tables::{GenericTypetable, ConcreteShape},
-    utils::{CellId},
+    ids::{CellId},
 };
 
 
@@ -87,7 +87,7 @@ impl LIRBuilder {
                 };
                 [left_stmts, right_stmts, vec![bin_stmt]].concat()
             }
-            MIRStatement::Call { target, func, type_params, args } => {
+            MIRStatement::Call { target, func, type_params: _, args } => {
                 let lir_target = self.lower_place(target);
                 let mut arg_places: Vec<LIRPlace> = Vec::new();
                 let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();
@@ -269,7 +269,7 @@ impl LIRBuilder {
             let curr_typ_layout = self.layouts.get_layout(&curr_typ);
 
             match curr_typ_layout {
-                LayoutInfo::Struct { size, field_offsets } => {
+                LayoutInfo::Struct { size: _, field_offsets } => {
                     let ConcreteType::NewType(id, tvars) = curr_typ else {panic!("Type in field chain not struct");};
                     let ConcreteShape::Struct { fields } = self.typetable.monomorphize(id, tvars) else {unreachable!()};
                     curr_typ = fields[&field].clone();

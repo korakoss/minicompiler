@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::stages::lir::*;
 use crate::shared::binops::BinaryOperator;
-use crate::shared::utils::{FuncId, BlockId};
+use crate::shared::ids::{BlockId, FuncId, Id};
 
 
 struct StackFrame {
@@ -59,7 +59,7 @@ impl LIRCompiler {
         self.emit("    mov fp, sp");     
         self.emit("    sub sp, sp, #16"); 
         self.emit("    sub r12, fp, #8");
-        self.emit(&format!("    bl func_{}", program.entry.0));
+        self.emit(&format!("    bl func_{}", program.entry.raw()));
         self.emit("    ldr r0, [r12]");
         self.emit("    add sp, sp, #16"); 
         self.emit("    pop {fp, lr}");
@@ -75,7 +75,7 @@ impl LIRCompiler {
         let LIRFunction { blocks, entry, chunks, args } = lir_func;
         let frame = StackFrame::make(chunks);
         
-        self.emit(&format!("func_{}:", func_id.0));
+        self.emit(&format!("func_{}:", func_id.raw()));
         self.emit("    push {fp, lr}");     
         self.emit("    mov fp, sp");     
         self.emit(&format!("    sub sp, sp, #{}", frame.size)); 
@@ -85,13 +85,13 @@ impl LIRCompiler {
             self.emit(&format!("    str r{}, [fp, #-{}]", i+1, arg_offset));
 }
 
-        self.emit(&format!("    b block_{}", entry.0));
+        self.emit(&format!("    b block_{}", entry.raw()));
 
         for (id, block) in blocks.into_iter() {
             self.compile_block(id, block, &frame, func_id);
         }
 
-        self.emit(&format!("ret_{}:", func_id.0));        
+        self.emit(&format!("ret_{}:", func_id.raw()));        
         self.emit("    str r0, [r12]");
         self.emit(&format!("    add sp, sp, #{}", frame.size));         
         self.emit("    pop {fp, lr}");
@@ -101,7 +101,7 @@ impl LIRCompiler {
 
     
     fn compile_block(&mut self, id: BlockId, block: LIRBlock, frame: &StackFrame, func: FuncId) {
-        self.emit(&format!("block_{}:", id.0));
+        self.emit(&format!("block_{}:", id.raw()));
         let LIRBlock {statements, terminator} = block;
         for stmt in statements {
             self.compile_stmt(stmt, frame);
@@ -141,13 +141,13 @@ impl LIRCompiler {
                     LIRPlaceKind::Local { base, offset } => {
                         let target_offset = frame.offsets[&base] + offset;
                         self.emit(&format!("    sub r12, fp, #{}", target_offset));
-                        self.emit(&format!("    bl func_{}", func.0));
+                        self.emit(&format!("    bl func_{}", func.raw()));
                     }
                     LIRPlaceKind::Deref { pointer, offset } => {
                         let pointer_st_offset = frame.offsets[&pointer];
                         self.emit(&format!("    ldr r0, [fp, #-{}]", pointer_st_offset));  
                         self.emit(&format!("    ldr r0, [r0, #-{}]", offset));  
-                        self.emit(&format!("    bl func_{}", func.0));                       
+                        self.emit(&format!("    bl func_{}", func.raw()));                       
                     }
                 }
                 self.emit("    pop {r12}"); 
@@ -197,19 +197,19 @@ impl LIRCompiler {
     fn compile_terminator(&mut self, term: LIRTerminator, frame: &StackFrame, func_id: FuncId) {
         match term {
             LIRTerminator::Goto{dest} => {
-                self.emit(&format!("    b block_{}", dest.0));
+                self.emit(&format!("    b block_{}", dest.raw()));
             }
             LIRTerminator::Branch { condition, then_block, else_block } => {
                 self.emit_operand_load(condition, frame);
                 self.emit("    cmp r0, #1");
-                self.emit(&format!("    beq block_{}", then_block.0));
-                self.emit(&format!("    b block_{}", else_block.0));
+                self.emit(&format!("    beq block_{}", then_block.raw()));
+                self.emit(&format!("    b block_{}", else_block.raw()));
             }
             LIRTerminator::Return(operand_opt) => {
                 if let Some(operand) = operand_opt {
                     self.emit_operand_load(operand, frame);
                 }
-                self.emit(&format!("    b ret_{}", func_id.0));
+                self.emit(&format!("    b ret_{}", func_id.raw()));
             }
         }
     }

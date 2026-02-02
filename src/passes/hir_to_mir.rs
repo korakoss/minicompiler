@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use crate::stages::{hir::*, mir::*};
 use crate::shared::{
     typing::{GenericType, PrimType},
-    utils::{CellId, BlockId},
+    ids::{CellId, BlockId, IdFactory},
 };
 
 
 pub struct MIRBuilder {
     var_map: HashMap<VarId, CellId>,
     current_cells: HashMap<CellId, GenericType>,
-    cell_counter: usize,
-    block_counter: usize,
+    cell_id_factory: IdFactory<CellId>,
+    block_id_factory: IdFactory<BlockId>,
     loop_start_stack: Vec<BlockId>,
     loop_end_stack: Vec<BlockId>,
     curr_collected_blocks: HashMap<BlockId, MIRBlock>,
@@ -26,8 +26,8 @@ impl MIRBuilder {
         let mut builder = MIRBuilder {
             var_map: HashMap::new(),
             current_cells: HashMap::new(),
-            cell_counter: 0,
-            block_counter: 1,
+            cell_id_factory: IdFactory::new(),
+            block_id_factory: IdFactory::new(),
             loop_start_stack: Vec::new(),
             loop_end_stack: Vec::new(),
             curr_collected_blocks: HashMap::new(),
@@ -354,7 +354,7 @@ impl MIRBuilder {
     }
 
     fn add_new_block(&mut self) -> BlockId {
-        let new_id = self.get_new_blockid();
+        let new_id = self.block_id_factory.next_id();
         self.wip_blocks.insert(new_id, Vec::new());
         new_id
     }
@@ -381,16 +381,8 @@ impl MIRBuilder {
         self.processing_stack.last().copied()
     }
 
-        
-    fn get_new_blockid(&mut self) -> BlockId {
-        let block_id = BlockId(self.block_counter); 
-        self.block_counter += 1;
-        block_id 
-    }
-
     fn add_cell(&mut self, typ: GenericType) -> CellId {
-        let new_id = CellId(self.cell_counter);
-        self.cell_counter += 1;
+        let new_id = self.cell_id_factory.next_id();
         self.current_cells.insert(new_id, typ);
         new_id
     }
