@@ -78,7 +78,7 @@ pub enum MIRValueKind {
     StructLiteral {
         fields: HashMap<String, MIRValue>,
     },
-    Reference(MIRPlace),
+    Reference(MIRPlace),    // TODO: Clarify the semantics of this!
 }
 
 

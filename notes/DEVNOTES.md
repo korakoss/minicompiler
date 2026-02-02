@@ -5,11 +5,29 @@
 Have generic functions. 
 - correctly monomorphized and typechecked
 
+some kind of pattern for the usize counter things we keep using
+
+in MIRValueKind::Reference, is it a ref or deref?
+
+There are these weird patterns where we are lowering some IR or something and there are interreferences within it, and so we'd need to map all IDs and so forth beforehands.
 
 ## STEPS
 
 ### Current problem (start here) 
 Write _concretize_mir.rs_. 
+
+
+### Abstract algorithm plan for the Pareto comparison
+At each iteration, we have a set of previous rank vectors, and the current one. 
+If the current one Pareto-dominates any previous one, we have a problem.
+If it doesn't (equal/decrease/incommensurable), that's fine. 
+But if the monomorphizations don't "diverge", how do we know when the process have "saturated" and that we can stop. 
+I think the key for this is some kind of deduplication mechanism in the monomorphizations and some associated processing with the DFS.
+
+So basically, we only put things in the "to-monomorphize" queue if that monomorphization haven't been done before. Otherwise, we "tick it off" right away. And in the DFS, we say that a given monomorphization was "processed" if there are no more monomorphization requests downstream from it. 
+
+Alright, so how do we do this?
+t
 
 
 ### Implementation plan
