@@ -32,7 +32,7 @@ impl MIRBuilder {
             loop_end_stack: Vec::new(),
             curr_collected_blocks: HashMap::new(),
             wip_blocks: HashMap::new(),
-            processing_stack: Vec::new()
+            processing_stack: Vec::new(),
         };
         MIRProgram {
             functions: program.functions
@@ -40,7 +40,7 @@ impl MIRBuilder {
                 .map(|(id, func)| (id, builder.lower_function(func)))
                 .collect(),
             entry: program.entry,
-            typetable: program.typetable
+            typetable: program.typetable,
         }
     }
 

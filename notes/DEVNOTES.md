@@ -27,8 +27,12 @@ I think the key for this is some kind of deduplication mechanism in the monomorp
 So basically, we only put things in the "to-monomorphize" queue if that monomorphization haven't been done before. Otherwise, we "tick it off" right away. And in the DFS, we say that a given monomorphization was "processed" if there are no more monomorphization requests downstream from it. 
 
 Alright, so how do we do this?
-t
 
+We should probably represent it as a "request tree".
+
+Maybe we should just make a call graph earlier on.
+
+First, we build out all the monomorphizations from the call graph alone, then make the actual monos.
 
 ### Implementation plan
 Iterate through functions recursively, in a DFS manner, like planned. Start from main.
