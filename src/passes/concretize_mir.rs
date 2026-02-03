@@ -8,22 +8,9 @@ use crate::shared::{
     ids::{BlockId, CellId, FuncId, IdFactory}
 };
 
-#[derive(Hash, PartialEq, Eq)]
-struct FuncMonomorph(FuncId, Vec<ConcreteType>);
 
-struct MonomorphizationNode {
-    func: FuncMonomorph,
-    callees: Vec<FuncMonomorph>,
-}
-
-struct MonomorphizationStack {
-    stack: Vec<MonomorphizationNode>,
-}
 
 pub struct MIRLowerer {
-    mono_funcs_map: HashMap<FuncMonomorph, FuncId>, 
-    current_mono_stack: Vec<FuncMonomorph>,
-    mono_requests: Vec<FuncMonomorph>,
     generic_functions: HashMap<FuncId, MIRFunction>,
     mono_types: Vec<(NewtypeId, Vec<ConcreteType>)>,
     typetable: GenericTypetable,

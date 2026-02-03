@@ -1,6 +1,6 @@
 
 # NEXT STEP REMINDER
-> TBD! -- It's about wiring up the CallGraph correctly for substitution of concretes
+Write the algorithm – in callgraph.rs.
 
 
 # CURRENT FOCUS: **Generic functions** 

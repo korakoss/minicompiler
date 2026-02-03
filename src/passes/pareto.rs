@@ -19,7 +19,7 @@
 
 
 
-fn dominates(a: &[usize], b: &[usize]) -> bool {
+pub fn dominates(a: &[usize], b: &[usize]) -> bool {
     if a.len() != b.len() {
         panic!("Attempted to compare vectors of different length");
     }
