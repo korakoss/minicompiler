@@ -253,11 +253,9 @@ impl HIRBuilder {
                         .map(|arg| arg.typ.clone())
                         .collect();
                 let (func_id, _,ret_typ) = &self.function_map[&(funcname, type_params.len(), argtypes)];
-                /*
                 self.call_graph
                     .add_callee(&scope_context.ambient_func.0, (*func_id, type_params.clone())
                 );
-                */
                 HIRExpression {
                     typ: ret_typ.clone(),
                     expr: HIRExpressionKind::FuncCall{ 
