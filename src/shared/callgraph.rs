@@ -1,21 +1,25 @@
 use std::collections::HashMap;
 use crate::shared::ids::FuncId;
-use crate::shared::typing::{ConcreteType, GenericType};
+use crate::shared::typing::{GenericType, TypevarId};
 
 
 #[derive(Clone, Debug)]
 pub struct CallGraph {
+    type_param_map: HashMap<FuncId, Vec<TypevarId>>,
     calls: HashMap<FuncId, Vec<(FuncId, Vec<GenericType>)>>,    
     // Stores the callees along with a vector of type parameter indices to substitute 
 }
 
 impl CallGraph {
     
-    pub fn new(ids: &Vec<FuncId>) -> Self {
+    pub fn new(funcs: &Vec<(FuncId, Vec<TypevarId>)>) -> Self {
         Self {
-            calls: ids.iter().map(|i| (*i, vec![])).collect()
+            type_param_map: funcs.iter().cloned().collect(),
+            calls: funcs.iter().map(|(id, _)| (*id, vec![])).collect()
         }
     }
+
+    pub fn get_concrete_callees() {}
     /*
     pub fn get_concrete_callees(
         &self, 

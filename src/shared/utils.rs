@@ -6,6 +6,7 @@ pub type ConcreteFuncSignature = FuncSignature<ConcreteType>;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FuncSignature<T> {
     pub name: String,
+    pub typevars: Vec<TypevarId>,
     pub argtypes: Vec<T>,
 }
 

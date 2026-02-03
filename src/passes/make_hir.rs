@@ -7,13 +7,13 @@ use crate::shared::{
     typing::{GenericType, PrimType},
     tables::{GenericTypetable, GenericShape},
     binops::binop_typecheck,
-    utils::{GenTypeVariable, GenericFuncSignature,FuncSignature, Variable},
+    utils::{GenTypeVariable, Variable},
     ids::{FuncId, Id},
 };
        
         
 pub struct HIRBuilder {
-    function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)>,
+    function_map: HashMap<(String, usize, Vec<GenericType>), (FuncId, Vec<TypevarId>, GenericType)>,
     typetable: GenericTypetable,
     call_graph: CallGraph,
 }
@@ -23,22 +23,22 @@ impl HIRBuilder {
     pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
         let ASTProgram{typetable, functions} = ast;
 
-        let function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)> = functions
-            .iter()
-            .enumerate()
-            .map(|(i, (sgn, func))| (
-                sgn.clone(), (FuncId::from_raw(i), func.ret_type.clone())
-            ))
-            .collect();
+        let mut function_map: HashMap<(String, usize, Vec<GenericType>), (FuncId, Vec<TypevarId>, GenericType)> = HashMap::new();
+        let mut funcs: Vec<(FuncId, ASTFunction)> = Vec::new();
 
+        for (i, (sgn, func)) in functions.into_iter().enumerate() {
+            function_map.insert((sgn.name.clone(), sgn.typevars.len(), sgn.argtypes.clone()), (FuncId::from_raw(i), sgn.typevars.clone(), func.ret_type.clone()));
+            funcs.push((FuncId::from_raw(i), func));
+        }
+        
         let call_graph = CallGraph::new(&function_map
             .iter()
-            .map(|(_, (id, _))| *id)
+            .map(|(_, (id, tvs, _))| (*id, tvs.clone()))
             .collect()
         );
         let entry = function_map
             .iter()
-            .find_map(|(sgn, id)| { (sgn.name == "main")
+            .find_map(|((name, _, _), id)| { (name == "main")
             .then_some(id)})
             .unwrap().0;
 
@@ -50,8 +50,7 @@ impl HIRBuilder {
 
         let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
 
-        for (sgn,func) in functions {
-            let id = builder.function_map[&sgn].0;
+        for (id, func) in funcs {
             let hir_func = builder.lower_function(id, func); 
             hir_functions.insert(id, hir_func);
         }
@@ -249,17 +248,16 @@ impl HIRBuilder {
                     .map(|arg| self.lower_expression(scope_context, arg))
                     .collect();
                 
-                let func_sgn = FuncSignature {
-                    name: funcname,
-                    argtypes: hir_args
+                let argtypes = hir_args
                         .iter()
                         .map(|arg| arg.typ.clone())
-                        .collect()
-                };
-                let (func_id, ret_typ) = &self.function_map[&func_sgn];
+                        .collect();
+                let (func_id, _,ret_typ) = &self.function_map[&(funcname, type_params.len(), argtypes)];
+                /*
                 self.call_graph
                     .add_callee(&scope_context.ambient_func.0, (*func_id, type_params.clone())
                 );
+                */
                 HIRExpression {
                     typ: ret_typ.clone(),
                     expr: HIRExpressionKind::FuncCall{ 
