@@ -1,11 +1,20 @@
 
-# NEXT STEP REMINDER
-Write the algorithm – in callgraph.rs.
-
-
 # CURRENT FOCUS: **Generic functions** 
 
-We want to have generic functions, with a sound monomorphization algorithm that can detect "divergent" call cycles that would result in infinitely many monomorphizations.
+*TLDR:* We want to have generic functions, with a sound monomorphization algorithm that can detect "divergent" call cycles that would result in infinitely many monomorphizations.
+
+## Recent history/status/something
+Worked in _callgraph.rs_, with associated additions elsewhere. Added a _CallGraph_ struct (design maybe stable now), implemented its construction in _make-hir_, passed it down through HIR, MIR.
+Started working on finally implementing the MIR->CMIR pass as outlined in the *Implementation plan* section below. Some progress on the first stage, collecting the required monomorphs.
+Set up the stack-tree structure thing (_MonoStack_) according to plan, and started implementing the DFS algorithm. The Pareto check part of the iteration is maybe completed.
+
+## Next steps
+Continue implementing the DFS. Something like the following things are left there:
+- checking if all required monos by the current node are redundant
+- backtracking on the stack when that is detected
+- building a flat collection of monomorphs that we'll return
+- detecting when the whole DFS terminates altogether, and returning
+- collection of instantiated generic types as well? though maybe that's not this module's responsibility
 
 
 ## Implementation plan
@@ -35,23 +44,6 @@ Repeat until we find a cycle or all nodes are completed.
 During this whole process, we should also note down what concrete parametrizations of generic *types* were instantiated. 
 (Note: it seems to me that laying them out in LIR won't require the toposorting we used to do – we can simply iterate by rank)
 
-
-## Next step / Current blocker
-The currently muddy area is how _type variables_ should work. Firstly, we need to be able to bind concrete (or maybe even generic) types to them. This is maybe more tractable with some work.
-The more difficult question is how we should represent the connections in the CallGraph. 
-
-For example, if we have functions and calls like
-```
-fun f<A,B,C>(a: A, b:B, c:C) {
-    //...
-    g<C, B>(c, b);
-}
-```
-we need to be able to somehow sorta say "the third param of f is plugged into the first of g and the second of f into the second of g". But we can't just map them by index – since f is not limited to plugging in its type params, but also any concrete type as well. Which is basically GenericType, I guess? Ehh, it seems a bit confusing, but probably this is the way.
-    
-
-## Design questions along the way
-- How to represent the type variables in scope and bind concrete types to them ergonomically?
 
 ## Things about the current code that I'm unsure about
 - Is parsing stable now? Can it parse function type params? In defs and funccalls?
