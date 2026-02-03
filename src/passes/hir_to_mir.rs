@@ -41,6 +41,7 @@ impl MIRBuilder {
                 .collect(),
             entry: program.entry,
             typetable: program.typetable,
+            call_graph: program.call_graph,
         }
     }
 

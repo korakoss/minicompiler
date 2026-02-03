@@ -1,6 +1,7 @@
 use std::{collections::HashMap};
 
 use crate::shared::callgraph::CallGraph;
+use crate::shared::typing::TypevarId;
 use crate::stages::{ast::*, hir::*};
 use crate::shared::{
     typing::{GenericType, PrimType},
@@ -57,13 +58,14 @@ impl HIRBuilder {
 
         HIRProgram {
             typetable: builder.typetable, 
+            call_graph: builder.call_graph,
             functions: hir_functions,
             entry, 
         }
     }
     fn lower_function(&mut self, id: FuncId, func: ASTFunction) -> HIRFunction {
         let ASTFunction { name, typvars, args, body, ret_type } = func;
-        let mut scope_context = ScopeContext::new(id, ret_type.clone());
+        let mut scope_context = ScopeContext::new(id, typvars.clone(), ret_type.clone());
         let arg_ids: Vec<VarId>  = args
             .into_iter()
             .map(|arg| scope_context.add_var(Variable { name: arg.0, typ: arg.1}))
@@ -183,7 +185,7 @@ impl HIRBuilder {
             }
             ASTStatement::Return(expr) => {
                 let hir_expr = self.lower_expression(scope_context, expr);
-                if hir_expr.typ != scope_context.ambient_func.1.clone() {
+                if hir_expr.typ != scope_context.ambient_func.2.clone() {
                     panic!("Return statement has unexpected type");
                 }
                 HIRStatement::Return(Some(hir_expr))
@@ -255,7 +257,9 @@ impl HIRBuilder {
                         .collect()
                 };
                 let (func_id, ret_typ) = &self.function_map[&func_sgn];
-                // TODO: self.call_graph.add_callee(&scope_context.ambient_func, (*func_id, type_params.clone()));
+                self.call_graph
+                    .add_callee(&scope_context.ambient_func.0, (*func_id, type_params.clone())
+                );
                 HIRExpression {
                     typ: ret_typ.clone(),
                     expr: HIRExpressionKind::FuncCall{ 
@@ -351,7 +355,7 @@ impl HIRBuilder {
 
 
 struct ScopeContext {
-    ambient_func: (FuncId, GenericType),
+    ambient_func: (FuncId, Vec<TypevarId>, GenericType),
     var_scope_stack: Vec<HashMap<String, VarId>>,
     loop_entrances: Vec<bool>,
     var_map: HashMap<VarId, GenTypeVariable>,
@@ -362,9 +366,9 @@ struct ScopeContext {
 
 impl ScopeContext {
 
-    fn new(func_id: FuncId, ret_type: GenericType) -> Self {
+    fn new(func_id: FuncId, typ_vars: Vec<TypevarId>, ret_type: GenericType) -> Self {
         ScopeContext {
-            ambient_func: (func_id, ret_type),
+            ambient_func: (func_id, typ_vars, ret_type),
             var_scope_stack: vec![HashMap::new()],
             loop_entrances: vec![false],
             var_map: HashMap::new(),

@@ -13,6 +13,7 @@ use crate::shared::{
 #[derive(Clone, Debug)]
 pub struct HIRProgram {
     pub typetable: GenericTypetable, 
+    pub call_graph: CallGraph,
     pub functions: HashMap<FuncId, HIRFunction>,
     pub entry: FuncId,
 }

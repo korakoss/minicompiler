@@ -1,15 +1,18 @@
 use std::{collections::HashMap};
 
 use crate::shared::{
-    binops::BinaryOperator, tables::GenericTypetable,
-    typing::{GenericType, ConcreteType, TypevarId},
-    ids::{BlockId, CellId, FuncId},
+    binops::BinaryOperator, 
+    callgraph::CallGraph, 
+    ids::{BlockId, CellId, FuncId}, 
+    tables::GenericTypetable, 
+    typing::{GenericType, TypevarId}
 };
 
 
 #[derive(Clone, Debug)]
 pub struct MIRProgram {
     pub typetable: GenericTypetable,
+    pub call_graph: CallGraph,
     pub functions: HashMap<FuncId, MIRFunction>,
     pub entry: FuncId,
 }
