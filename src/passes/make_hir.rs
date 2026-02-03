@@ -12,9 +12,9 @@ use crate::shared::{
        
         
 pub struct HIRBuilder {
-    scope_context: ScopeContext,
     function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)>,
     typetable: GenericTypetable,
+    call_graph: CallGraph,
 }
 
 impl HIRBuilder {
@@ -25,8 +25,16 @@ impl HIRBuilder {
         let function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)> = functions
             .iter()
             .enumerate()
-            .map(|(i, (sgn, func))| (sgn.clone(), (FuncId::from_raw(i), func.ret_type.clone())))
+            .map(|(i, (sgn, func))| (
+                sgn.clone(), (FuncId::from_raw(i), func.ret_type.clone())
+            ))
             .collect();
+
+        let call_graph = CallGraph::new(&function_map
+            .iter()
+            .map(|(_, (id, _))| *id)
+            .collect()
+        );
         let entry = function_map
             .iter()
             .find_map(|(sgn, id)| { (sgn.name == "main")
@@ -34,9 +42,9 @@ impl HIRBuilder {
             .unwrap().0;
 
         let mut builder = HIRBuilder {
-            scope_context: ScopeContext::new(),
             function_map,
             typetable,
+            call_graph,
         };
 
         let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
@@ -54,12 +62,12 @@ impl HIRBuilder {
     }
     fn lower_function(&mut self, func: ASTFunction) -> HIRFunction {
         let ASTFunction { name, typvars, args, body, ret_type } = func;
-        self.scope_context.reset(ret_type.clone());
+        let mut scope_context = ScopeContext::new(ret_type.clone());
         let arg_ids: Vec<VarId>  = args
             .into_iter()
-            .map(|arg| self.scope_context.add_var(Variable { name: arg.0, typ: arg.1}))
+            .map(|arg| scope_context.add_var(Variable { name: arg.0, typ: arg.1}))
             .collect();
-        let mut hir_body = self.lower_block(body, false);
+        let mut hir_body = self.lower_block(&mut scope_context, body, false);
         if ret_type == GenericType::Prim(PrimType::None) {
             hir_body.push(HIRStatement::Return(None));
         }
@@ -67,25 +75,24 @@ impl HIRBuilder {
             name, 
             typvars,
             args: arg_ids,
-            variables: self.scope_context.var_map.clone(),
+            variables: scope_context.var_map,
             body: hir_body, 
             ret_type 
         }; 
-        self.scope_context.exit_scope();
         hir_func
     }
 
-    fn lower_lvalue(&self, lvalue: ASTLValue) -> Place {
+    fn lower_lvalue(&self, scope_context: &mut ScopeContext, lvalue: ASTLValue) -> Place {
         match lvalue {
             ASTLValue::Variable(var_name) => {
-                let (id, typ) = self.scope_context.get_var_info(&var_name);
+                let (id, typ) = scope_context.get_var_info(&var_name);
                 Place {
                     typ,
                     place: PlaceKind::Variable(id),
                 }
             }
             ASTLValue::FieldAccess { of, field: fname } => {
-                let hir_of = self.lower_lvalue(*of);
+                let hir_of = self.lower_lvalue(scope_context, *of);
                 let GenericType::NewType(id, typvars) = hir_of.typ.clone() else {
                     unreachable!()
                 };
@@ -103,7 +110,7 @@ impl HIRBuilder {
                 }
             }
             ASTLValue::Deref(reference) => {
-                let hir_ref = self.lower_expression(reference);
+                let hir_ref = self.lower_expression(scope_context, reference);
                 let GenericType::Reference(refd_typ) = hir_ref.typ.clone() else {unreachable!()};
                 Place {
                     typ: *refd_typ,
@@ -113,100 +120,115 @@ impl HIRBuilder {
         }
     }
 
-    fn lower_statement(&mut self, statement: ASTStatement) -> HIRStatement {
+    fn lower_statement(
+        &mut self, 
+        scope_context: &mut ScopeContext, 
+        statement: ASTStatement
+    ) -> HIRStatement {
         match statement {
             ASTStatement::Let {var, value} => {
-                let hir_value = self.lower_expression(value);
+                let hir_value = self.lower_expression(scope_context, value);
                 if hir_value.typ != var.typ {
                     panic!("Variable definition inconsistent with value type");
                 }
-                let var_id = self.scope_context.add_var(var);
+                let var_id = scope_context.add_var(var);
                 HIRStatement::Let {
                     var: var_id,
                     value: hir_value,
                 }
             }
             ASTStatement::Assign { target, value } => {
-                let hir_target = self.lower_lvalue(target);
-                let hir_value = self.lower_expression(value);
+                let hir_target = self.lower_lvalue(scope_context, target);
+                let hir_value = self.lower_expression(scope_context, value);
                 if hir_target.typ != hir_value.typ {
                     panic!("Non-matching types in assignment");
                 }
                 HIRStatement::Assign { target: hir_target, value: hir_value}
             }
             ASTStatement::If { condition, if_body, else_body } => {
-                let hir_condition = self.lower_expression(condition);
+                let hir_condition = self.lower_expression(scope_context, condition);
                 if hir_condition.typ != GenericType::Prim(PrimType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::If {
                     condition: hir_condition, 
-                    if_body: self.lower_block(if_body, false), 
-                    else_body: else_body.map(|block| self.lower_block(block, false)),
+                    if_body: self.lower_block(scope_context, if_body, false), 
+                    else_body: else_body.map(
+                        |block| self.lower_block(scope_context, block, false)
+                    ),
                 }
             }
             ASTStatement::While { condition, body } => {
-                let hir_condition = self.lower_expression(condition);
+                let hir_condition = self.lower_expression(scope_context, condition);
                 if hir_condition.typ != GenericType::Prim(PrimType::Bool) {
                     panic!("If condition expression not boolean");
                 }
                 HIRStatement::While { 
                     condition: hir_condition,
-                    body: self.lower_block(body, true),
+                    body: self.lower_block( scope_context, body, true),
                 }
             }
             ASTStatement::Break => {
-                if !self.scope_context.in_loop() {
+                if !scope_context.in_loop() {
                     panic!("Break statement detected out of loop");
                 }
                 HIRStatement::Break
             }
             ASTStatement::Continue => {
-                if !self.scope_context.in_loop() {
+                if !scope_context.in_loop() {
                     panic!("Continue statement detected out of loop");
                 }
                 HIRStatement::Continue
             }
             ASTStatement::Return(expr) => {
-                let hir_expr = self.lower_expression(expr);
-                if hir_expr.typ != self.scope_context.ret_type.clone().unwrap() {
+                let hir_expr = self.lower_expression(scope_context, expr);
+                if hir_expr.typ != scope_context.ret_type.clone() {
                     panic!("Return statement has unexpected type");
                 }
                 HIRStatement::Return(Some(hir_expr))
             }
             ASTStatement::Print(expr) => {
-                let hir_expr = self.lower_expression(expr);
+                let hir_expr = self.lower_expression(scope_context, expr);
                 HIRStatement::Print(hir_expr)    // Subtler later
             }
         }
     }
 
-    fn lower_block(&mut self, stmts: Vec<ASTStatement>, loop_block: bool) -> Vec<HIRStatement>{
-        self.scope_context.add_scope(loop_block);
+    fn lower_block(
+        &mut self, 
+        scope_context: &mut ScopeContext,
+        stmts: Vec<ASTStatement>, 
+        loop_block: bool
+    ) -> Vec<HIRStatement>{
+        scope_context.add_scope(loop_block);
         let stmts: Vec<HIRStatement> = stmts 
             .into_iter()
-            .map(|stmt| self.lower_statement(stmt))
+            .map(|stmt| self.lower_statement(scope_context, stmt))
             .collect();
-        self.scope_context.exit_scope();
+        scope_context.exit_scope();
         stmts
     }
 
-    fn lower_expression(&self, expr: ASTExpression) -> HIRExpression {
+    fn lower_expression(
+        &self, 
+        scope_context: &mut ScopeContext, 
+        expr: ASTExpression
+    ) -> HIRExpression {
         match expr {
             ASTExpression::IntLiteral(num) => HIRExpression {
                 typ: GenericType::Prim(PrimType::Integer),
                 expr: HIRExpressionKind::IntLiteral(num),
             },
             ASTExpression::Variable(varname) => {
-                let (id, typ) = self.scope_context.get_var_info(&varname);
+                let (id, typ) = scope_context.get_var_info(&varname);
                 HIRExpression {
                     typ,
                     expr: HIRExpressionKind::Variable(id)
                 }
             }
             ASTExpression::BinOp{ op, left, right} => {
-                let left_hir = self.lower_expression(*left);
-                let right_hir = self.lower_expression(*right);
+                let left_hir = self.lower_expression(scope_context, *left);
+                let right_hir = self.lower_expression(scope_context, *right);
                 let result_type = binop_typecheck(&op, &left_hir.typ, &right_hir.typ)
                     .expect("Binop typecheck failed");
                 HIRExpression {
@@ -221,7 +243,7 @@ impl HIRBuilder {
             ASTExpression::FuncCall { funcname, type_params, args } => {        // TODO: propagate type params
                 let hir_args: Vec<HIRExpression> = args
                     .into_iter()
-                    .map(|arg| self.lower_expression(arg))
+                    .map(|arg| self.lower_expression(scope_context, arg))
                     .collect();
                 
                 let func_sgn = FuncSignature {
@@ -250,7 +272,7 @@ impl HIRBuilder {
                 expr: HIRExpressionKind::BoolFalse,
             },
             ASTExpression::FieldAccess{expr, field} => {
-                let hir_expr = self.lower_expression(*expr);
+                let hir_expr = self.lower_expression(scope_context, *expr);
                 let GenericType::NewType(id, bindings) = hir_expr.typ.clone() else {
                     panic!("Expression in field access isn't a newtype");
                 };
@@ -272,7 +294,10 @@ impl HIRBuilder {
             ASTExpression::StructLiteral{typ, fields} => {
                 let hir_fields: HashMap<String, HIRExpression> = fields 
                         .into_iter()
-                        .map(|(fname, fexpr)| (fname, self.lower_expression(fexpr)))
+                        .map(|(fname, fexpr)| (
+                            fname, 
+                            self.lower_expression(scope_context, fexpr)
+                        ))
                         .collect();
                 self.typecheck_struct_literal(typ.clone(), hir_fields.clone());
                 HIRExpression {
@@ -283,14 +308,14 @@ impl HIRBuilder {
                 }
             }
             ASTExpression::Reference(refd) => {
-                let hir_refd = self.lower_expression(*refd);
+                let hir_refd = self.lower_expression(scope_context, *refd);
                 HIRExpression{
                     typ: GenericType::Reference(Box::new(hir_refd.typ.clone())),
                     expr: HIRExpressionKind::Reference(Box::new(hir_refd)),
                 }
             }
             ASTExpression::Dereference(derefd) => {
-                let hir_derefd = self.lower_expression(*derefd);
+                let hir_derefd = self.lower_expression(scope_context, *derefd);
                 let GenericType::Reference(deref_typ) = hir_derefd.typ.clone() else {
                     unreachable!();
                 };
@@ -324,32 +349,26 @@ impl HIRBuilder {
 
 
 struct ScopeContext {
+   // ambient_func: (FuncId, GenericType),    // ID and rettype
     var_scope_stack: Vec<HashMap<String, VarId>>,
     loop_entrances: Vec<bool>,
     var_map: HashMap<VarId, GenTypeVariable>,
     var_counter: usize,
-    ret_type: Option<GenericType>,
+    ret_type: GenericType,
 }
 
 
 
 impl ScopeContext {
 
-    fn new() -> Self {
+    fn new(ret_type: GenericType) -> Self {
         ScopeContext {
             var_scope_stack: vec![HashMap::new()],
             loop_entrances: vec![false],
             var_map: HashMap::new(),
             var_counter: 0,
-            ret_type: None,
+            ret_type,
         }
-    }
-
-    fn reset(&mut self, new_ret_type: GenericType) {
-        self.var_scope_stack = vec![HashMap::new()];
-        self.loop_entrances = vec![false];
-        self.var_map = HashMap::new();
-        self.ret_type = Some(new_ret_type);
     }
 
     fn add_scope(&mut self, loop_entry: bool) {

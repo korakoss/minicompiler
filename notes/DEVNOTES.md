@@ -59,6 +59,8 @@ We check two things about these monomorphizations:
 ## Miscellaneous TODOs
 - some checks for various type stuff (eg. checking for the number of type parameters in funccalls or newtype literals)
 - continuously refactor. use clippy. do everything you can.
+- switch out NewTypeID for an int one (with some mapping to original strings), so we can implement copy for the ID (and consequently for Generic/ConcreteType and so forth
+- in make_HIR, we don't issue globally unique IDs to variables! (technically probably fine, but unaesthetic)
 
 
 ## Miscellaneous notes
