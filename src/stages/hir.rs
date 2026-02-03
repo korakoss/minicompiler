@@ -6,6 +6,7 @@ use crate::shared::{
     typing::{GenericType, TypevarId}, 
     utils::{GenTypeVariable},
     ids::FuncId,
+    callgraph::CallGraph,
 };
 
 

@@ -1,5 +1,6 @@
 use std::{collections::HashMap};
 
+use crate::shared::callgraph::CallGraph;
 use crate::stages::{ast::*, hir::*};
 use crate::shared::{
     typing::{GenericType, PrimType},
@@ -13,7 +14,7 @@ use crate::shared::{
 pub struct HIRBuilder {
     scope_context: ScopeContext,
     function_map: HashMap<GenericFuncSignature, (FuncId, GenericType)>,
-    typetable: GenericTypetable
+    typetable: GenericTypetable,
 }
 
 impl HIRBuilder {
@@ -74,7 +75,7 @@ impl HIRBuilder {
         hir_func
     }
 
-    fn lower_lvalue(&mut self, lvalue: ASTLValue) -> Place {
+    fn lower_lvalue(&self, lvalue: ASTLValue) -> Place {
         match lvalue {
             ASTLValue::Variable(var_name) => {
                 let (id, typ) = self.scope_context.get_var_info(&var_name);
@@ -190,7 +191,7 @@ impl HIRBuilder {
         stmts
     }
 
-    fn lower_expression(&mut self, expr: ASTExpression) -> HIRExpression {
+    fn lower_expression(&self, expr: ASTExpression) -> HIRExpression {
         match expr {
             ASTExpression::IntLiteral(num) => HIRExpression {
                 typ: GenericType::Prim(PrimType::Integer),
@@ -303,7 +304,7 @@ impl HIRBuilder {
     }
 
     fn typecheck_struct_literal(
-        &mut self, 
+        &self, 
         typ: GenericType, 
         literal_fields: HashMap<String, HIRExpression>
     ) {

@@ -19,7 +19,7 @@ impl GenericTypetable {
     }
     
     pub fn bind(
-        &mut self, 
+        &self, 
         id: NewtypeId, 
         typ_var_vals: Vec<GenericType>
     ) -> GenericShape {
@@ -45,7 +45,7 @@ impl GenericTypetable {
     }
 
     pub fn monomorphize(
-        &mut self, 
+        &self, 
         id: NewtypeId, 
         typ_var_vals: Vec<ConcreteType>
     ) -> ConcreteShape {
@@ -71,7 +71,7 @@ impl GenericTypetable {
     }
 
     pub fn get_genericity_rank(
-        &mut self,
+        &self,
         typ: &ConcreteType,
     ) -> usize {
         match typ {
