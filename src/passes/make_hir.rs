@@ -50,8 +50,9 @@ impl HIRBuilder {
         let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
 
         for (sgn,func) in functions {
-            let hir_func = builder.lower_function(func); 
-            hir_functions.insert(builder.function_map[&sgn].0, hir_func);
+            let id = builder.function_map[&sgn].0;
+            let hir_func = builder.lower_function(id, func); 
+            hir_functions.insert(id, hir_func);
         }
 
         HIRProgram {
@@ -60,9 +61,9 @@ impl HIRBuilder {
             entry, 
         }
     }
-    fn lower_function(&mut self, func: ASTFunction) -> HIRFunction {
+    fn lower_function(&mut self, id: FuncId, func: ASTFunction) -> HIRFunction {
         let ASTFunction { name, typvars, args, body, ret_type } = func;
-        let mut scope_context = ScopeContext::new(ret_type.clone());
+        let mut scope_context = ScopeContext::new(id, ret_type.clone());
         let arg_ids: Vec<VarId>  = args
             .into_iter()
             .map(|arg| scope_context.add_var(Variable { name: arg.0, typ: arg.1}))
@@ -82,7 +83,7 @@ impl HIRBuilder {
         hir_func
     }
 
-    fn lower_lvalue(&self, scope_context: &mut ScopeContext, lvalue: ASTLValue) -> Place {
+    fn lower_lvalue(&mut self, scope_context: &mut ScopeContext, lvalue: ASTLValue) -> Place {
         match lvalue {
             ASTLValue::Variable(var_name) => {
                 let (id, typ) = scope_context.get_var_info(&var_name);
@@ -182,7 +183,7 @@ impl HIRBuilder {
             }
             ASTStatement::Return(expr) => {
                 let hir_expr = self.lower_expression(scope_context, expr);
-                if hir_expr.typ != scope_context.ret_type.clone() {
+                if hir_expr.typ != scope_context.ambient_func.1.clone() {
                     panic!("Return statement has unexpected type");
                 }
                 HIRStatement::Return(Some(hir_expr))
@@ -210,7 +211,7 @@ impl HIRBuilder {
     }
 
     fn lower_expression(
-        &self, 
+        &mut self, 
         scope_context: &mut ScopeContext, 
         expr: ASTExpression
     ) -> HIRExpression {
@@ -254,6 +255,7 @@ impl HIRBuilder {
                         .collect()
                 };
                 let (func_id, ret_typ) = &self.function_map[&func_sgn];
+                // TODO: self.call_graph.add_callee(&scope_context.ambient_func, (*func_id, type_params.clone()));
                 HIRExpression {
                     typ: ret_typ.clone(),
                     expr: HIRExpressionKind::FuncCall{ 
@@ -349,25 +351,24 @@ impl HIRBuilder {
 
 
 struct ScopeContext {
-   // ambient_func: (FuncId, GenericType),    // ID and rettype
+    ambient_func: (FuncId, GenericType),
     var_scope_stack: Vec<HashMap<String, VarId>>,
     loop_entrances: Vec<bool>,
     var_map: HashMap<VarId, GenTypeVariable>,
     var_counter: usize,
-    ret_type: GenericType,
 }
 
 
 
 impl ScopeContext {
 
-    fn new(ret_type: GenericType) -> Self {
+    fn new(func_id: FuncId, ret_type: GenericType) -> Self {
         ScopeContext {
+            ambient_func: (func_id, ret_type),
             var_scope_stack: vec![HashMap::new()],
             loop_entrances: vec![false],
             var_map: HashMap::new(),
             var_counter: 0,
-            ret_type,
         }
     }
 
