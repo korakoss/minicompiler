@@ -1,101 +1,91 @@
 
-# CURRENT THING
+# NEXT STEP REMINDER
+Put the _CallGraph_ definition in some more adequate place (probably it's own file or some utils file, not in IR codes), and write code for constructing it in _make_hir_.
+
+
+# CURRENT FOCUS NOTES
 
 ## GOAL  
-Have generic functions. 
-- correctly monomorphized and typechecked
+We want to have generic functions, with a sound monomorphization algorithm that can detect "divergent" call cycles that would result in infinitely many monomorphizations.
 
-some kind of pattern for the usize counter things we keep using
+## IMPLEMENTATION OUTLINE
+We add a new CMIR stage, and replace the MIR->LIR pass by a MIR->CMIR->LIR sequence. Most of the current MIR->LIR logic would go to the CMIR->LIR pass. In the MIR->CMIR pass, we collect the required concrete monomorphizations (or detect if the monomorphization process would diverge), create those monomorphic functions, and construct the CMIR from these, also collecting the required monomorphizations of generic _types_ in the process.
 
-in MIRValueKind::Reference, is it a ref or deref?
+## NOTES
+- Instead of doing the full topological sort on types, it seems sufficient to simply iterate by rank.
 
-There are these weird patterns where we are lowering some IR or something and there are interreferences within it, and so we'd need to map all IDs and so forth beforehands.
+## THINKING OUT LOUD ABOUT THE ALGORITHM
+We create a call graph. A _CallGraph_ type is currently sketched out in the MIR file, but I think this should be constructed in the AST->HIR pass instead. 
+The call graph should enable us to determine that monomorphizing a given function with some concrete type parameters leads to what downstream monomorphizations.
 
-## STEPS
+Opposed to some previous plans, I think we should actually first collect all required monomorphizations constructed from this call graph abstractly, then monomorphize the bodies of the collected batch in a separate step. 
 
-### Current problem (start here) 
-Write _concretize_mir.rs_. 
+I'm not sure about this yet, but this approach maybe also enables us to ditch the DFS approach and just recursively monomorphize the current "leaves" of the "call tree" until we either reach "saturation" or we detect divergent cycling. Hmm no, on second thought, that's not how it works. A given generic function can be called by two different functions in such a way that "one call Pareto-dominates the other" – this doesn't lead to divergence in itself. Okay, so we still need to do this in a DFS way. 
 
+The other difficult part is that we need to track mono requests in two kinds of ways. Firstly, we'll want as output a non-redundant, flat list of required monomorphizations. But – I think – for the tree walk algorithm, we don't want to deduplicate naively (eg. just naively stop when we run into an already-requested mono, like I previously planned). So what do we really need to do?
 
-### Abstract algorithm plan for the Pareto comparison
-At each iteration, we have a set of previous rank vectors, and the current one. 
-If the current one Pareto-dominates any previous one, we have a problem.
-If it doesn't (equal/decrease/incommensurable), that's fine. 
-But if the monomorphizations don't "diverge", how do we know when the process have "saturated" and that we can stop. 
-I think the key for this is some kind of deduplication mechanism in the monomorphizations and some associated processing with the DFS.
-
-So basically, we only put things in the "to-monomorphize" queue if that monomorphization haven't been done before. Otherwise, we "tick it off" right away. And in the DFS, we say that a given monomorphization was "processed" if there are no more monomorphization requests downstream from it. 
-
-Alright, so how do we do this?
-
-We should probably represent it as a "request tree".
-
-Maybe we should just make a call graph earlier on.
-
-First, we build out all the monomorphizations from the call graph alone, then make the actual monos.
-
-### Implementation plan
-Iterate through functions recursively, in a DFS manner, like planned. Start from main.
-
-Data we're tracking:
-- monomorphizations of functions
-    - both the monomorphized bodies and the parameter (or just rank) vectors for a FuncID
-- the current "monomorphization" stack
-- things to be monomorphized next 
-    - sort of as a stack of queues, maybe?
-- required monomorphizations of generic types
-
-Algorithm outline:
-- start at entry
-- pop the next monomorphization "request" off the to-process stack
-    - check if that monomorphization already exists, proceed if not
-- compute and note down the "rank vector"
-- monomorphize the function body
-    - go through the blocks in the body
-    - keep track of the "typevar binding" we're operating with
-    - monomorphize generic types in the blocks we encounter
-    - also collect function calls 
-        - noting down the typevar bindings 
-        - add these to the queue stack thing
-        - run the Pareto rank check as planned
-- add the monomorphized function body to monomorphizations
-- proceed with the queue stack
+Okay, here's a naive approach. We grow the tree in a naive and wasteful way, just adding new, potentially redundant nodes. 
+This makes it easy to check whether adding a leaf leads to a divergent cycle or not. 
+So, in each step, we choose a leaf (in some kind of DFS manner, I suppose), and do one iteration of generating its children. If all children of it are redundant, we mark the node as "finished" and backtrack to other parts of the tree left to process. If there are "new" children, we add them to the stack-queue-thingy and iterate into them. Eventually we either find a cycle downstream, or complete the descendants of the node, in which case we also mark the node as "finished" and pivot elsewhere. And so on and so on.
 
 
-### Things we need to implement along the way, questions etc.
-- Clear up how to represent type variables in scope and bind concrete types to them ergonomically
-- Visitor patterns?
-- problems with Hashmap nondeterministic order?
+## ALGROTHM WRITEUP (naive, possibly can be optimized later)
+
+The MIR->CMIR pass has two stages:
+
+1. Collect all monomorphizations (just in the form of function ID + type parameters) we'll need to make (or detect a divergent cycle that makes this impossible).
+2. Actually produce the monomorphized functions for the "requests" we collected in Step 1.
+
+Step 2 is fairly trivial, so let's focus on how to do Step 1. Firstly, there is a call graph, that stores what functions call what other functions and what type variables they plug into them.
+This call graph will be probably constructed in HIR. 
+Using this graph, we can determine, given a generic function and some concrete type parameters, the monomorphized callees corresponding to that caller. 
+We'll walk this graph with a DFS algorithm, starting from _main_ (which is never generic). 
+At each step, we'll have a "call stack" that we're currently exploring and further "dangling" monomorphization requests associated with each other. 
+In an iteration, we select the first unprocessed child of the current end of the stack for processing. Using _CallGraph_, we see what monomorphizations it requests.
+We check two things about these monomorphizations:
+- First, we check the Pareto criterion to see if we detect a cycle. We panic (or whatever) if so.
+- Secondly, we check whether all the new monomorphizations were already requested. If so, we mark the node as completed and backtrack in the stack. Otherwise we iterate into its children.
 
 
-### Later steps
-- add (Rust-)tests:
-    - eg. for the parsing!
-- add type params to funccalls in AST too
-- weave the type params stuff in all the IRs it concerns (so maybe up to current MIR)
-- probably create a ConcreteTypetable
-    - topological order determination is sufficient for _that_ one (we need it for laying out newtypes)
-    - (!!!) actually, _rank_ does this for us, no? if we simply process concrete types in rank order, we're good
-- add CMIR
-    - vision:
-        - MIR: functions stay generic, probably reuses the same HIR->MIR machinery
-- add some check for Type operations (checking the number of type parameters?)
+## Design questions along the way
+- How to represent the type variables in scope and bind concrete types to them ergonomically?
 
+## Things about the current code that I'm unsure about
+- Is parsing stable now? Can it parse function type params? In defs and funccalls?
+- Are type parameters inside every IR now that they need to be in?
+- Is it problematic that Hashmap has nondeterministic iteration order? (This can happen if we do some function argument-related thing with hashmaps)
+- Does MIRValueKind::Reference mean the _reference_ or the _dereference_ of its content? Clear this up!
+
+## Miscellaneous TODOs
+- some checks for various type stuff (eg. checking for the number of type parameters in funccalls or newtype literals)
+- continuously refactor. use clippy. do everything you can.
+
+
+## Miscellaneous notes
+- maybe look into visitor patterns and whether they can help with better design for the lowering passes?
+
+
+# TODOS AFTERWARDS
+- add a bunch of Rust tests, esp. for:
+    - parsing
+    - monomorphization machinery
+    - but basically for everything we can
+- also add a bunch of Yum tests, esp.:
+    - break and continue
+    - various struct and pointer ones
+        - circular struct defs  
+    - some functions calling each other back and forth  
+    - functions with many arguments 
+    - negative tests (that shouldn't compile)
+    - many generic function tests once we have them
+        - divergent monos
+- fix bugs in INSECTS.md
+- make run/test scripts nicer
 
 # OTHER
 
-## Cleanup
-- continuously try refactoring to make it nicer
-- fix bugs on the list
-- make running/debug scripts nicer
+## Vague design problems that pop up in a flew places:
+1. We want to lower some IR. It has interreferences that we are tracking by IDs. (For example, we have blocks in MIR and their terminators refer to other blocks). Then, in the lowering pass, we like to issue new IDs (I think sometimes we need to, as new objects of the given type can be created in the pass -- this definitely happens with cells, I believe). But this leads to this unwieldy mapping problem, as we need to track what old ID was mapped to what new ID and lower correctly.
 
-## Yum tests to add
-- break and continue
-- various struct and pointer tests
-    - circular struct defs
-- some functions calling each other back and forth
-- "negative" test (that shouldn't compile)
+2. In general, I think the lowering passes are architectured in an awkward pattern. There's typically some kind of builder, we cram a bunch of info into it, it has this weird entry point function that is typically simultaneously a constructor and the lowering function itself. The builders also seem too "global" possibly. For example, in _at least_ later IRs, functions are fairly logically independent of each other, and the lowering should be correspondingly more local, probably.
 
-## Rust tests to add
-- topo ordering
-- monomorphization machinery
