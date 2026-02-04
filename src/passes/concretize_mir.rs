@@ -5,7 +5,6 @@ use crate::shared::typing::{NewtypeId, TypevarId};
 use crate::stages::{mir::*, cmir::*};
 use crate::shared::{
     typing::{ConcreteType},
-    tables::{GenericTypetable},
     ids::{BlockId, CellId, FuncId, IdFactory},
     callgraph::get_monomorphizations,
 };
@@ -44,6 +43,7 @@ struct Monomorphizer {
     block_id_factory: IdFactory<BlockId>,
     block_id_map: HashMap<BlockId, BlockId>,
     cell_id_map: HashMap<CellId, CellId>,
+    newtype_monos: HashSet<(NewtypeId, Vec<ConcreteType>)>,
 }
 // TODO: maybe later put cell/block-map here, all funcs' ones piled together? unsure yet
 
@@ -56,6 +56,7 @@ impl Monomorphizer {
             block_id_factory: IdFactory::new(),
             block_id_map: HashMap::new(),
             cell_id_map: HashMap::new(),
+            newtype_monos: [].into(),
         }
     }
 
@@ -92,14 +93,14 @@ impl Monomorphizer {
     }
 
     fn monomorphize_block(
-        &self, gen_block: MIRBlock, tparam_bindings: &BTreeMap<TypevarId, ConcreteType>) -> CMIRBlock {
+        &mut self, gen_block: MIRBlock, tparam_bindings: &BTreeMap<TypevarId, ConcreteType>) -> CMIRBlock {
         CMIRBlock {
             statements: gen_block.statements.into_iter().map(|stmt| self.monomorphize_statement(stmt, tparam_bindings)).collect(),
             terminator: self.monomorphize_terminator(gen_block.terminator, tparam_bindings),
         }
     }
 
-    fn monomorphize_statement(&self, gen_stmt: MIRStatement, tparam_bindings: &BTreeMap<TypevarId, ConcreteType>) -> CMIRStatement {
+    fn monomorphize_statement(&mut self, gen_stmt: MIRStatement, tparam_bindings: &BTreeMap<TypevarId, ConcreteType>) -> CMIRStatement {
         match gen_stmt {
             MIRStatement::Assign { target, value } => CMIRStatement::Assign {
                 target: self.monomorphize_place(target, tparam_bindings), 
@@ -123,7 +124,7 @@ impl Monomorphizer {
         }
     }
 
-    fn monomorphize_terminator(&self, gen_term: MIRTerminator, tparam_bindings: &BTreeMap<TypevarId, ConcreteType>, ) -> CMIRTerminator {
+    fn monomorphize_terminator(&mut self, gen_term: MIRTerminator, tparam_bindings: &BTreeMap<TypevarId, ConcreteType>, ) -> CMIRTerminator {
         match gen_term {
             MIRTerminator::Goto(id) => CMIRTerminator::Goto(self.block_id_map[&id]),
             MIRTerminator::Branch { condition, then_, else_ } => {
@@ -151,7 +152,7 @@ impl Monomorphizer {
         }
     }
 
-    fn monomorphize_value(&self, gen_val: MIRValue, tparam_bindings: &BTreeMap<TypevarId, ConcreteType>) -> CMIRValue {
+    fn monomorphize_value(&mut self, gen_val: MIRValue, tparam_bindings: &BTreeMap<TypevarId, ConcreteType>) -> CMIRValue {
         let mono_val_kind = match gen_val.value {
             MIRValueKind::Place(place) => {
                 CMIRValueKind::Place(self.monomorphize_place(place, tparam_bindings))
@@ -171,8 +172,12 @@ impl Monomorphizer {
                 CMIRValueKind::Reference(self.monomorphize_place(place, tparam_bindings))
             }
         };
+        let typ = gen_val.typ.monomorphize(tparam_bindings); 
+        if let ConcreteType::NewType(id, params) = typ.clone() {
+            self.newtype_monos.insert((id, params));
+        }
         CMIRValue { 
-            typ: gen_val.typ.monomorphize(tparam_bindings),
+            typ, 
             value: mono_val_kind,
         }
     }
