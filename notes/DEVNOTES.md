@@ -9,6 +9,9 @@ Started working on finally implementing the MIR->CMIR pass as outlined in the *I
 Set up the stack-tree structure thing (_MonoStack_) according to plan, and started implementing the DFS algorithm. The Pareto check part of the iteration is maybe completed.
 
 ## Next steps
+
+> TODO: Tracking type monomorphizations too !!
+
 Continue implementing the DFS. Something like the following things are left there:
 - checking if all required monos by the current node are redundant
 - backtracking on the stack when that is detected
@@ -49,7 +52,6 @@ During this whole process, we should also note down what concrete parametrizatio
 - Is parsing stable now? Can it parse function type params? In defs and funccalls?
 - Are type parameters inside every IR now that they need to be in?
 - Is it problematic that Hashmap has nondeterministic iteration order? (This can happen if we do some function argument-related thing with hashmaps)
-- Does MIRValueKind::Reference mean the _reference_ or the _dereference_ of its content? Clear this up!
 
 ## Miscellaneous TODOs
 - the bind/monomorphize namings for substitutions kinda suck
@@ -57,7 +59,20 @@ During this whole process, we should also note down what concrete parametrizatio
 - continuously refactor. use clippy. do everything you can.
 - switch out NewTypeID for an int one (with some mapping to original strings), so we can implement copy for the ID (and consequently for Generic/ConcreteType and so forth
 - in make_HIR, we don't issue globally unique IDs to variables! (technically probably fine, but unaesthetic)
+- we could create various new ID _types_ wherever we reassign IDs
+    - eg separate block/cell ID types for IR/CMIR
+    - reason: the old->new mappings and so forth are kinda confusing currently, that the type is the same
+- we should rename some things probably 
+    - instead of MIR/CMIR, have GMIR/CMIR at least, or sth even better
+    - change some pass names, eg. make_hir and concretize_mir
+    - and some file-internal renamings across te boards too of course
+    - does MIRValueKind::Reference mean the _reference_ or the _dereference_ of its content? 
+        - *Clear this up!*
+    - sometimes a field storing a [thing]ID type is called [thing], which is... not sure 
 
+
+## Showerthoughts
+- can the two MIRs be made generic?
 
 # TODOS AFTERWARDS
 - add a bunch of Rust tests, esp. for:
@@ -75,6 +90,7 @@ During this whole process, we should also note down what concrete parametrizatio
         - divergent monos
 - fix bugs in INSECTS.md
 - make run/test scripts nicer
+- the literal //TODO-s across the code
 
 # OTHER
 
