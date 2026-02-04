@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet, hash_set};
 use crate::shared::ids::FuncId;
 use crate::shared::tables::GenericTypetable;
 use crate::shared::typing::{ConcreteType, GenericType, TypevarId};
@@ -18,6 +18,10 @@ impl CallGraph {
             typevar_map: funcs.iter().cloned().collect(),
             calls: funcs.iter().map(|(id, _)| (*id, vec![])).collect()
         }
+    }
+
+    pub fn funcs(&self) -> Vec<FuncId> {
+        self.typevar_map.keys().cloned().collect()
     }
 
     pub fn add_callee(&mut self, caller: &FuncId, callee: (FuncId, Vec<GenericType>)) {
@@ -77,18 +81,16 @@ impl MonoStack {
         self.stack.push(nd);
     }
 
-    fn dfs_pop_child(&mut self) -> Option<(FuncId, Vec<ConcreteType>)> {
-        // TODO: maybe some checks or whatever
-        self.stack.last_mut().and_then(|nd| nd.callees.pop())
+    fn goto_unprocessed(&mut self) {
+        while self.stack.last().is_some_and(|nd| nd.callees.is_empty()) {
+            self.stack.pop();
+        }
     }
 
-    fn retreat(&mut self) {
-        // TODO: maybe build some checks in
-        self.stack.pop();
-    }
-
-    fn empty(&self) -> bool {
-        self.stack.is_empty()
+    fn pop_next(&mut self) -> Option<(FuncId, Vec<ConcreteType>)> {
+        self.goto_unprocessed();
+        let Some(tip_node) = self.stack.last_mut() else { return None; };
+        tip_node.callees.pop()
     }
 }
 
@@ -98,27 +100,31 @@ struct MonoNode {
     callees: Vec<(FuncId, Vec<ConcreteType>)>,
 }
 
-fn get_monomorphizations(
-    call_graph: CallGraph, 
-    typetable: GenericTypetable,
-    entry: FuncId,
-) -> HashMap<FuncId, Vec<Vec<ConcreteType>>> {
+pub fn get_monomorphizations(
+    call_graph: &CallGraph, 
+    typetable: &GenericTypetable,
+    entry: &FuncId,
+) -> HashSet<(FuncId, Vec<ConcreteType>)> {
     let entry_node = MonoNode {
-        func: entry,
+        func: *entry,
         type_params: vec![],
         callees: call_graph.get_concrete_callees(&entry, vec![]),
     };
+
+    let mut required_monos: HashSet<(FuncId, Vec<ConcreteType>)> = call_graph.funcs()
+        .iter()
+        .map(|k| (*k, [].into()))
+        .collect(); // TODO: maybe have funcs() return the iter itself?
     let mut mono_stack = MonoStack::new(entry_node);
 
-    while !mono_stack.empty() {
-        let (curr_id, curr_tparams) = mono_stack.dfs_pop_child().unwrap();
+    while let Some((curr_id, curr_tparams)) = mono_stack.pop_next() {
         let child_monos = call_graph.get_concrete_callees(&curr_id, curr_tparams);
         
         // Checking the Pareto criterion
-        for (child_id, child_tparams) in child_monos {
-            let child_vector: Vec<usize> = get_rank_vector(&typetable, &child_tparams);
+        for (child_id, child_tparams) in child_monos.iter() {
+            let child_vector: Vec<usize> = get_rank_vector(&typetable, child_tparams);
             let stack_vectors: Vec<Vec<usize>> = mono_stack
-                .monos_on_stack(child_id)
+                .monos_on_stack(*child_id)
                 .iter()
                 .map(|tpars| get_rank_vector(&typetable, tpars))
                 .collect();
@@ -130,10 +136,29 @@ fn get_monomorphizations(
             }
         }
 
-        // TODO: check for all reqs being redundant
-            // TODO: collecting required monos into a flat list (the result actually) 
+        // TODO: fuse these two loops, above and below, if code proves to be stable
+        // Check for children completeness
+        let mut exist_nonredund_child = false;
+        for (child_id, child_tparams) in child_monos.iter() {
+            let prev_monos: Vec<Vec<ConcreteType>> = required_monos
+                .iter()
+                .filter(|(id, _)| id == child_id)
+                .map(|(_, tpars)| tpars)
+                .cloned()
+                .collect();
+            if !prev_monos.contains(&child_tparams) {
+                exist_nonredund_child = true;
+                break;
+            }
+        }
+        
+        if !exist_nonredund_child {
+            continue;
+        }
+
+        required_monos.extend(child_monos.into_iter());
     }
-    unimplemented!();
+    required_monos
 }
 
 

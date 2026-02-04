@@ -1,14 +1,70 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
+use crate::shared::ids::Id;
 use crate::shared::typing::{NewtypeId, TypevarId};
 use crate::stages::{mir::*, cmir::*};
 use crate::shared::{
     typing::{ConcreteType},
     tables::{GenericTypetable},
-    ids::{BlockId, CellId, FuncId, IdFactory}
+    ids::{BlockId, CellId, FuncId, IdFactory},
+    callgraph::get_monomorphizations,
 };
 
 
+pub fn concretize_mir(mir_program: MIRProgram) -> CMIRProgram {
+    let MIRProgram { typetable, call_graph, functions, entry } = mir_program;
+    let mono_reqs: HashSet<(FuncId, Vec<ConcreteType>)> = get_monomorphizations(&call_graph, &typetable, &entry);
+
+    let mono_func_map: HashMap<(FuncId, Vec<ConcreteType>), FuncId> = mono_reqs
+        .into_iter()
+        .enumerate()
+        .map(|(i,x)| (x, FuncId::from_raw(i)))
+        .collect();
+
+    let new_entry = mono_func_map[&(entry, vec![])];
+
+    let monomorphizer = Monomorphizer::new(mono_func_map.clone());
+
+    let mono_funcs: HashMap<FuncId, CMIRFunction> = mono_func_map
+        .into_iter()
+        .map(|((gen_id, tpars), mono_id)| 
+            (mono_id, monomorphizer.monomorphize_func(functions[&gen_id].clone(), tpars)))      // TODO: could probably pop here
+        .collect();
+
+    CMIRProgram {
+        functions: mono_funcs,
+        entry: new_entry,
+    }
+}
+
+
+struct Monomorphizer {
+    mono_func_map: HashMap<(FuncId, Vec<ConcreteType>), FuncId>,
+}
+
+impl Monomorphizer {
+    
+    fn new(mono_func_map: HashMap<(FuncId, Vec<ConcreteType>), FuncId>) -> Self {
+        Self { mono_func_map }
+    }
+
+    fn monomorphize_func(&self, gen_func: MIRFunction, tparams: Vec<ConcreteType>) -> CMIRFunction {
+        unimplemented!();
+    }
+
+}
+
+fn monomorphize_function(gen_func: MIRFunction, tparams: Vec<ConcreteType>) -> CMIRFunction {
+    let mono_func = CMIRFunction {
+        name: gen_func.name,
+        args: unimplemented!(),
+        cells: unimplemented!(),
+        blocks: unimplemented!(),
+        entry: unimplemented!(),
+        ret_type: unimplemented!(),
+    };
+    unimplemented!();
+}
 
 pub struct MIRLowerer {
     generic_functions: HashMap<FuncId, MIRFunction>,
