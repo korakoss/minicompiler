@@ -8,7 +8,6 @@ use passes::preproc::lex::*;
 use passes::preproc::parse::*;
 use passes::make_hir::*;
 use passes::hir_to_mir::*;
-use passes::mir_to_lir::*;
 use passes::lir_codegen::*;
 
 fn main() {
@@ -33,6 +32,7 @@ fn main() {
     let hir = HIRBuilder::lower_ast(ast);
     fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
 
+    /*
     let mir = MIRBuilder::lower_hir(hir);
     fs::write(mir_filepath, format!("{:#?}", mir)).unwrap();
 
@@ -41,6 +41,7 @@ fn main() {
 
     let assembly = LIRCompiler::compile(lir);
     fs::write(assembly_filename, assembly).unwrap();
+    */
 }
 
 

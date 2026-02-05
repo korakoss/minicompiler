@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use crate::shared::ids::*;
 use crate::shared::typing::*;
@@ -8,6 +9,7 @@ use crate::shared::{binops::BinaryOperator};
 pub struct CMIRProgram {
     pub functions: HashMap<FuncId, CMIRFunction>,
     pub entry: FuncId,
+    pub newtype_monomorphs: HashSet<(NewtypeId, Vec<ConcreteType>)>,
 }
 
 #[derive(Clone, Debug)]

@@ -33,6 +33,7 @@ pub fn concretize_mir(mir_program: MIRProgram) -> CMIRProgram {
     CMIRProgram {
         functions: mono_funcs,
         entry: new_entry,
+        newtype_monomorphs: monomorphizer.newtype_monos,
     }
 }
 
@@ -41,7 +42,7 @@ struct Monomorphizer {
     mono_func_map: HashMap<(FuncId, Vec<ConcreteType>), FuncId>,
     cell_id_factory: IdFactory<CellId>,
     block_id_factory: IdFactory<BlockId>,
-    block_id_map: HashMap<BlockId, BlockId>,
+    block_id_map: HashMap<BlockId, BlockId>, // TODO: these are not pushed to!! IMPORTANT!!
     cell_id_map: HashMap<CellId, CellId>,
     newtype_monos: HashSet<(NewtypeId, Vec<ConcreteType>)>,
 }

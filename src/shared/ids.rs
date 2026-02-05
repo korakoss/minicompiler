@@ -20,6 +20,7 @@ macro_rules! define_id {
 define_id!(FuncId);
 define_id!(BlockId);
 define_id!(CellId);
+define_id!(ChunkId);
 
 
 pub struct IdFactory<I: Id> {
@@ -31,6 +32,10 @@ impl<I: Id> IdFactory<I> {
 
     pub fn new() -> Self {
         Self{ counter: 0, _marker: std::marker::PhantomData}
+    }
+
+    pub fn new_from(start: usize) -> Self {
+        Self{ counter: start, _marker: std::marker::PhantomData}
     }
     
     pub fn next_id(&mut self) -> I {

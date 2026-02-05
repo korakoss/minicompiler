@@ -1,7 +1,7 @@
 use std::{collections::HashMap};
 
 use crate::shared::binops::BinaryOperator;
-use crate::shared::ids::{BlockId, FuncId};
+use crate::shared::ids::{BlockId, FuncId, CellId};
 
 
 #[derive(Clone, Debug)]
@@ -14,8 +14,8 @@ pub struct LIRProgram {
 pub struct LIRFunction {
     pub blocks: HashMap<BlockId, LIRBlock>,
     pub entry: BlockId,
-    pub chunks: HashMap<ChunkId, Chunk>,
-    pub args: Vec<ChunkId>
+    pub chunks: HashMap<CellId, usize>,     // sizes
+    pub args: Vec<CellId>
 }
 
 #[derive(Clone, Debug)]
@@ -86,23 +86,13 @@ pub struct LIRPlace {
 #[derive(Clone, Debug)]
 pub enum LIRPlaceKind {
     Local {
-        base: ChunkId,
+        base: CellId,
         offset: usize,
     },
     Deref {
-        pointer: ChunkId,
+        pointer: CellId,
         offset: usize,
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Chunk {
-    pub size: usize,
-    // TODO: align or whatever
-}
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
-pub struct ChunkId(pub usize);
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
-pub struct VRegId(pub usize);

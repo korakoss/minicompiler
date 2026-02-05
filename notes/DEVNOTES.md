@@ -9,8 +9,9 @@ Started working on finally implementing the MIR->CMIR pass as outlined in the *I
 Set up the stack-tree structure thing (_MonoStack_) according to plan, and started implementing the DFS algorithm. The Pareto check part of the iteration is maybe completed.
 
 ## Next steps
-
+> currently working on CMIR->LIR
 > TODO: Tracking type monomorphizations too !!
+> TODO: in MIR->CMIR lowerer, the cell and block maps (old->new ID) are not filled. IMPORTANT!!
 
 Continue implementing the DFS. Something like the following things are left there:
 - checking if all required monos by the current node are redundant
@@ -73,6 +74,10 @@ During this whole process, we should also note down what concrete parametrizatio
 
 ## Showerthoughts
 - can the two MIRs be made generic?
+- type IDs, so they can implement copy  
+    - currently the two Type types can't, because the Newtype variants aren't sized
+- store struct literals as Vec<fieldname, fieldtype>
+    - corresponds to fixed layout, could be nice
 
 # TODOS AFTERWARDS
 - add a bunch of Rust tests, esp. for:
