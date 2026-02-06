@@ -34,6 +34,7 @@ pub fn concretize_mir(mir_program: MIRProgram) -> CMIRProgram {
         functions: mono_funcs,
         entry: new_entry,
         newtype_monomorphs: monomorphizer.newtype_monos,
+        typetable,
     }
 }
 

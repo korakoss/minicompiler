@@ -4,12 +4,15 @@ use std::collections::HashSet;
 use crate::shared::ids::*;
 use crate::shared::typing::*;
 use crate::shared::{binops::BinaryOperator};
+use crate::shared::tables::GenericTypetable;
+
 
 #[derive(Clone, Debug)]
 pub struct CMIRProgram {
     pub functions: HashMap<FuncId, CMIRFunction>,
     pub entry: FuncId,
     pub newtype_monomorphs: HashSet<(NewtypeId, Vec<ConcreteType>)>,
+    pub typetable: GenericTypetable,
 }
 
 #[derive(Clone, Debug)]

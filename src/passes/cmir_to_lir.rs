@@ -1,8 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, usize};
 
 use crate::{
-    shared::{ids::{CellId, IdFactory}, 
-    typing::{ConcreteType, NewtypeId}}, 
+    shared::{
+        ids::{CellId, IdFactory}, tables::{ConcreteShape, GenericTypetable}, typing::{ConcreteType, NewtypeId}
+    }, 
     stages::{
         cmir::*,
         lir::*,
@@ -15,14 +16,42 @@ struct LayoutTable {
 }
 
 impl LayoutTable {
-    fn new(concrete_newtypes: HashSet<(NewtypeId, Vec<ConcreteType>)>) -> Self {
-        unimplemented!();   // iterate in rank order
+
+    fn make(typetable: GenericTypetable ,concrete_newtypes: HashSet<(NewtypeId, Vec<ConcreteType>)>) -> Self {
+        let mut table = Self { layouts: HashMap::new() };
+        let mut concrete_newtypes = concrete_newtypes
+            .into_iter()
+            .collect::<Vec<_>>();
+        concrete_newtypes.sort_by_key(|(id, typ)| typetable.get_genericity_rank(&ConcreteType::NewType(id.clone(), typ.clone())));
+        for (id, tparams) in concrete_newtypes {
+            let type_shape = typetable.monomorphize(id.clone(), tparams.clone());
+            let type_layout = match type_shape {
+                ConcreteShape::Struct { fields } => {
+                    let fields: Vec<(String, ConcreteType)> = fields.into_iter().collect();
+                    ChunkLayout {
+                        size: fields.iter().map(|(_ ,ftyp)| table.get_layout(&ftyp).size).sum(),
+                        typ: ConcreteType::NewType(id.clone(), tparams.clone()),
+                        kind: LayoutKind::Struct(fields),
+                    }
+                },
+                ConcreteShape::Enum {..} => {
+                    unimplemented!();
+                },
+            };
+            table.layouts.insert((id, tparams), type_layout);
+        }
+        table
     }
 
     fn get_layout(&self, typ: &ConcreteType) -> ChunkLayout {
-        unimplemented!();
+        match typ {
+            ConcreteType::Prim(..) => ChunkLayout { size: 8, typ: typ.clone(), kind: LayoutKind::Atomic },
+            ConcreteType::Reference(..) => ChunkLayout { size: 8, typ: typ.clone(), kind: LayoutKind::Atomic },
+            ConcreteType::NewType(id, tparams) => self.layouts[&(id.clone(), tparams.clone())].clone(),
+        }
     }
 }
+
 
 #[derive(Clone, Debug)]
 pub struct ChunkLayout {
@@ -40,8 +69,8 @@ pub enum LayoutKind {
 
 
 
-fn lower_cmir(program: CMIRProgram) -> LIRProgram {
-    let layout_table = LayoutTable::new(program.newtype_monomorphs);
+pub fn lower_cmir(program: CMIRProgram) -> LIRProgram {
+    let layout_table = LayoutTable::make(program.typetable, program.newtype_monomorphs);
     let mut builder = LIRBuilder::new(layout_table);
     LIRProgram { 
         functions: program.functions
@@ -86,9 +115,12 @@ impl LIRBuilder {
             entry: func.entry, 
             chunks: func.cells
                 .into_keys()
+                .map(|id| (id, self.chunk_table[&self.cell_chunk_map[&id]].size))
+                .collect(),
+            args: func.args
+                .into_iter()
                 .map(|id| self.cell_chunk_map[&id])
                 .collect(),
-            args: unimplemented!(),
         }
     }
 
