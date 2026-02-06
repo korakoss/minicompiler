@@ -7,7 +7,7 @@ use crate::shared::{
     typing::{GenericType, PrimType},
     tables::{GenericTypetable, GenericShape},
     binops::binop_typecheck,
-    utils::{GenTypeVariable, Variable},
+    utils::GenTypeVariable,
     ids::{FuncId, Id},
 };
        
@@ -67,7 +67,7 @@ impl HIRBuilder {
         let mut scope_context = ScopeContext::new(id, typvars.clone(), ret_type.clone());
         let arg_ids: Vec<VarId>  = args
             .into_iter()
-            .map(|arg| scope_context.add_var(Variable { name: arg.0, typ: arg.1}))
+            .map(|arg| scope_context.add_var(GenTypeVariable { name: arg.0, typ: arg.1}))
             .collect();
         let mut hir_body = self.lower_block(&mut scope_context, body, false);
         if ret_type == GenericType::Prim(PrimType::None) {

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet, hash_set};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::shared::ids::FuncId;
 use crate::shared::tables::GenericTypetable;
 use crate::shared::typing::{ConcreteType, GenericType, TypevarId};
