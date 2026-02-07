@@ -2,21 +2,21 @@ use std::collections::HashMap;
 
 use crate::stages::lir::*;
 use crate::shared::binops::BinaryOperator;
-use crate::shared::ids::{BlockId, FuncId, Id};
+use crate::shared::ids::{BlockId, CellId, FuncId, Id};
 
 
 struct StackFrame {
     size: usize,
-    offsets: HashMap<ChunkId, usize>,
+    offsets: HashMap<CellId, usize>,
 }
 
 impl StackFrame {
-    fn make(chunks: HashMap<ChunkId, Chunk>) -> StackFrame {
-        let mut offsets: HashMap<ChunkId, usize> = HashMap::new();
+    fn make(chunks: HashMap<CellId, usize>) -> StackFrame {
+        let mut offsets: HashMap<CellId, usize> = HashMap::new();
         let mut curr_offset = 8;
-        for (id, chunk) in chunks {
+        for (id, chunk_size) in chunks {
             offsets.insert(id, curr_offset);
-            curr_offset += chunk.size; 
+            curr_offset += chunk_size; 
         }
         StackFrame {
             size: curr_offset,
