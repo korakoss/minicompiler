@@ -12,6 +12,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Clean up intermediate folders
+find tests/ -type f -not -path "tests/src/*" -delete
+
 # Sync mac -> pi
 rsync -av --exclude "target" "$MAC_YUM/" "$PI_YUM/"
 
@@ -30,7 +33,9 @@ else
     failures=()
 
     # Positive tests - should compile and return 1
-    for t in primetest nonparam_func long_ass_binop; do
+    postests=("primetest" "nonparam_func" "long_ass_binop")
+
+    for t in "${postests[@]}"; do
         ex_path=$(compile_yum "./tests" "$t")
         
         "$ex_path"
@@ -45,7 +50,7 @@ else
     for t in bad_branch; do
         src_path="./tests/src/$t.yum"
         
-        if RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" /dev/null /dev/null /dev/null /dev/null /dev/null /dev/null 2>/dev/null; then
+        if RUST_BACKTRACE=1 target/debug/minicompiler "$src_path" /dev/null /dev/null /dev/null /dev/null /dev/null /dev/null /dev/null 2>/dev/null; then
             failures+=("$t (should have failed to compile)")
         fi
     done

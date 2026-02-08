@@ -102,6 +102,8 @@ impl LIRBuilder {
     }
 
     fn lower_function(&mut self, func: CMIRFunction) -> LIRFunction {
+        self.cell_chunk_map = HashMap::new();
+        self.chunk_table = HashMap::new();
         for (cell_id, cell_type) in func.cells.iter() {
             let chunk_id = self.chunk_id_factory.next_id();
             self.cell_chunk_map.insert(*cell_id, chunk_id);
@@ -112,10 +114,11 @@ impl LIRBuilder {
                 .into_iter()
                 .map(|(id, block)| (id, self.lower_block(block)))
                 .collect(),
-            entry: func.entry, 
-            chunks: func.cells
-                .into_keys()
-                .map(|id| (id, self.chunk_table[&self.cell_chunk_map[&id]].size))
+            entry: func.entry,
+            chunks: self.chunk_table
+                .clone()
+                .into_iter()
+                .map(|(id, ch_lay)| (id, ch_lay.size))
                 .collect(),
             args: func.args
                 .into_iter()
@@ -293,10 +296,11 @@ impl LIRBuilder {
 
     fn lower_place(&mut self, place: CMIRPlace) -> LIRPlace {
         let kind = match place.base {
-            CMIRPlaceBase::Cell(id) => {
-                let base_type = self.chunk_table[&self.cell_chunk_map[&id]].typ.clone();
+            CMIRPlaceBase::Cell(cell_id) => {
+                let chunk_id = self.cell_chunk_map[&cell_id];
+                let base_type = self.chunk_table[&chunk_id].typ.clone();
                 let offset = self.lower_field_access_chain(&base_type, &place.fieldchain);
-                LIRPlaceKind::Local { base: id, offset}
+                LIRPlaceKind::Local { base: chunk_id, offset}
             },
             CMIRPlaceBase::Deref(ref_id) => {
                 let ref_type = self.chunk_table[&self.cell_chunk_map[&ref_id]].typ.clone();

@@ -21,7 +21,8 @@ fn main() {
     let ast_filepath = &args[4];
     let hir_filepath = &args[5];
     let mir_filepath = &args[6];
-    let lir_filepath = &args[7];
+    let cmir_filepath = &args[7];
+    let lir_filepath = &args[8];
 
     let program_text = &fs::read_to_string(code_filename).unwrap();
     let tokens = lex(program_text);
@@ -38,6 +39,7 @@ fn main() {
     fs::write(mir_filepath, format!("{:#?}", mir)).unwrap();
 
     let cmir = concretize_mir(mir);
+    fs::write(cmir_filepath, format!("{:#?}", cmir)).unwrap();
 
     let lir = lower_cmir(cmir);
     fs::write(lir_filepath, format!("{:#?}", lir)).unwrap();

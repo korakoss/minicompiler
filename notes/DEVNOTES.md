@@ -78,7 +78,7 @@ During this whole process, we should also note down what concrete parametrizatio
     - currently the two Type types can't, because the Newtype variants aren't sized
 - store struct literals as Vec<fieldname, fieldtype>
     - corresponds to fixed layout, could be nice
-
+- collect what _new types_ do monomorphizations of certain generic functions induce, collect and produce them in one pass (in MIR->CMIR) after collecting func monos
 # TODOS AFTERWARDS
 - add a bunch of Rust tests, esp. for:
     - parsing

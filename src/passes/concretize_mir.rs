@@ -74,16 +74,20 @@ impl Monomorphizer {
             .map(|(old_id, gen_typ)| (old_id, (self.cell_id_factory.next_id(), gen_typ.monomorphize(&tparam_bindings))))
             .collect();
 
+        self.cell_id_map = cell_map.clone().into_iter().map(|(old_id, (new_id, _))| (old_id, new_id)).collect(); 
+
         let block_id_map: HashMap<BlockId, BlockId> = gen_func.blocks
             .keys()
             .map(|old_id| (*old_id, self.block_id_factory.next_id()))
             .collect();
 
+        self.block_id_map = block_id_map.clone();
+
         let mono_blocks: HashMap<BlockId, CMIRBlock> = gen_func.blocks
             .into_iter()
             .map(|(old_id, block)| (block_id_map[&old_id] , self.monomorphize_block(block, &tparam_bindings)))
             .collect();
-            
+
         CMIRFunction {
             name: gen_func.name,
             args: gen_func.args.into_iter().map(|old_id| cell_map[&old_id].0).collect(),
@@ -144,7 +148,9 @@ impl Monomorphizer {
 
     fn monomorphize_place(&self, gen_place: MIRPlace, tparam_bindings: &BTreeMap<TypevarId, ConcreteType>) -> CMIRPlace {
         let mono_place_base = match gen_place.base {
-            MIRPlaceBase::Cell(id) => CMIRPlaceBase::Cell(self.cell_id_map[&id]),
+            MIRPlaceBase::Cell(id) => {
+                CMIRPlaceBase::Cell(self.cell_id_map[&id])
+            },
             MIRPlaceBase::Deref(ref_id) => CMIRPlaceBase::Deref(self.cell_id_map[&ref_id]),
         };
         CMIRPlace { 

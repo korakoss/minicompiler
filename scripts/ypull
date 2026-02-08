@@ -2,3 +2,4 @@
 
 # Pull yum/ outputs from pi to mac
 rsync -av "$PI_YUM/yum/" "$MAC_YUM/yum/"
+rsync -av "$PI_YUM/tests/" "$MAC_YUM/tests/"

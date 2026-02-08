@@ -4,7 +4,7 @@ use crate::stages::lir::*;
 use crate::shared::binops::BinaryOperator;
 use crate::shared::ids::{BlockId, CellId, FuncId, Id};
 
-
+#[derive(Debug, Clone)]
 struct StackFrame {
     size: usize,
     offsets: HashMap<CellId, usize>,
@@ -72,6 +72,7 @@ impl LIRCompiler {
 
 
     fn compile_function(&mut self, func_id: FuncId,lir_func: LIRFunction) {
+
         let LIRFunction { blocks, entry, chunks, args } = lir_func;
         let frame = StackFrame::make(chunks);
         
@@ -139,7 +140,11 @@ impl LIRCompiler {
                 self.emit("    push {r12}"); 
                 match dest.place {
                     LIRPlaceKind::Local { base, offset } => {
-                        let target_offset = frame.offsets[&base] + offset;
+                        let base_offset = frame.offsets
+                            .get(&base)
+                            .expect(&format!("Cell ID {:?} not found in table \n \n {:?}", base, frame.offsets
+                            ));
+                        let target_offset = base_offset + offset;
                         self.emit(&format!("    sub r12, fp, #{}", target_offset));
                         self.emit(&format!("    bl func_{}", func.raw()));
                     }
@@ -255,7 +260,8 @@ impl LIRCompiler {
     fn emit_place_store(&mut self, place: LIRPlace, frame: &StackFrame) {
         match place.place {
             LIRPlaceKind::Local { base, offset } => {
-                let place_offset = frame.offsets[&base] + offset;
+                let base_offset = frame.offsets.get(&base).expect(&format!("Unsuccessful offset lookup for cell ID {:?}. \n Offset table: \n {:?}", base, frame.offsets));
+                let place_offset = base_offset + offset;
                 self.emit(&format!("    str r0, [fp, #-{}]", place_offset));
             }
             LIRPlaceKind::Deref { pointer, offset } => {
