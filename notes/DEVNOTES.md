@@ -1,52 +1,11 @@
 
 # CURRENT FOCUS: **Generic functions** 
 
-*TLDR:* We want to have generic functions, with a sound monomorphization algorithm that can detect "divergent" call cycles that would result in infinitely many monomorphizations.
+I think I largely finished the CMIR addition stuff. Yum test cases run again. However, there are issues
+- running gen1.yum printed 7, which would mean that struct fields are scrambled
+- I wrote a small generic function program, gen2.yum, which fails to compile
 
-## Recent history/status/something
-Worked in _callgraph.rs_, with associated additions elsewhere. Added a _CallGraph_ struct (design maybe stable now), implemented its construction in _make-hir_, passed it down through HIR, MIR.
-Started working on finally implementing the MIR->CMIR pass as outlined in the *Implementation plan* section below. Some progress on the first stage, collecting the required monomorphs.
-Set up the stack-tree structure thing (_MonoStack_) according to plan, and started implementing the DFS algorithm. The Pareto check part of the iteration is maybe completed.
-
-## Next steps
-> currently working on CMIR->LIR
-> TODO: Tracking type monomorphizations too !!
-> TODO: in MIR->CMIR lowerer, the cell and block maps (old->new ID) are not filled. IMPORTANT!!
-
-Continue implementing the DFS. Something like the following things are left there:
-- checking if all required monos by the current node are redundant
-- backtracking on the stack when that is detected
-- building a flat collection of monomorphs that we'll return
-- detecting when the whole DFS terminates altogether, and returning
-- collection of instantiated generic types as well? though maybe that's not this module's responsibility
-
-
-## Implementation plan
-
-We add a new stage, _CMIR_ (concrete MIR), between the previous MIR and LIR. This stage will be like MIR, but with concrete types instead of generic ones.
-Most of the current MIR->LIR logic goes into CMIR->LIR. In the MIR->CMIR pass goes our algorithm for collecting the required monomorphizations of generic functions and types – or detecting divergence.
-
-The MIR-> CMIR pass itself has two stages:
-
-1. Collect all "monomorphization requests" in the form (func ID, type params) or detect a divergent cycle   
-2. Actually produce the monomorphized function bodies for the "requests"
-
-To help with Step 1, we'll construct a _call graph_. This is done in the AST->HIR pass.
-The graph stores information about what (generic) functions call what other (generic) functions with what type parameters – including potentially their own abstract typevars.
-
-Our algorithm walks this graph, in a DFS manner, starting from main() – which is never generic. 
-For the algorithm, we maintain a "call stack" – a path in the call graph we're currently working on – and further "dangling" monomorphization requests for each element of the stack.
-An iteration of the algorithm goes like this:
-- select the first unprocessed child node of the end of the stack, and push it onto the stack 
-- using CallGraph, compute what other monomorphizations it "requests"
-- check if one of these requests induce a divergent cycle according to the Pareto criterion, panic (or whatever) if so 
-- check if all requested monomorphizations were requested already (by previous stack nodes)
-        - if so, mark the current node as "completed" and backtrack on the stack for unprocessed nodes
-        - if not, iterate into its children
-
-Repeat until we find a cycle or all nodes are completed.
-During this whole process, we should also note down what concrete parametrizations of generic *types* were instantiated. 
-(Note: it seems to me that laying them out in LIR won't require the toposorting we used to do – we can simply iterate by rank)
+So the whole thing is not actually sound yet. Debug and fxix, then proceed with the rest of the todos.
 
 
 ## Things about the current code that I'm unsure about
