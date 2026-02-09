@@ -1,8 +1,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use crate::shared::ids::FuncId;
-use crate::shared::tables::GenericTypetable;
-use crate::shared::typing::{ConcreteType, GenericType, TypevarId};
-use crate::passes::pareto::dominates;
+
+use crate::shared::{
+    ids::FuncId,
+    tables::GenericTypetable,
+    typing::{ConcreteType, GenericType, TypevarId},
+};
 
 
 #[derive(Clone, Debug)]
@@ -13,7 +15,7 @@ pub struct CallGraph {
 
 impl CallGraph {
     
-    pub fn new(funcs: &Vec<(FuncId, Vec<TypevarId>)>) -> Self {
+    pub fn new(funcs: &[(FuncId, Vec<TypevarId>)]) -> Self {
         Self {
             typevar_map: funcs.iter().cloned().collect(),
             calls: funcs.iter().map(|(id, _)| (*id, vec![])).collect()
@@ -33,7 +35,7 @@ impl CallGraph {
         caller: &FuncId, 
         type_params: Vec<ConcreteType>
     ) -> Vec<(FuncId, Vec<ConcreteType>)> {
-        let caller_typevars = self.typevar_map[&caller].clone(); 
+        let caller_typevars = self.typevar_map[caller].clone(); 
         if type_params.len() != caller_typevars.len() {
             panic!("Attempted monomorphization with wrong number of type parameters");
         }
@@ -42,7 +44,7 @@ impl CallGraph {
             .cloned()
             .zip(type_params.iter().cloned())
             .collect();
-        self.calls[&caller]
+        self.calls[caller]
             .iter()
             .cloned()
             .map(|(id, tps)| (
@@ -89,7 +91,7 @@ impl MonoStack {
 
     fn pop_next(&mut self) -> Option<(FuncId, Vec<ConcreteType>)> {
         self.goto_unprocessed();
-        let Some(tip_node) = self.stack.last_mut() else { return None; };
+        let tip_node = self.stack.last_mut()?; 
         tip_node.callees.pop()
     }
 }
@@ -108,7 +110,7 @@ pub fn get_monomorphizations(
     let entry_node = MonoNode {
         func: *entry,
         type_params: vec![],
-        callees: call_graph.get_concrete_callees(&entry, vec![]),
+        callees: call_graph.get_concrete_callees(entry, vec![]),
     };
 
     let mut required_monos: HashSet<(FuncId, Vec<ConcreteType>)> = call_graph.funcs()
@@ -122,11 +124,11 @@ pub fn get_monomorphizations(
         
         // Checking the Pareto criterion
         for (child_id, child_tparams) in child_monos.iter() {
-            let child_vector: Vec<usize> = get_rank_vector(&typetable, child_tparams);
+            let child_vector: Vec<usize> = get_rank_vector(typetable, child_tparams);
             let stack_vectors: Vec<Vec<usize>> = mono_stack
                 .monos_on_stack(*child_id)
                 .iter()
-                .map(|tpars| get_rank_vector(&typetable, tpars))
+                .map(|tpars| get_rank_vector(typetable, tpars))
                 .collect();
            let dominates_old = stack_vectors
                 .iter()
@@ -146,7 +148,7 @@ pub fn get_monomorphizations(
                 .map(|(_, tpars)| tpars)
                 .cloned()
                 .collect();
-            if !prev_monos.contains(&child_tparams) {
+            if !prev_monos.contains(child_tparams) {
                 exist_nonredund_child = true;
                 break;
             }
@@ -162,9 +164,25 @@ pub fn get_monomorphizations(
 }
 
 
-fn get_rank_vector(typetable: &GenericTypetable, tparams: &Vec<ConcreteType>) -> Vec<usize> {
+fn get_rank_vector(typetable: &GenericTypetable, tparams: &[ConcreteType]) -> Vec<usize> {
     tparams
         .iter()
         .map(|typ| typetable.get_genericity_rank(typ))
         .collect()
+}
+
+pub fn dominates(a: &[usize], b: &[usize]) -> bool {
+    if a.len() != b.len() {
+        panic!("Attempted to compare vectors of different length");
+    }
+    let mut strict_improvement = false;
+    
+    for i in 0..a.len() {
+        if b[i] > a[i] {
+            return false;
+        } else if b[i] < a[i] {
+            strict_improvement = true;
+        }
+    }
+    strict_improvement
 }

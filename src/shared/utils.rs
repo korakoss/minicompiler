@@ -1,7 +1,7 @@
 use crate::shared::typing::*;
 
+
 pub type GenericFuncSignature = FuncSignature<GenericType>;
-pub type ConcreteFuncSignature = FuncSignature<ConcreteType>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FuncSignature<T> {

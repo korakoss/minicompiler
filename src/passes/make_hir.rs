@@ -10,10 +10,13 @@ use crate::shared::{
     utils::GenTypeVariable,
     ids::{FuncId, Id},
 };
+
+
+type FunctionSignatureMap = HashMap<(String, usize, Vec<GenericType>), (FuncId, Vec<TypevarId>, GenericType)>;
        
         
 pub struct HIRBuilder {
-    function_map: HashMap<(String, usize, Vec<GenericType>), (FuncId, Vec<TypevarId>, GenericType)>,
+    function_map: FunctionSignatureMap,
     typetable: GenericTypetable,
     call_graph: CallGraph,
 }
@@ -23,7 +26,7 @@ impl HIRBuilder {
     pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
         let ASTProgram{typetable, functions} = ast;
 
-        let mut function_map: HashMap<(String, usize, Vec<GenericType>), (FuncId, Vec<TypevarId>, GenericType)> = HashMap::new();
+        let mut function_map: FunctionSignatureMap = HashMap::new();
         let mut funcs: Vec<(FuncId, ASTFunction)> = Vec::new();
 
         for (i, (sgn, func)) in functions.into_iter().enumerate() {
@@ -34,7 +37,7 @@ impl HIRBuilder {
         let call_graph = CallGraph::new(&function_map
             .iter()
             .map(|(_, (id, tvs, _))| (*id, tvs.clone()))
-            .collect()
+            .collect::<Vec<_>>()
         );
         let entry = function_map
             .iter()
@@ -73,15 +76,14 @@ impl HIRBuilder {
         if ret_type == GenericType::Prim(PrimType::None) {
             hir_body.push(HIRStatement::Return(None));
         }
-        let hir_func = HIRFunction { 
+        HIRFunction { 
             name, 
             typvars,
             args: arg_ids,
             variables: scope_context.var_map,
             body: hir_body, 
             ret_type 
-        }; 
-        hir_func
+        } 
     }
 
     fn lower_lvalue(&mut self, scope_context: &mut ScopeContext, lvalue: ASTLValue) -> Place {

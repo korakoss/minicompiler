@@ -443,45 +443,7 @@ impl Parser {
         self.expect_unparametric_token(Token::RightSqBracket);
         bindings
     }
-    
-    fn expect_concrete_type_annotation(&mut self) -> ConcreteType {
-        match self.tokens.next().unwrap() {
-            Token::Int => {
-                ConcreteType::Prim(PrimType::Integer)
-            }
-            Token::Bool => {
-                ConcreteType::Prim(PrimType::Bool)
-            }
-            Token::Identifier(type_id) => {
-                let bindings = self.expect_concrete_bindings();
-                ConcreteType::NewType(NewtypeId(type_id), bindings)
-            }
-            Token::Ref => {
-                let refd_type = self.expect_concrete_type_annotation();
-                ConcreteType::Reference(Box::new(refd_type))
-            }
-            _ => {
-                panic!("Unexpected token while parsing type annotation");
-            }
-        }
-    }
-
-    fn expect_concrete_bindings(&mut self) -> Vec<ConcreteType> {
-        if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
-            return vec![]
-        } else {
-            self.tokens.next();
-        }
-        let mut bindings: Vec<ConcreteType> = Vec::new();
-        bindings.push(self.expect_concrete_type_annotation());
-        while self.tokens.peek().unwrap() == &Token::Comma {
-            self.tokens.next();
-            bindings.push(self.expect_concrete_type_annotation());
-        }
-        self.expect_unparametric_token(Token::RightSqBracket);
-        bindings
-    }
-}
+ }
 
 
 

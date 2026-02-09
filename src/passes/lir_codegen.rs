@@ -142,8 +142,7 @@ impl LIRCompiler {
                     LIRPlaceKind::Local { base, offset } => {
                         let base_offset = frame.offsets
                             .get(&base)
-                            .expect(&format!("Cell ID {:?} not found in table \n \n {:?}", base, frame.offsets
-                            ));
+                            .unwrap_or_else(|| panic!("Cell ID {:?} not found in table \n \n {:?}", base, frame.offsets));
                         let target_offset = base_offset + offset;
                         self.emit(&format!("    sub r12, fp, #{}", target_offset));
                         self.emit(&format!("    bl func_{}", func.raw()));
@@ -260,7 +259,9 @@ impl LIRCompiler {
     fn emit_place_store(&mut self, place: LIRPlace, frame: &StackFrame) {
         match place.place {
             LIRPlaceKind::Local { base, offset } => {
-                let base_offset = frame.offsets.get(&base).expect(&format!("Unsuccessful offset lookup for cell ID {:?}. \n Offset table: \n {:?}", base, frame.offsets));
+                let base_offset = frame.offsets
+                    .get(&base)
+                    .unwrap_or_else(|| panic!("Unsuccessful offset lookup for cell ID {:?}. \n Offset table: \n {:?}", base, frame.offsets));
                 let place_offset = base_offset + offset;
                 self.emit(&format!("    str r0, [fp, #-{}]", place_offset));
             }

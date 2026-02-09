@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, usize};
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     shared::{
@@ -29,7 +29,7 @@ impl LayoutTable {
                 ConcreteShape::Struct { fields } => {
                     let fields: Vec<(String, ConcreteType)> = fields.into_iter().collect();
                     ChunkLayout {
-                        size: fields.iter().map(|(_ ,ftyp)| table.get_layout(&ftyp).size).sum(),
+                        size: fields.iter().map(|(_ ,ftyp)| table.get_layout(ftyp).size).sum(),
                         typ: ConcreteType::NewType(id.clone(), tparams.clone()),
                         kind: LayoutKind::Struct(fields),
                     }
@@ -379,13 +379,5 @@ impl LIRPlace {
             LIRPlaceKind::Local { base, offset } => LIRPlaceKind::Local { base, offset: offset + increment },
             LIRPlaceKind::Deref { pointer, offset } => LIRPlaceKind::Deref { pointer, offset: offset + increment},
         }
-    }
-}
-
-
-fn increment_place_offset(place: LIRPlaceKind, increment: usize) -> LIRPlaceKind {
-    match place {
-        LIRPlaceKind::Local { base, offset } => LIRPlaceKind::Local { base, offset: offset + increment },
-        LIRPlaceKind::Deref { pointer, offset } => LIRPlaceKind::Deref { pointer, offset: offset + increment},
     }
 }

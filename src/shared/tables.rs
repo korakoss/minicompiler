@@ -101,7 +101,6 @@ pub type GenericTypeDef = NewtypeDef<GenericType>;
 pub type GenericShape = NewtypeShape<GenericType>;
 
 pub type ConcreteShape = NewtypeShape<ConcreteType>;
-pub type ConcreteTypeDef = NewtypeDef<ConcreteType>;
 
 
 #[derive(Clone, Debug)]
