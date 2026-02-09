@@ -256,38 +256,71 @@ impl LIRBuilder {
         value: CMIRValue, 
         target: LIRPlace
     ) -> Vec<LIRStatement> {
-        let size = self.layout_table.get_layout(&value.typ).size;
+        let layout = self.layout_table.get_layout(&value.typ);
         match value.value {
             CMIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::Place(lir_val_place)}}] 
+                vec![LIRStatement::Store{
+                    dest: target, 
+                    value: LIRValue { 
+                        size: layout.size, 
+                        value: LIRValueKind::Place(lir_val_place)
+                    }
+                }] 
             },
             CMIRValueKind::IntLiteral(num) => {
-                vec![LIRStatement::Store{dest: target, value: LIRValue{ size, value: LIRValueKind::IntLiteral(num)}}]
+                vec![LIRStatement::Store{
+                    dest: target, 
+                    value: LIRValue{ 
+                        size: layout.size, 
+                        value: LIRValueKind::IntLiteral(num)
+                    }
+                }]
             },
             CMIRValueKind::BoolTrue => {
-                vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::BoolTrue}}]
+                vec![LIRStatement::Store{
+                    dest: target, 
+                    value: LIRValue { 
+                        size: layout.size, 
+                        value: LIRValueKind::BoolTrue
+                    }
+                }]
             }
             CMIRValueKind::BoolFalse => {
-                vec![LIRStatement::Store{dest: target, value: LIRValue { size, value: LIRValueKind::BoolFalse}}]
+                vec![LIRStatement::Store{
+                    dest: target, 
+                    value: LIRValue { 
+                        size: layout.size, 
+                        value: LIRValueKind::BoolFalse
+                    }
+                }]
             }
             CMIRValueKind::StructLiteral { fields } => {
                 let mut stmts: Vec<LIRStatement> = Vec::new();
                 let mut curr_field_offset = 0;
-                for (_, fexpr) in fields {                                      // TODO: probably this is where an error is
-                    let fsize = self.layout_table.get_layout(&fexpr.typ).size;
+                let ChunkLayout { size:_ , typ:_ , kind: LayoutKind::Struct(type_fields) } = layout else {
+                    unreachable!();
+                };
+                for (fname, ftyp) in type_fields {
+                    let fsize = self.layout_table.get_layout(&ftyp).size;
                     let f_target = LIRPlace {
                         size: fsize,
-                        place: increment_place_offset(target.place.clone(), curr_field_offset),
+                        place: target.increment_offset(curr_field_offset),
                     };
                     curr_field_offset += fsize;
-                    stmts.extend(self.lower_value_into_place(fexpr, f_target));
+                    stmts.extend(self.lower_value_into_place(fields[&fname].clone(), f_target));
                 }
                 stmts
             }
             CMIRValueKind::Reference(refd) => {
                 let refd_place = self.lower_place(refd);
-                let stmt = LIRStatement::Store { dest: target, value: LIRValue { size, value: LIRValueKind::Reference(refd_place)}}; 
+                let stmt = LIRStatement::Store { 
+                    dest: target, 
+                    value: LIRValue { 
+                        size: layout.size, 
+                        value: LIRValueKind::Reference(refd_place)
+                    }
+                }; 
                 vec![stmt]
             }
         }
@@ -334,6 +367,18 @@ impl LIRBuilder {
             current_type = curr_fields[field_idx].1.clone();
         }
         current_offset
+    }
+}
+
+
+
+impl LIRPlace {
+
+    fn increment_offset(&self, increment: usize) -> LIRPlaceKind {
+        match self.place {
+            LIRPlaceKind::Local { base, offset } => LIRPlaceKind::Local { base, offset: offset + increment },
+            LIRPlaceKind::Deref { pointer, offset } => LIRPlaceKind::Deref { pointer, offset: offset + increment},
+        }
     }
 }
 
