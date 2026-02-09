@@ -274,7 +274,7 @@ impl LIRBuilder {
             CMIRValueKind::StructLiteral { fields } => {
                 let mut stmts: Vec<LIRStatement> = Vec::new();
                 let mut curr_field_offset = 0;
-                for (_, fexpr) in fields {
+                for (_, fexpr) in fields {                                      // TODO: probably this is where an error is
                     let fsize = self.layout_table.get_layout(&fexpr.typ).size;
                     let f_target = LIRPlace {
                         size: fsize,
