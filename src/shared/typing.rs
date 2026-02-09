@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap};
+use anyhow::{Result, anyhow};
 
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -39,22 +40,25 @@ impl GenericType {
         }
     }
     
-    pub fn monomorphize(&self, type_params: &BTreeMap<TypevarId, ConcreteType>) -> ConcreteType {
+    pub fn monomorphize(&self, type_params: &BTreeMap<TypevarId, ConcreteType>) -> Result<ConcreteType> {
+        // TODO: check lengths, handle mismatch
         match self {
-            Self::Prim(prim_typ) => ConcreteType::Prim(*prim_typ),
+            Self::Prim(prim_typ) => Ok(ConcreteType::Prim(*prim_typ)),
             Self::NewType(id, gen_params) => {
-                let resolved_params = gen_params
+                let resolved_params: Result<Vec<_>> = gen_params
                     .iter()
                     .map(|p| p.monomorphize(type_params))
                     .collect();
-                ConcreteType::NewType(id.clone(), resolved_params)
-                
+                Ok(ConcreteType::NewType(id.clone(), resolved_params?))
             }
             Self::Reference(typ) => {
-                ConcreteType::Reference(Box::new(typ.monomorphize(type_params)))
+                Ok(ConcreteType::Reference(Box::new(typ.monomorphize(type_params)?)))
             }
             Self::TypeVar(id) => {
-                type_params[id].clone()
+                Ok(type_params
+                    .get(id)
+                    .ok_or_else(|| anyhow!("Type variable {:?} not found among type params {:?}", id, type_params))?
+                    .clone())
             }
         }
     }

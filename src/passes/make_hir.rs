@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::{collections::HashMap};
 
 use crate::stages::{ast::*, hir::*};
@@ -25,14 +26,14 @@ impl FuncTable {
         }
     }
 
-    fn find(&self, name: &str, type_params: &[GenericType], arg_types: &[GenericType]) -> (FuncId, GenericType) {
+    fn find(&self, name: &str, type_params: &[GenericType], arg_types: &[GenericType]) -> (FuncId, GenericType, Vec<TypevarId>) {
         let candidates = self.signature_map.iter().filter(|((cand_name, cand_tvars, _), _)| *cand_name == name && cand_tvars.len() == type_params.len()).collect::<Vec<_>>();
 
         // TODO: this of course sucks, do it nicer later
         for ((_, tvars, args), (id, ret_type)) in candidates {
             let bindings = tvars.iter().cloned().zip(type_params.iter().cloned()).collect();
             if args.iter().map(|arg| arg.bind(&bindings)).collect::<Vec<_>>() == arg_types {
-                return (*id, ret_type.clone());
+                return (*id, ret_type.clone(), tvars.clone());
             }
         }
         panic!("No function matched the signature: \n \t name: {:?}, \n \t type params: {:?}, \n \t arg types: {:?}", name, type_params, arg_types);
@@ -148,8 +149,8 @@ impl HIRBuilder {
         match statement {
             ASTStatement::Let {var, value} => {
                 let hir_value = self.lower_expression(scope_context, value);
-                if hir_value.typ != var.typ {
-                    panic!("Variable definition inconsistent with value type");
+                if !types_match(&var.typ, &hir_value.typ){
+                    panic!("Expected value in let statement doesn't match value type. \n \t Expected: {:?} \n \t Got: {:?}", var.typ, hir_value.typ);
                 }
                 let var_id = scope_context.add_var(var);
                 HIRStatement::Let {
@@ -270,10 +271,11 @@ impl HIRBuilder {
                         .iter()
                         .map(|arg| arg.typ.clone())
                         .collect();
-                let (func_id, ret_type) = self.func_table.find(&funcname, &type_params, &argtypes);
+                let (func_id, ret_type, typevars) = self.func_table.find(&funcname, &type_params, &argtypes);
+                let bindings = typevars.iter().cloned().zip(type_params.iter().cloned()).collect::<BTreeMap<_,_>>();
                 self.call_graph.add_callee(&scope_context.ambient_func.0, (func_id, type_params.clone()));
                 HIRExpression {
-                    typ: ret_type,
+                    typ: ret_type.bind(&bindings),
                     expr: HIRExpressionKind::FuncCall{ 
                         id: func_id, 
                         type_params,
@@ -361,6 +363,34 @@ impl HIRBuilder {
                 panic!("Field type doesn't match expected type");
             }
         }
+    }
+}
+
+
+fn types_match(target: &GenericType, candidate: &GenericType) -> bool {
+    match target {
+        GenericType::Prim(..) => target == candidate,
+        GenericType::NewType(id, tparams) => {
+            let GenericType::NewType(cand_id, cand_tparams) = candidate else {
+                return false;
+            };
+            if cand_id != id {
+                return false;
+            }
+            for (i, typ) in tparams.iter().enumerate() {
+                if !types_match(typ, &cand_tparams[i]) {
+                    return false;
+                }
+            }
+            return true;
+        },
+        GenericType::Reference(refd_typ) => {
+            let GenericType::Reference(cand_refd_typ) = candidate else {
+                return false;
+            };
+            types_match(&*refd_typ, &*cand_refd_typ)
+        }
+        GenericType::TypeVar(..) => true,
     }
 }
 
