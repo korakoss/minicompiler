@@ -1,6 +1,9 @@
 
 # CURRENT FOCUS: **Generic functions** 
 
+> fix function signature matching
+    - add argtypes
+
 I think I largely finished the CMIR addition stuff. Yum test cases run again. However, there are issues
 - running gen1.yum printed 7, which would mean that struct fields are scrambled
 - I wrote a small generic function program, gen2.yum, which fails to compile

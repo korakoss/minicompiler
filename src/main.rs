@@ -4,13 +4,16 @@ use std::env;
 mod shared;
 mod stages;
 mod passes;
-use passes::preproc::lex::*;
-use passes::preproc::parse::*;
-use passes::make_hir::*;
-use passes::hir_to_mir::*;
-use passes::concretize_mir::concretize_mir;
-use passes::cmir_to_lir::*;
-use passes::lir_codegen::*;
+
+use passes::{
+    preproc::{lex::*, parse::*},
+    make_hir::lower_ast,
+    hir_to_mir::*,
+    concretize_mir::concretize_mir,
+    cmir_to_lir::*,
+    lir_codegen::*,
+};
+
 
 fn main() {
     
@@ -32,7 +35,7 @@ fn main() {
     let ast = Parser::parse_program(tokens);
     fs::write(ast_filepath, format!("{:#?}", ast)).unwrap();
 
-    let hir = HIRBuilder::lower_ast(ast);
+    let hir = lower_ast(ast);
     fs::write(hir_filepath, format!("{:#?}", hir)).unwrap();
     
     let mir = MIRBuilder::lower_hir(hir);

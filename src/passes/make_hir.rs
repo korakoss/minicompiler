@@ -1,70 +1,86 @@
 use std::{collections::HashMap};
 
-use crate::shared::callgraph::CallGraph;
-use crate::shared::typing::TypevarId;
 use crate::stages::{ast::*, hir::*};
 use crate::shared::{
-    typing::{GenericType, PrimType},
+    callgraph::CallGraph,
+    typing::{GenericType, PrimType, TypevarId},
     tables::{GenericTypetable, GenericShape},
     binops::binop_typecheck,
-    utils::GenTypeVariable,
+    utils::{GenTypeVariable, FuncSignature},
     ids::{FuncId, Id},
 };
 
 
-type FunctionSignatureMap = HashMap<(String, usize, Vec<GenericType>), (FuncId, Vec<TypevarId>, GenericType)>;
+struct FuncTable {
+    signature_map: Vec<((String, Vec<TypevarId>, Vec<GenericType>), (FuncId, GenericType))>,    // name, type vars, arg types : id, return type
+}
+
+impl FuncTable {
+    
+    fn new(ast_functions: &HashMap<FuncSignature<GenericType>, ASTFunction>) -> Self {
+        Self {
+            signature_map: ast_functions.iter().enumerate()
+                .map(|(i, (sgn, func))| ((sgn.name.clone(), sgn.typevars.clone(), sgn.argtypes.clone()), (FuncId::from_raw(i), func.ret_type.clone())))
+                .collect(),
+        }
+    }
+
+    fn find(&self, name: &str, type_params: &[GenericType], arg_types: &[GenericType]) -> (FuncId, GenericType) {
+        let candidates = self.signature_map.iter().filter(|((cand_name, cand_tvars, _), _)| *cand_name == name && cand_tvars.len() == type_params.len()).collect::<Vec<_>>();
+
+        // TODO: this of course sucks, do it nicer later
+        for ((_, tvars, args), (id, ret_type)) in candidates {
+            let bindings = tvars.iter().cloned().zip(type_params.iter().cloned()).collect();
+            if args.iter().map(|arg| arg.bind(&bindings)).collect::<Vec<_>>() == arg_types {
+                return (*id, ret_type.clone());
+            }
+        }
+        panic!("No function matched the signature: \n \t name: {:?}, \n \t type params: {:?}, \n \t arg types: {:?}", name, type_params, arg_types);
+    }
+
+    fn callgraph(&self) -> CallGraph {
+        CallGraph::new(&self.signature_map.iter().map(|((_, typevars, _), (id, _))| (*id, typevars.clone())).collect::<Vec<_>>())
+    }
+}
        
+
+pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
+    let mut builder = HIRBuilder::new(&ast.functions, ast.typetable);
+    let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
+
+    for (sgn, func) in ast.functions {
+        let id = builder.func_table.find(&sgn.name, &sgn.typevars.iter().map(|tvar| GenericType::TypeVar(*tvar)).collect::<Vec<_>>(), &sgn.argtypes).0;
+        let hir_func = builder.lower_function(id, func.clone()); 
+        hir_functions.insert(id, hir_func);
+    }
+    HIRProgram { 
+        typetable: builder.typetable, 
+        call_graph: builder.call_graph, 
+        functions: hir_functions,
+        entry: builder.func_table.find("main".into(), &vec![], &vec![]).0,
+    }
+}
         
 pub struct HIRBuilder {
-    function_map: FunctionSignatureMap,
+    func_table: FuncTable,
     typetable: GenericTypetable,
     call_graph: CallGraph,
 }
 
 impl HIRBuilder {
-    
-    pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
-        let ASTProgram{typetable, functions} = ast;
 
-        let mut function_map: FunctionSignatureMap = HashMap::new();
-        let mut funcs: Vec<(FuncId, ASTFunction)> = Vec::new();
-
-        for (i, (sgn, func)) in functions.into_iter().enumerate() {
-            function_map.insert((sgn.name.clone(), sgn.typevars.len(), sgn.argtypes.clone()), (FuncId::from_raw(i), sgn.typevars.clone(), func.ret_type.clone()));
-            funcs.push((FuncId::from_raw(i), func));
-        }
-        
-        let call_graph = CallGraph::new(&function_map
-            .iter()
-            .map(|(_, (id, tvs, _))| (*id, tvs.clone()))
-            .collect::<Vec<_>>()
-        );
-        let entry = function_map
-            .iter()
-            .find_map(|((name, _, _), id)| { (name == "main")
-            .then_some(id)})
-            .unwrap().0;
-
-        let mut builder = HIRBuilder {
-            function_map,
-            typetable,
-            call_graph,
-        };
-
-        let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
-
-        for (id, func) in funcs {
-            let hir_func = builder.lower_function(id, func); 
-            hir_functions.insert(id, hir_func);
-        }
-
-        HIRProgram {
-            typetable: builder.typetable, 
-            call_graph: builder.call_graph,
-            functions: hir_functions,
-            entry, 
+    fn new(
+        ast_functions: &HashMap<FuncSignature<GenericType>, ASTFunction>,
+        typetable: GenericTypetable,
+    ) -> Self {
+        let func_table = FuncTable::new(ast_functions);
+        Self { 
+            call_graph: func_table.callgraph(),
+            func_table, 
+            typetable, 
         }
     }
+
     fn lower_function(&mut self, id: FuncId, func: ASTFunction) -> HIRFunction {
         let ASTFunction { name, typvars, args, body, ret_type } = func;
         let mut scope_context = ScopeContext::new(id, typvars.clone(), ret_type.clone());
@@ -250,18 +266,16 @@ impl HIRBuilder {
                     .map(|arg| self.lower_expression(scope_context, arg))
                     .collect();
                 
-                let argtypes = hir_args
+                let argtypes: Vec<_> = hir_args
                         .iter()
                         .map(|arg| arg.typ.clone())
                         .collect();
-                let (func_id, _,ret_typ) = &self.function_map[&(funcname, type_params.len(), argtypes)];
-                self.call_graph
-                    .add_callee(&scope_context.ambient_func.0, (*func_id, type_params.clone())
-                );
+                let (func_id, ret_type) = self.func_table.find(&funcname, &type_params, &argtypes);
+                self.call_graph.add_callee(&scope_context.ambient_func.0, (func_id, type_params.clone()));
                 HIRExpression {
-                    typ: ret_typ.clone(),
+                    typ: ret_type,
                     expr: HIRExpressionKind::FuncCall{ 
-                        id: *func_id, 
+                        id: func_id, 
                         type_params,
                         args: hir_args
                     }
