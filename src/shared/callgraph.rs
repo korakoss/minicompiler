@@ -29,7 +29,7 @@ impl CallGraph {
     pub fn get_concrete_callees(
         &self, 
         caller: &FuncId, 
-        type_params: Vec<ConcreteType>
+        type_params: &[ConcreteType]
     ) -> Vec<(FuncId, Vec<ConcreteType>)> {
         let caller_typevars = self.typevar_map[caller].clone(); 
         assert_eq!(type_params.len(), caller_typevars.len(), "Attempted monomorphization with wrong number of type parameters");
@@ -55,30 +55,6 @@ impl CallGraph {
 
 
 #[derive(Debug)]
-struct MonoStack {
-    stack: Vec<MonoNode>,
-}
-
-impl MonoStack {
-
-    fn monos_on_stack(&self, fid: &FuncId) -> Vec<Vec<ConcreteType>> {
-        self.stack
-            .iter()
-            .map(|mn| mn.type_params.clone())
-            .collect()
-    }
-
-    fn pop_next(&mut self) -> Option<(FuncId, Vec<ConcreteType>)> {
-        if let Some(child) = self.stack.last_mut()?.callees.pop() {
-            Some(child)
-        } else {
-            let tip_node = self.stack.pop().unwrap();
-            Some((tip_node.func, tip_node.type_params))
-        }
-    }
-}
-
-#[derive(Debug)]
 struct MonoNode {
     func: FuncId,
     type_params: Vec<ConcreteType>,
@@ -92,37 +68,36 @@ pub fn get_monomorphizations(
 ) -> HashSet<(FuncId, Vec<ConcreteType>)> {
     
     let mut required_monos: HashSet<(FuncId, Vec<ConcreteType>)> = [(*entry, vec![])].into();
-    let mut mono_stack = MonoStack {
-        stack: vec![
-            MonoNode {
-                func: *entry,
-                type_params: vec![],
-                callees: call_graph.get_concrete_callees(entry, vec![]),
-            }],
-    };
+    let mut mono_stack: Vec<MonoNode> = vec![MonoNode {
+        func: *entry,
+        type_params: vec![],
+        callees: call_graph.get_concrete_callees(entry, &vec![]),
+    }];
 
-    while let Some((curr_id, curr_tparams)) = mono_stack.pop_next() {
-        let child_monos = call_graph.get_concrete_callees(&curr_id, curr_tparams.clone());
-        
-        // Checking the Pareto criterion
-        if child_monos.iter().any(|(child_id, child_tparams)| {
-            let child_vector: Vec<usize> = get_rank_vector(typetable, child_tparams);
-            mono_stack
-                .stack
-                .iter()
-                .filter(|MonoNode{func: id, type_params: _,callees: _}| id == child_id)
-                .map(|node| get_rank_vector(typetable, &node.type_params))
-                .any(|v| dominates(&child_vector, &v))
-        }) {
-                panic!("Infinite cycle found in monomorphization");
+    while let Some(stack_tip) = mono_stack.last_mut() {
+        let (curr_id, curr_tparams) = match stack_tip.callees.pop() {
+            Some(callee) => callee,
+            None => {
+                let tip_node = mono_stack.pop().unwrap();
+                (tip_node.func, tip_node.type_params)
+            }
+        };
+        let child_monos = call_graph.get_concrete_callees(&curr_id, &curr_tparams);
+        if child_monos
+            .iter()
+            .any(|(child_id, child_tparams)| {
+                mono_stack
+                    .iter()
+                    .filter(|MonoNode{func: id, type_params: _,callees: _}| id == child_id)
+                    .any(|node| dominates_typeslice(&typetable, &child_tparams, &node.type_params))
+            }) 
+        {
+            panic!("Infinite cycle found in monomorphization");
         }
-
-        // TODO: fuse these two loops, above and below, if code proves to be stable
-        // Check for children completeness
         if child_monos.iter().all(|child| required_monos.contains(child)) {
             continue;
         }
-        mono_stack.stack.push(MonoNode { 
+        mono_stack.push(MonoNode { 
             func: curr_id, 
             type_params: curr_tparams, 
             callees: child_monos.clone(), 
@@ -133,20 +108,15 @@ pub fn get_monomorphizations(
 }
 
 
-fn get_rank_vector(typetable: &GenericTypetable, tparams: &[ConcreteType]) -> Vec<usize> {
-    tparams
-        .iter()
-        .map(|typ| typetable.get_genericity_rank(typ))
-        .collect()
-}
-
-pub fn dominates(a: &[usize], b: &[usize]) -> bool {
-    assert_eq!(a.len(), b.len(), "Attempted to compare vectors of different length");
-
-    let mut strict_incr = false;
-    for (a_i, b_i) in a.iter().zip(b) {
-        if b_i > a_i { return false; } 
-        strict_incr |= b_i < a_i;
+fn dominates_typeslice(typetable: &GenericTypetable, types1: &[ConcreteType], types2: &[ConcreteType]) -> bool {
+    assert_eq!(types1.len(), types2.len(), "Attempted to compare type slices of different length");
+    
+    let mut strict_impr = false;
+    for (t1_i, t2_i) in types1.iter().zip(types2) {
+        let rank1 = typetable.get_genericity_rank(t1_i);
+        let rank2 = typetable.get_genericity_rank(t2_i);
+        if rank2 > rank1 { return false; }
+        strict_impr |= rank2 < rank1;
     }
-    strict_incr
+    strict_impr
 }
