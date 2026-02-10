@@ -20,6 +20,7 @@ macro_rules! define_id {
 define_id!(FuncId);
 define_id!(BlockId);
 define_id!(CellId);
+define_id!(VarId);
 
 
 pub struct IdFactory<I: Id> {

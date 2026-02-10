@@ -8,7 +8,7 @@ use crate::shared::{
     tables::{GenericTypetable, GenericShape},
     binops::binop_typecheck,
     utils::{GenTypeVariable, FuncSignature},
-    ids::{FuncId, Id},
+    ids::{FuncId, Id, VarId, IdFactory},
 };
 
 
@@ -33,6 +33,7 @@ pub struct HIRBuilder {
     signature_map: Vec<((String, Vec<TypevarId>, Vec<GenericType>), (FuncId, GenericType))>,    // name, type vars, arg types : id, return type
     typetable: GenericTypetable,
     call_graph: CallGraph,
+    var_id_factory: IdFactory<VarId>,
 }
 
 impl HIRBuilder {
@@ -52,6 +53,7 @@ impl HIRBuilder {
             signature_map, 
             typetable, 
             call_graph,
+            var_id_factory: IdFactory::new(),
         }
     }
 
@@ -71,10 +73,14 @@ impl HIRBuilder {
     fn lower_function(&mut self, id: FuncId, func: ASTFunction) -> HIRFunction {
         let ASTFunction { name, typvars, args, body, ret_type } = func;
         let mut scope_context = ScopeContext::new(id, typvars.clone(), ret_type.clone());
-        let arg_ids: Vec<VarId>  = args
-            .into_iter()
-            .map(|arg| scope_context.add_var(GenTypeVariable { name: arg.0, typ: arg.1}))
-            .collect();
+        let mut arg_ids: Vec<VarId> = Vec::new();
+
+        for (arg_name, arg_type) in args {
+            let id = self.var_id_factory.next_id();
+            scope_context.add_var(id, GenTypeVariable {name: arg_name, typ: arg_type });
+            arg_ids.push(id);
+        }
+
         let mut hir_body = self.lower_block(&mut scope_context, body, false);
         if ret_type == GenericType::Prim(PrimType::None) {
             hir_body.push(HIRStatement::Return(None));
@@ -138,7 +144,8 @@ impl HIRBuilder {
                 if !types_match(&var.typ, &hir_value.typ){
                     panic!("Expected value in let statement doesn't match value type. \n \t Expected: {:?} \n \t Got: {:?}", var.typ, hir_value.typ);
                 }
-                let var_id = scope_context.add_var(var);
+                let var_id = self.var_id_factory.next_id();
+                scope_context.add_var( var_id, var);
                 HIRStatement::Let {
                     var: var_id,
                     value: hir_value,
@@ -418,12 +425,9 @@ impl ScopeContext {
         self.loop_entrances.pop();
     }
     
-    fn add_var(&mut self, var: GenTypeVariable) -> VarId {
-        let id = VarId(self.var_counter);
-        self.var_counter += 1;
+    fn add_var(&mut self, id: VarId, var: GenTypeVariable) {
         self.var_scope_stack.last_mut().unwrap().insert(var.name.clone(), id);
         self.var_map.insert(id, var);
-        id
     }
 
     fn get_var_info(&self, name: &String) -> (VarId, GenericType) {

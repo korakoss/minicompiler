@@ -5,7 +5,7 @@ use crate::shared::{
     tables::GenericTypetable, 
     typing::{GenericType, TypevarId}, 
     utils::{GenTypeVariable},
-    ids::FuncId,
+    ids::{FuncId, VarId},
     callgraph::CallGraph,
 };
 
@@ -104,6 +104,3 @@ pub enum PlaceKind {
     },
     Deref(HIRExpression),
 }
-
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub struct VarId(pub usize);
