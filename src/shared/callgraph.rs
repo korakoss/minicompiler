@@ -22,10 +22,6 @@ impl CallGraph {
         }
     }
 
-    pub fn funcs(&self) -> Vec<FuncId> {
-        self.typevar_map.keys().cloned().collect()
-    }
-
     pub fn add_callee(&mut self, caller: &FuncId, callee: (FuncId, Vec<GenericType>)) {
         self.calls.get_mut(caller).unwrap().push(callee);
     }
@@ -109,17 +105,14 @@ pub fn get_monomorphizations(
     entry: &FuncId,
 ) -> HashSet<(FuncId, Vec<ConcreteType>)> {
     
-    let mut required_monos: HashSet<(FuncId, Vec<ConcreteType>)> = HashSet::new();
-
-    required_monos.insert((*entry, vec![]));
-
-    let entry_node = MonoNode {
-        func: *entry,
-        type_params: vec![],
-        callees: call_graph.get_concrete_callees(entry, vec![]),
-    };
-
-        let mut mono_stack = MonoStack::new(entry_node);
+    let mut required_monos: HashSet<(FuncId, Vec<ConcreteType>)> = [(*entry, vec![])].into();
+    let mut mono_stack = MonoStack::new(
+        MonoNode {
+            func: *entry,
+            type_params: vec![],
+            callees: call_graph.get_concrete_callees(entry, vec![]),
+        }
+    );
 
     while let Some((curr_id, curr_tparams)) = mono_stack.pop_next() {
         let child_monos = call_graph.get_concrete_callees(&curr_id, curr_tparams.clone());
@@ -142,30 +135,14 @@ pub fn get_monomorphizations(
 
         // TODO: fuse these two loops, above and below, if code proves to be stable
         // Check for children completeness
-        let mut exist_nonredund_child = false;
-        for (child_id, child_tparams) in child_monos.iter() {
-            let prev_monos: Vec<Vec<ConcreteType>> = required_monos
-                .iter()
-                .filter(|(id, _)| id == child_id)
-                .map(|(_, tpars)| tpars)
-                .cloned()
-                .collect();
-            if !prev_monos.contains(child_tparams) {
-                exist_nonredund_child = true;
-                break;
-            }
-        }
-        if !exist_nonredund_child {
+        if child_monos.iter().all(|child| required_monos.contains(child)) {
             continue;
         }
-
-        let node = MonoNode {
-            func: curr_id,
-            type_params: curr_tparams,
-            callees: child_monos.clone(),
-        };
-        mono_stack.push(node);
-
+        mono_stack.push(MonoNode { 
+            func: curr_id, 
+            type_params: curr_tparams, 
+            callees: child_monos.clone(), 
+        });
         required_monos.extend(child_monos.into_iter());
     }
     required_monos
