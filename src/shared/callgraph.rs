@@ -61,10 +61,9 @@ struct MonoStack {
 
 impl MonoStack {
 
-    fn monos_on_stack(&self, fid: FuncId) -> Vec<Vec<ConcreteType>> {
+    fn monos_on_stack(&self, fid: &FuncId) -> Vec<Vec<ConcreteType>> {
         self.stack
             .iter()
-            .filter(|MonoNode{func: id, type_params: _,callees: _}| *id == fid)
             .map(|mn| mn.type_params.clone())
             .collect()
     }
@@ -106,19 +105,16 @@ pub fn get_monomorphizations(
         let child_monos = call_graph.get_concrete_callees(&curr_id, curr_tparams.clone());
         
         // Checking the Pareto criterion
-        for (child_id, child_tparams) in child_monos.iter() {
+        if child_monos.iter().any(|(child_id, child_tparams)| {
             let child_vector: Vec<usize> = get_rank_vector(typetable, child_tparams);
-            let stack_vectors: Vec<Vec<usize>> = mono_stack
-                .monos_on_stack(*child_id)
+            mono_stack
+                .stack
                 .iter()
-                .map(|tpars| get_rank_vector(typetable, tpars))
-                .collect();
-           let dominates_old = stack_vectors
-                .iter()
-                .any(|v| dominates(&child_vector, v));
-            if dominates_old {
+                .filter(|MonoNode{func: id, type_params: _,callees: _}| id == child_id)
+                .map(|node| get_rank_vector(typetable, &node.type_params))
+                .any(|v| dominates(&child_vector, &v))
+        }) {
                 panic!("Infinite cycle found in monomorphization");
-            }
         }
 
         // TODO: fuse these two loops, above and below, if code proves to be stable
