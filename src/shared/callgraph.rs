@@ -32,9 +32,7 @@ impl CallGraph {
         type_params: Vec<ConcreteType>
     ) -> Vec<(FuncId, Vec<ConcreteType>)> {
         let caller_typevars = self.typevar_map[caller].clone(); 
-        if type_params.len() != caller_typevars.len() {
-            panic!("Attempted monomorphization with wrong number of type parameters");
-        }
+        assert_eq!(type_params.len(), caller_typevars.len(), "Attempted monomorphization with wrong number of type parameters");
         let tparam_bindings: BTreeMap<TypevarId, ConcreteType> = caller_typevars
             .iter()
             .cloned()
@@ -63,10 +61,6 @@ struct MonoStack {
 
 impl MonoStack {
 
-    fn new(entry: MonoNode) -> Self {
-        Self { stack: vec![entry] }
-    }
-
     fn monos_on_stack(&self, fid: FuncId) -> Vec<Vec<ConcreteType>> {
         self.stack
             .iter()
@@ -75,19 +69,12 @@ impl MonoStack {
             .collect()
     }
 
-    fn push(&mut self, nd: MonoNode) {
-        self.stack.push(nd);
-    }
-
     fn pop_next(&mut self) -> Option<(FuncId, Vec<ConcreteType>)> {
-        if self.stack.is_empty() {
-            None
-        } else if self.stack.last_mut().unwrap().callees.is_empty() {
+        if let Some(child) = self.stack.last_mut()?.callees.pop() {
+            Some(child)
+        } else {
             let tip_node = self.stack.pop().unwrap();
             Some((tip_node.func, tip_node.type_params))
-        } else {
-            let tip_node = self.stack.last_mut().unwrap();
-            Some(tip_node.callees.pop().unwrap())
         }
     }
 }
@@ -106,13 +93,14 @@ pub fn get_monomorphizations(
 ) -> HashSet<(FuncId, Vec<ConcreteType>)> {
     
     let mut required_monos: HashSet<(FuncId, Vec<ConcreteType>)> = [(*entry, vec![])].into();
-    let mut mono_stack = MonoStack::new(
-        MonoNode {
-            func: *entry,
-            type_params: vec![],
-            callees: call_graph.get_concrete_callees(entry, vec![]),
-        }
-    );
+    let mut mono_stack = MonoStack {
+        stack: vec![
+            MonoNode {
+                func: *entry,
+                type_params: vec![],
+                callees: call_graph.get_concrete_callees(entry, vec![]),
+            }],
+    };
 
     while let Some((curr_id, curr_tparams)) = mono_stack.pop_next() {
         let child_monos = call_graph.get_concrete_callees(&curr_id, curr_tparams.clone());
@@ -138,7 +126,7 @@ pub fn get_monomorphizations(
         if child_monos.iter().all(|child| required_monos.contains(child)) {
             continue;
         }
-        mono_stack.push(MonoNode { 
+        mono_stack.stack.push(MonoNode { 
             func: curr_id, 
             type_params: curr_tparams, 
             callees: child_monos.clone(), 
@@ -157,17 +145,12 @@ fn get_rank_vector(typetable: &GenericTypetable, tparams: &[ConcreteType]) -> Ve
 }
 
 pub fn dominates(a: &[usize], b: &[usize]) -> bool {
-    if a.len() != b.len() {
-        panic!("Attempted to compare vectors of different length");
+    assert_eq!(a.len(), b.len(), "Attempted to compare vectors of different length");
+
+    let mut strict_incr = false;
+    for (a_i, b_i) in a.iter().zip(b) {
+        if b_i > a_i { return false; } 
+        strict_incr |= b_i < a_i;
     }
-    let mut strict_improvement = false;
-    
-    for i in 0..a.len() {
-        if b[i] > a[i] {
-            return false;
-        } else if b[i] < a[i] {
-            strict_improvement = true;
-        }
-    }
-    strict_improvement
+    strict_incr
 }
