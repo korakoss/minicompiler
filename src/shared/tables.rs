@@ -60,7 +60,7 @@ impl GenericTypetable {
                 ConcreteShape::Struct { 
                     fields: fields
                         .into_iter()
-                        .map(|(name, typ)| (name, typ.monomorphize(&type_params)))
+                        .map(|(name, typ)| (name, typ.monomorphize(&type_params).unwrap()))
                         .collect()
                 }
             }

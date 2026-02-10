@@ -1,8 +1,7 @@
 
 # CURRENT FOCUS: **Generic functions** 
 
-> fix function signature matching
-    - add argtypes
+> Currently debugging why gen2.yum is not compiling. The issues currently center around concretize_mir
 
 I think I largely finished the CMIR addition stuff. Yum test cases run again. However, there are issues
 - running gen1.yum printed 7, which would mean that struct fields are scrambled

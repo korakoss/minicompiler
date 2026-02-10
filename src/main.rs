@@ -41,7 +41,7 @@ fn main() {
     let mir = MIRBuilder::lower_hir(hir);
     fs::write(mir_filepath, format!("{:#?}", mir)).unwrap();
 
-    let cmir = concretize_mir(mir);
+    let cmir = concretize_mir(mir).unwrap();
     fs::write(cmir_filepath, format!("{:#?}", cmir)).unwrap();
 
     let lir = lower_cmir(cmir);

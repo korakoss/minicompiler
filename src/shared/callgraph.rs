@@ -52,7 +52,7 @@ impl CallGraph {
                 tps
                     .iter()
                     .cloned()
-                    .map(|tp| tp.monomorphize(&tparam_bindings))
+                    .map(|tp| tp.monomorphize(&tparam_bindings).unwrap())
                     .collect()
             ))
             .collect()
@@ -60,7 +60,7 @@ impl CallGraph {
 }
 
 
-
+#[derive(Debug)]
 struct MonoStack {
     stack: Vec<MonoNode>,
 }
@@ -83,19 +83,20 @@ impl MonoStack {
         self.stack.push(nd);
     }
 
-    fn goto_unprocessed(&mut self) {
-        while self.stack.last().is_some_and(|nd| nd.callees.is_empty()) {
-            self.stack.pop();
-        }
-    }
-
     fn pop_next(&mut self) -> Option<(FuncId, Vec<ConcreteType>)> {
-        self.goto_unprocessed();
-        let tip_node = self.stack.last_mut()?; 
-        tip_node.callees.pop()
+        if self.stack.is_empty() {
+            return None;
+        } else if self.stack.last_mut().unwrap().callees.is_empty() {
+            let tip_node = self.stack.pop().unwrap();
+            return Some((tip_node.func, tip_node.type_params));
+        } else {
+            let tip_node = self.stack.last_mut().unwrap();
+            Some(tip_node.callees.pop().unwrap())
+        }
     }
 }
 
+#[derive(Debug)]
 struct MonoNode {
     func: FuncId,
     type_params: Vec<ConcreteType>,
@@ -107,20 +108,21 @@ pub fn get_monomorphizations(
     typetable: &GenericTypetable,
     entry: &FuncId,
 ) -> HashSet<(FuncId, Vec<ConcreteType>)> {
+    
+    let mut required_monos: HashSet<(FuncId, Vec<ConcreteType>)> = HashSet::new();
+
+    required_monos.insert((*entry, vec![]));
+
     let entry_node = MonoNode {
         func: *entry,
         type_params: vec![],
         callees: call_graph.get_concrete_callees(entry, vec![]),
     };
 
-    let mut required_monos: HashSet<(FuncId, Vec<ConcreteType>)> = call_graph.funcs()
-        .iter()
-        .map(|k| (*k, [].into()))
-        .collect(); // TODO: maybe have funcs() return the iter itself?
-    let mut mono_stack = MonoStack::new(entry_node);
+        let mut mono_stack = MonoStack::new(entry_node);
 
     while let Some((curr_id, curr_tparams)) = mono_stack.pop_next() {
-        let child_monos = call_graph.get_concrete_callees(&curr_id, curr_tparams);
+        let child_monos = call_graph.get_concrete_callees(&curr_id, curr_tparams.clone());
         
         // Checking the Pareto criterion
         for (child_id, child_tparams) in child_monos.iter() {
@@ -153,10 +155,16 @@ pub fn get_monomorphizations(
                 break;
             }
         }
-        
         if !exist_nonredund_child {
             continue;
         }
+
+        let node = MonoNode {
+            func: curr_id,
+            type_params: curr_tparams,
+            callees: child_monos.clone(),
+        };
+        mono_stack.push(node);
 
         required_monos.extend(child_monos.into_iter());
     }

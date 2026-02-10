@@ -1,25 +1,30 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use anyhow::Result;
+use anyhow::{Context, Result, anyhow};
 
-use crate::shared::ids::Id;
-use crate::shared::typing::{NewtypeId, TypevarId};
-use crate::stages::{mir::*, cmir::*};
-use crate::shared::{
-    typing::{ConcreteType},
-    ids::{BlockId, CellId, FuncId, IdFactory},
-    callgraph::get_monomorphizations,
+
+use crate::{
+    stages::{mir::*, cmir::*},
+    shared::{
+        typing::{ConcreteType, NewtypeId, TypevarId},
+        ids::{Id, BlockId, CellId, FuncId, IdFactory},
+        callgraph::get_monomorphizations,
+    }
 };
 
 
 pub fn concretize_mir(mir_program: MIRProgram) -> Result<CMIRProgram> {
     let MIRProgram { typetable, call_graph, functions, entry } = mir_program;
+
+     
     let mono_reqs: HashSet<(FuncId, Vec<ConcreteType>)> = get_monomorphizations(&call_graph, &typetable, &entry);
+
 
     let mono_func_map: HashMap<(FuncId, Vec<ConcreteType>), FuncId> = mono_reqs
         .into_iter()
         .enumerate()
         .map(|(i,x)| (x, FuncId::from_raw(i)))
         .collect();
+
 
     let new_entry = mono_func_map[&(entry, vec![])];
 
@@ -28,9 +33,15 @@ pub fn concretize_mir(mir_program: MIRProgram) -> Result<CMIRProgram> {
     let mono_funcs: HashMap<FuncId, CMIRFunction> = mono_func_map
         .into_iter()
         .map(|((gen_id, tpars), mono_id)| {
-            Ok((mono_id, monomorphizer.monomorphize_func(functions[&gen_id].clone(), &tpars)?))
+            let func = functions[&gen_id].clone();
+            let func_name = func.name.clone();
+            Ok((mono_id, monomorphizer
+                .monomorphize_func(functions[&gen_id].clone(), &tpars)
+                .with_context(|| format!("Failed to monomorphize func {:?}", func_name))?
+            ))
         })      // TODO: could probably pop here
         .collect::<Result<HashMap<_,_>>>()?;
+
 
     Ok(CMIRProgram {
         functions: mono_funcs,
@@ -86,9 +97,12 @@ impl Monomorphizer {
         let mono_blocks: HashMap<BlockId, CMIRBlock> = gen_func.blocks
             .into_iter()
             .map(|(old_id, block)| {
-                Ok((self.block_id_map[&old_id], self.monomorphize_block(block, &tparam_bindings)?))
+                self.monomorphize_block(block, &tparam_bindings)
+                    .with_context(|| format!("Failed to monomorphize func {:?}", gen_func.name))
+                    .map(|mono_block| (self.block_id_map[&old_id], mono_block))
             })
             .collect::<Result<HashMap<_,_>>>()?;
+
 
         Ok(CMIRFunction {
             name: gen_func.name,
@@ -121,7 +135,8 @@ impl Monomorphizer {
                 right: self.monomorphize_value(right, tparam_bindings)?,
             }),
             MIRStatement::Call { target, func, type_params, args } => {
-                let mono_func = self.mono_func_map[&(func, type_params.into_iter().map(|tpar| tpar.monomorphize(tparam_bindings)).collect::<Result<Vec<_>>>()?)];
+                let sgn = (func, type_params.into_iter().map(|tpar| tpar.monomorphize(tparam_bindings)).collect::<Result<Vec<_>>>()?);
+                let mono_func = self.mono_func_map.get(&sgn).ok_or_else(|| anyhow!("Function with signature {:?} not found during monomorphization", sgn))?.clone();
                 Ok(CMIRStatement::Call { 
                     target: self.monomorphize_place(target, tparam_bindings)?, 
                     func: mono_func,
