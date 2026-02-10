@@ -31,7 +31,7 @@ impl CallGraph {
         caller: &FuncId, 
         type_params: &[ConcreteType]
     ) -> Vec<(FuncId, Vec<ConcreteType>)> {
-        let caller_typevars = self.typevar_map[caller].clone(); 
+        let caller_typevars = self.typevar_map.get(caller).unwrap(); 
         assert_eq!(type_params.len(), caller_typevars.len(), "Attempted monomorphization with wrong number of type parameters");
         let tparam_bindings: BTreeMap<TypevarId, ConcreteType> = caller_typevars
             .iter()
