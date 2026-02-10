@@ -391,10 +391,10 @@ fn types_match(target: &GenericType, candidate: &GenericType) -> bool {
 
 struct ScopeContext {
     ambient_func: (FuncId, Vec<TypevarId>, GenericType),
+    stack: Vec<Scope>,
     var_scope_stack: Vec<HashMap<String, VarId>>,
     loop_entrances: Vec<bool>,
     var_map: HashMap<VarId, GenTypeVariable>,
-    var_counter: usize,
 }
 
 
@@ -404,40 +404,49 @@ impl ScopeContext {
     fn new(func_id: FuncId, typ_vars: Vec<TypevarId>, ret_type: GenericType) -> Self {
         ScopeContext {
             ambient_func: (func_id, typ_vars, ret_type),
+            stack: vec![Scope {scope_vars: HashMap::new(), loop_entry: false }],
             var_scope_stack: vec![HashMap::new()],
             loop_entrances: vec![false],
             var_map: HashMap::new(),
-            var_counter: 0,
         }
     }
 
     fn add_scope(&mut self, loop_entry: bool) {
+        self.stack.push(Scope { scope_vars: HashMap::new(), loop_entry });
         self.var_scope_stack.push(HashMap::new());
         self.loop_entrances.push(loop_entry);
     }
 
     fn in_loop(&self) -> bool {
-        self.loop_entrances.iter().any(|x| *x)
+        self.stack.iter().any(|x| x.loop_entry)
     }
 
     fn exit_scope(&mut self) {
+        self.stack.pop();
         self.var_scope_stack.pop();
         self.loop_entrances.pop();
     }
     
     fn add_var(&mut self, id: VarId, var: GenTypeVariable) {
+        self.stack.last_mut().unwrap().scope_vars.insert(var.name.clone(), id);
         self.var_scope_stack.last_mut().unwrap().insert(var.name.clone(), id);
         self.var_map.insert(id, var);
     }
 
     fn get_var_info(&self, name: &String) -> (VarId, GenericType) {
-        let id = **self.var_scope_stack
+        let id = *self.stack
             .iter()
+            .map(|scope| scope.scope_vars.clone())
             .flatten()
-            .collect::<HashMap<&String, &VarId>>()
+            .collect::<HashMap<String, VarId>>()
             .get(name)
             .expect("Variable name not found in scope");
         (id, self.var_map[&id].typ.clone())
     }
 }
  
+
+struct Scope {
+    scope_vars: HashMap<String, VarId>,
+    loop_entry: bool,
+}
