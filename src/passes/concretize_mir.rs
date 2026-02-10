@@ -136,10 +136,11 @@ impl Monomorphizer {
             }),
             MIRStatement::Call { target, func, type_params, args } => {
                 let sgn = (func, type_params.into_iter().map(|tpar| tpar.monomorphize(tparam_bindings)).collect::<Result<Vec<_>>>()?);
-                let mono_func = self.mono_func_map.get(&sgn).ok_or_else(|| anyhow!("Function with signature {:?} not found during monomorphization", sgn))?.clone();
                 Ok(CMIRStatement::Call { 
                     target: self.monomorphize_place(target, tparam_bindings)?, 
-                    func: mono_func,
+                    func: *self.mono_func_map
+                        .get(&sgn)
+                        .ok_or_else(|| anyhow!("Function with signature {:?} not found during monomorphization", sgn))?,
                     args: args.into_iter().map(|arg| self.monomorphize_value(arg, tparam_bindings)).collect::<Result<Vec<_>>>()?,
                 })
             }

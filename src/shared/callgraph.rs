@@ -85,10 +85,10 @@ impl MonoStack {
 
     fn pop_next(&mut self) -> Option<(FuncId, Vec<ConcreteType>)> {
         if self.stack.is_empty() {
-            return None;
+            None
         } else if self.stack.last_mut().unwrap().callees.is_empty() {
             let tip_node = self.stack.pop().unwrap();
-            return Some((tip_node.func, tip_node.type_params));
+            Some((tip_node.func, tip_node.type_params))
         } else {
             let tip_node = self.stack.last_mut().unwrap();
             Some(tip_node.callees.pop().unwrap())

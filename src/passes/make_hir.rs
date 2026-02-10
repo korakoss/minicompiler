@@ -58,7 +58,7 @@ pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
         typetable: builder.typetable, 
         call_graph: builder.call_graph, 
         functions: hir_functions,
-        entry: builder.func_table.find("main".into(), &vec![], &vec![]).0,
+        entry: builder.func_table.find("main", &[], &[]).0,
     }
 }
         
@@ -382,7 +382,7 @@ fn types_match(target: &GenericType, candidate: &GenericType) -> bool {
                     return false;
                 }
             }
-            return true;
+            true
         },
         GenericType::Reference(refd_typ) => {
             let GenericType::Reference(cand_refd_typ) = candidate else {
