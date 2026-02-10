@@ -12,17 +12,46 @@ use crate::shared::{
 };
 
 
-struct FuncTable {
+pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
+    let mut builder = HIRBuilder::new(&ast.functions, ast.typetable);
+    let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
+
+    for (sgn, func) in ast.functions {
+        let id = builder.find(&sgn.name, &sgn.typevars.iter().map(|tvar| GenericType::TypeVar(*tvar)).collect::<Vec<_>>(), &sgn.argtypes).0;
+        let hir_func = builder.lower_function(id, func.clone()); 
+        hir_functions.insert(id, hir_func);
+    }
+    HIRProgram { 
+        typetable: builder.typetable.clone(), 
+        call_graph: builder.call_graph.clone(), 
+        functions: hir_functions,
+        entry: builder.find("main", &[], &[]).0,
+    }
+}
+        
+pub struct HIRBuilder {
     signature_map: Vec<((String, Vec<TypevarId>, Vec<GenericType>), (FuncId, GenericType))>,    // name, type vars, arg types : id, return type
+    typetable: GenericTypetable,
+    call_graph: CallGraph,
 }
 
-impl FuncTable {
-    
-    fn new(ast_functions: &HashMap<FuncSignature<GenericType>, ASTFunction>) -> Self {
-        Self {
-            signature_map: ast_functions.iter().enumerate()
+impl HIRBuilder {
+
+    fn new(
+        ast_functions: &HashMap<FuncSignature<GenericType>, ASTFunction>,
+        typetable: GenericTypetable,
+    ) -> Self {
+        let signature_map: Vec<_> = ast_functions.iter().enumerate()
                 .map(|(i, (sgn, func))| ((sgn.name.clone(), sgn.typevars.clone(), sgn.argtypes.clone()), (FuncId::from_raw(i), func.ret_type.clone())))
-                .collect(),
+                .collect();
+        let call_graph = CallGraph::new(&signature_map
+            .iter()
+            .map(|((_, typevars, _), (id, _))| (*id, typevars.clone())).collect::<Vec<_>>()
+        );
+        Self { 
+            signature_map, 
+            typetable, 
+            call_graph,
         }
     }
 
@@ -37,49 +66,6 @@ impl FuncTable {
             }
         }
         panic!("No function matched the signature: \n \t name: {:?}, \n \t type params: {:?}, \n \t arg types: {:?}", name, type_params, arg_types);
-    }
-
-    fn callgraph(&self) -> CallGraph {
-        CallGraph::new(&self.signature_map.iter().map(|((_, typevars, _), (id, _))| (*id, typevars.clone())).collect::<Vec<_>>())
-    }
-}
-       
-
-pub fn lower_ast(ast: ASTProgram) -> HIRProgram {
-    let mut builder = HIRBuilder::new(&ast.functions, ast.typetable);
-    let mut hir_functions: HashMap<FuncId, HIRFunction> = HashMap::new();
-
-    for (sgn, func) in ast.functions {
-        let id = builder.func_table.find(&sgn.name, &sgn.typevars.iter().map(|tvar| GenericType::TypeVar(*tvar)).collect::<Vec<_>>(), &sgn.argtypes).0;
-        let hir_func = builder.lower_function(id, func.clone()); 
-        hir_functions.insert(id, hir_func);
-    }
-    HIRProgram { 
-        typetable: builder.typetable, 
-        call_graph: builder.call_graph, 
-        functions: hir_functions,
-        entry: builder.func_table.find("main", &[], &[]).0,
-    }
-}
-        
-pub struct HIRBuilder {
-    func_table: FuncTable,
-    typetable: GenericTypetable,
-    call_graph: CallGraph,
-}
-
-impl HIRBuilder {
-
-    fn new(
-        ast_functions: &HashMap<FuncSignature<GenericType>, ASTFunction>,
-        typetable: GenericTypetable,
-    ) -> Self {
-        let func_table = FuncTable::new(ast_functions);
-        Self { 
-            call_graph: func_table.callgraph(),
-            func_table, 
-            typetable, 
-        }
     }
 
     fn lower_function(&mut self, id: FuncId, func: ASTFunction) -> HIRFunction {
@@ -271,7 +257,7 @@ impl HIRBuilder {
                         .iter()
                         .map(|arg| arg.typ.clone())
                         .collect();
-                let (func_id, ret_type, typevars) = self.func_table.find(&funcname, &type_params, &argtypes);
+                let (func_id, ret_type, typevars) = self.find(&funcname, &type_params, &argtypes);
                 let bindings = typevars.iter().cloned().zip(type_params.iter().cloned()).collect::<BTreeMap<_,_>>();
                 self.call_graph.add_callee(&scope_context.ambient_func.0, (func_id, type_params.clone()));
                 HIRExpression {
