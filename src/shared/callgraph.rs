@@ -71,7 +71,7 @@ pub fn get_monomorphizations(
     let mut mono_stack: Vec<MonoNode> = vec![MonoNode {
         func: *entry,
         type_params: vec![],
-        callees: call_graph.get_concrete_callees(entry, &vec![]),
+        callees: call_graph.get_concrete_callees(entry, &[]),
     }];
 
     while let Some(stack_tip) = mono_stack.last_mut() {
@@ -89,7 +89,7 @@ pub fn get_monomorphizations(
                 mono_stack
                     .iter()
                     .filter(|MonoNode{func: id, type_params: _,callees: _}| id == child_id)
-                    .any(|node| dominates_typeslice(&typetable, &child_tparams, &node.type_params))
+                    .any(|node| dominates_typeslice(typetable, child_tparams, &node.type_params))
             }) 
         {
             panic!("Infinite cycle found in monomorphization");

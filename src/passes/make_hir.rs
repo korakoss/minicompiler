@@ -427,8 +427,7 @@ impl ScopeContext {
     fn get_var_info(&self, name: &String) -> (VarId, GenericType) {
         let id = *self.stack
             .iter()
-            .map(|scope| scope.scope_vars.clone())
-            .flatten()
+            .flat_map(|scope| scope.scope_vars.clone())
             .collect::<HashMap<String, VarId>>()
             .get(name)
             .expect("Variable name not found in scope");
