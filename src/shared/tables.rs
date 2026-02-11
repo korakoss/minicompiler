@@ -1,23 +1,32 @@
 use std::{collections::{BTreeMap, HashMap}, hash::Hash};
+
 use crate::shared::typing::*;
-
-
-#[cfg(test)]
-#[path = "../tests/test_tables.rs"]
-mod tests;
+use crate::shared::ids::{IdFactory, NewtypeId, TypevarId};
 
 
 #[derive(Debug, Clone)]
 pub struct GenericTypetable {
+    pub id_map: HashMap<String, NewtypeId>,
     pub defs: HashMap<NewtypeId, GenericTypeDef>,
+    pub id_factory: IdFactory<NewtypeId>,
 }
 
 impl GenericTypetable {
 
-    pub fn new(defs: HashMap<NewtypeId, GenericTypeDef>) -> Self {
-        Self { defs}
+    pub fn new() -> Self {
+        Self { id_map: HashMap::new(), defs: HashMap::new(), id_factory: IdFactory::new() }
     }
     
+    pub fn add_newtype(&mut self, name: String, def: GenericTypeDef) {
+        let id = self.id_factory.next_id();
+        self.id_map.insert(name, id);
+        self.defs.insert(id, def);
+    }
+
+    pub fn get_type_id(&self, name: &String) -> Option<NewtypeId> {
+        self.id_map.get(name).copied()
+    }
+
     pub fn bind(
         &self, 
         id: NewtypeId, 

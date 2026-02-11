@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::shared::{
-    ids::FuncId,
+    ids::{FuncId, TypevarId},
     tables::GenericTypetable,
-    typing::{ConcreteType, GenericType, TypevarId},
+    typing::{ConcreteType, GenericType},
 };
 
 

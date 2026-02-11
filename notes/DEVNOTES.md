@@ -65,3 +65,13 @@ So the whole thing is not actually sound yet. Debug and fxix, then proceed with 
 
 2. In general, I think the lowering passes are architectured in an awkward pattern. There's typically some kind of builder, we cram a bunch of info into it, it has this weird entry point function that is typically simultaneously a constructor and the lowering function itself. The builders also seem too "global" possibly. For example, in _at least_ later IRs, functions are fairly logically independent of each other, and the lowering should be correspondingly more local, probably.
     - maybe look into Visitor patterns, see if they can help
+
+## Good practices discovered but not implemented everywhere
+- drain()
+
+
+
+# TODOs
+- Get rid of GenTypeVariable, just store types?
+- directory reorg
+    - merge some files in shared/ for instance

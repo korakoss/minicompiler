@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
 use crate::shared::{
-    binops::BinaryOperator, tables::GenericTypetable, typing::{GenericType, TypevarId}, utils::*
+    binops::BinaryOperator, 
+    tables::GenericTypetable, 
+    typing::GenericType, 
+    ids::TypevarId,
+    utils::{GenericFuncSignature, GenTypeVariable}
 };
 
 
@@ -24,7 +28,7 @@ pub struct ASTFunction {
 impl ASTFunction {
    
     pub fn get_signature(&self) -> GenericFuncSignature {
-        FuncSignature { 
+        GenericFuncSignature { 
             name: self.name.clone(), 
             typevars: self.typvars.clone(),
             argtypes: self.args.values().cloned().collect()

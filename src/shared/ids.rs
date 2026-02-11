@@ -7,7 +7,7 @@ pub trait Id: Copy + Eq + Hash {
 
 macro_rules! define_id {
     ($name:ident) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
         pub struct $name(usize);
 
         impl Id for $name {
@@ -21,8 +21,11 @@ define_id!(FuncId);
 define_id!(BlockId);
 define_id!(CellId);
 define_id!(VarId);
+define_id!(NewtypeId);
+define_id!(TypevarId);
 
 
+#[derive(Debug, Clone)]
 pub struct IdFactory<I: Id> {
     counter: usize,
     _marker: std::marker::PhantomData<I>,

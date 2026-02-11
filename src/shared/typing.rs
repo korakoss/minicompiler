@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap};
 use anyhow::{Result, anyhow};
 
+use crate::shared::ids::{TypevarId, NewtypeId};
+
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ConcreteType {
@@ -71,10 +73,3 @@ pub enum PrimType {
     Bool,
     None,
 }
-
-
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct NewtypeId(pub String); 
-
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
-pub struct TypevarId(pub usize);

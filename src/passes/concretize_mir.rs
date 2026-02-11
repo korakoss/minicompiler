@@ -5,8 +5,8 @@ use anyhow::{Context, Result, anyhow};
 use crate::{
     stages::{mir::*, cmir::*},
     shared::{
-        typing::{ConcreteType, NewtypeId, TypevarId},
-        ids::{Id, BlockId, CellId, FuncId, IdFactory},
+        typing::ConcreteType,
+        ids::{Id, BlockId, CellId, FuncId, IdFactory, NewtypeId, TypevarId},
         callgraph::get_monomorphizations,
     }
 };

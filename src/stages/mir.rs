@@ -3,9 +3,9 @@ use std::{collections::HashMap};
 use crate::shared::{
     binops::BinaryOperator, 
     callgraph::CallGraph, 
-    ids::{BlockId, CellId, FuncId}, 
+    ids::{BlockId, CellId, FuncId, TypevarId}, 
     tables::GenericTypetable, 
-    typing::{GenericType, TypevarId}
+    typing::GenericType,
 };
 
 

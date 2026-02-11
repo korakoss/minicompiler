@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     shared::{
-        ids::{CellId, IdFactory}, tables::{ConcreteShape, GenericTypetable}, typing::{ConcreteType, NewtypeId}
+        ids::{CellId, IdFactory, NewtypeId}, 
+        tables::{ConcreteShape, GenericTypetable}, 
+        typing::ConcreteType,
     }, 
     stages::{
         cmir::*,

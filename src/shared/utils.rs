@@ -1,4 +1,6 @@
-use crate::shared::typing::*;
+use crate::shared::typing::GenericType;
+use crate::shared::ids::TypevarId;
+
 
 
 pub type GenericFuncSignature = FuncSignature<GenericType>;

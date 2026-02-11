@@ -1,16 +1,21 @@
 use std::{collections::{BTreeMap, HashMap}, iter::Peekable};
 
+
 use crate::passes::preproc::tokens::*;
-use crate::shared::typing::*;
 use crate::stages::ast::*;
-use crate::shared::tables::*;
-use crate::shared::utils::*;
+use crate::shared::{
+    tables::{GenericTypetable, GenericShape, GenericTypeDef},
+    utils::{GenericFuncSignature, GenTypeVariable},
+    typing::*,
+    ids::{NewtypeId, TypevarId, IdFactory},
+};
+
 
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
-    new_types: HashMap<NewtypeId, GenericTypeDef>,
     functions: HashMap<GenericFuncSignature, ASTFunction>,
-    typevar_counter: usize,
+    typetable: GenericTypetable, 
+    typevar_id_factory: IdFactory<TypevarId>,
 }
 
 
@@ -19,9 +24,9 @@ impl Parser {
     pub fn parse_program(tokens: Vec<Token>) -> ASTProgram {
         let mut parser = Parser {
             tokens: tokens.into_iter().peekable(),
-            new_types: HashMap::new(),
             functions: HashMap::new(),              
-            typevar_counter: 0,
+            typetable: GenericTypetable::new(),
+            typevar_id_factory: IdFactory::new(),
         };
         while parser.tokens.peek().is_some() {
             match *parser.tokens.peek().unwrap() {
@@ -35,14 +40,14 @@ impl Parser {
             }
         }
         ASTProgram { 
-            typetable: GenericTypetable::new(parser.new_types),
+            typetable: parser.typetable,
             functions: parser.functions,
         } 
     }
     
     fn process_struct_typedef(&mut self) {
         self.expect_unparametric_token(Token::Struct);
-        let struct_identifier = NewtypeId(self.expect_identifier());
+        let type_name = self.expect_identifier();
         let type_params = self.collect_type_vars();
         self.expect_unparametric_token(Token::LeftBrace);
         let mut fields = BTreeMap::new();
@@ -58,15 +63,8 @@ impl Parser {
             type_params: type_params.into_values().collect(),
             defn: GenericShape::Struct { fields},
         };
-        self.new_types.insert(struct_identifier, typedef); 
+        self.typetable.add_newtype(type_name, typedef);
     }
-
-    fn assign_typevar_id(&mut self) -> TypevarId {
-        let id = self.typevar_counter;
-        self.typevar_counter += 1;
-        TypevarId(id)
-    }
-
 
     fn collect_type_vars(&mut self) -> HashMap<String, TypevarId> {
         if self.tokens.peek().unwrap() != &Token::LeftSqBracket {
@@ -75,10 +73,10 @@ impl Parser {
             self.tokens.next();
         }
         let mut type_params: HashMap<String, TypevarId> = HashMap::new();
-        type_params.insert(self.expect_identifier(), self.assign_typevar_id());
+        type_params.insert(self.expect_identifier(), self.typevar_id_factory.next_id());
         while self.tokens.peek().unwrap() == &Token::Comma {
             self.tokens.next();
-            type_params.insert(self.expect_identifier(), self.assign_typevar_id());
+            type_params.insert(self.expect_identifier(), self.typevar_id_factory.next_id());
         }
         self.expect_unparametric_token(Token::RightSqBracket);
         type_params
@@ -342,11 +340,11 @@ impl Parser {
                         ASTExpression::FuncCall { funcname: name, type_params, args}
                     }
                     Token::LeftBrace => {                                                   // StructLiteral                                             
-                        if self.new_types.contains_key(&NewtypeId(name.clone())) {
+                        if let Some(type_id) = self.typetable.get_type_id(&name) {
                             let fields = self.parse_struct_literal_internals(scope_typevars);
                             self.expect_unparametric_token(Token::RightBrace);
                             ASTExpression::StructLiteral {
-                                typ: GenericType::NewType(NewtypeId(name), type_params),
+                                typ: GenericType::NewType(type_id, type_params),
                                 fields
                             }
                         } else {
@@ -409,13 +407,14 @@ impl Parser {
             Token::Bool => {
                 GenericType::Prim(PrimType::Bool)
             }
-            Token::Identifier(type_id) => {
-                if scope_typevars.contains_key(&type_id) {
-                    GenericType::TypeVar(scope_typevars[&type_id])
-                }
-                else {
+            Token::Identifier(identifier) => {
+                if let Some(tvar_id) = scope_typevars.get(&identifier) {
+                    GenericType::TypeVar(*tvar_id)
+                } else if let Some(newtype_id) = self.typetable.get_type_id(&identifier) {
                     let bindings = self.expect_generic_type_params(scope_typevars);
-                    GenericType::NewType(NewtypeId(type_id), bindings)
+                    GenericType::NewType(newtype_id, bindings)
+                } else {
+                    panic!("Encountered unrecognized identifier in type annotation");
                 }
             }
             Token::Ref => {

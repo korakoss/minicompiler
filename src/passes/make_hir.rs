@@ -4,11 +4,11 @@ use std::{collections::HashMap};
 use crate::stages::{ast::*, hir::*};
 use crate::shared::{
     callgraph::CallGraph,
-    typing::{GenericType, PrimType, TypevarId},
+    typing::{GenericType, PrimType},
     tables::{GenericTypetable, GenericShape},
     binops::binop_typecheck,
     utils::{GenTypeVariable, FuncSignature},
-    ids::{FuncId, Id, VarId, IdFactory},
+    ids::{FuncId, VarId, IdFactory, TypevarId, Id},
 };
 
 
