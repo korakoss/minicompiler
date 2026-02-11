@@ -1,9 +1,8 @@
 use std::{collections::HashMap};
 
 use crate::shared::{
-    binops::BinaryOperator, 
+    definitions::{BinaryOperator, BlockId, CellId, FuncId, TypevarId},
     callgraph::CallGraph, 
-    ids::{BlockId, CellId, FuncId, TypevarId}, 
     tables::GenericTypetable, 
     typing::GenericType,
 };

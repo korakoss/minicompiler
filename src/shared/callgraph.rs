@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::shared::{
-    ids::{FuncId, TypevarId},
+    definitions::{FuncId, TypevarId},
     tables::GenericTypetable,
     typing::{ConcreteType, GenericType},
 };

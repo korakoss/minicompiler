@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use crate::stages::lir::*;
-use crate::shared::binops::BinaryOperator;
-use crate::shared::ids::{BlockId, CellId, FuncId, Id};
+use crate::shared::definitions::{BinaryOperator, BlockId, CellId, FuncId, Id};
 
 #[derive(Debug, Clone)]
 struct StackFrame {

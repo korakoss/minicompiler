@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap};
 use anyhow::{Result, anyhow};
 
-use crate::shared::ids::{TypevarId, NewtypeId};
+use crate::shared::definitions::{TypevarId, NewtypeId};
 
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

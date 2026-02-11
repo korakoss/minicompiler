@@ -1,7 +1,6 @@
 use std::{collections::HashMap};
 
-use crate::shared::binops::BinaryOperator;
-use crate::shared::ids::{BlockId, FuncId, CellId};
+use crate::shared::definitions::{BinaryOperator, BlockId, FuncId, CellId};
 
 
 #[derive(Clone, Debug)]

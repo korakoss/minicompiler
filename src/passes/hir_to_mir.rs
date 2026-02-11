@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::stages::{hir::*, mir::*};
 use crate::shared::{
     typing::{GenericType, PrimType},
-    ids::{CellId, BlockId, VarId, IdFactory},
+    definitions::{CellId, BlockId, VarId, IdFactory},
 };
 
 

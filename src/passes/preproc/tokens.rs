@@ -1,4 +1,4 @@
-use crate::shared::binops::*;
+use crate::shared::definitions::BinaryOperator;
 
 
 #[derive(Debug, Clone, PartialEq)]

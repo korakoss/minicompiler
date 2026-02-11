@@ -6,7 +6,7 @@ use crate::{
     stages::{mir::*, cmir::*},
     shared::{
         typing::ConcreteType,
-        ids::{Id, BlockId, CellId, FuncId, IdFactory, NewtypeId, TypevarId},
+        definitions::{Id, BlockId, CellId, FuncId, IdFactory, NewtypeId, TypevarId},
         callgraph::get_monomorphizations,
     }
 };

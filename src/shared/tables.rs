@@ -1,7 +1,7 @@
 use std::{collections::{BTreeMap, HashMap}, hash::Hash};
 
 use crate::shared::typing::*;
-use crate::shared::ids::{IdFactory, NewtypeId, TypevarId};
+use crate::shared::definitions::{IdFactory, NewtypeId, TypevarId};
 
 
 #[derive(Debug, Clone)]

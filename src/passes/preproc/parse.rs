@@ -4,10 +4,9 @@ use std::{collections::{BTreeMap, HashMap}, iter::Peekable};
 use crate::passes::preproc::tokens::*;
 use crate::stages::ast::*;
 use crate::shared::{
+    definitions::{ GenericFuncSignature, GenTypeVariable, TypevarId, IdFactory},
     tables::{GenericTypetable, GenericShape, GenericTypeDef},
-    utils::{GenericFuncSignature, GenTypeVariable},
     typing::*,
-    ids::{NewtypeId, TypevarId, IdFactory},
 };
 
 

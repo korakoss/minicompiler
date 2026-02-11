@@ -3,12 +3,10 @@ use std::{collections::HashMap};
 
 use crate::stages::{ast::*, hir::*};
 use crate::shared::{
+    definitions::{binop_typecheck, GenTypeVariable, FuncSignature, FuncId, VarId, IdFactory, TypevarId, Id},
     callgraph::CallGraph,
     typing::{GenericType, PrimType},
     tables::{GenericTypetable, GenericShape},
-    binops::binop_typecheck,
-    utils::{GenTypeVariable, FuncSignature},
-    ids::{FuncId, VarId, IdFactory, TypevarId, Id},
 };
 
 

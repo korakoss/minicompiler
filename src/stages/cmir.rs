@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use crate::shared::ids::*;
-use crate::shared::typing::*;
-use crate::shared::{binops::BinaryOperator};
-use crate::shared::tables::GenericTypetable;
+use crate::shared::{
+    definitions::{
+        BinaryOperator, FuncId, NewtypeId, BlockId, CellId,
+    }, 
+    typing::*,
+    tables::GenericTypetable,
+};
 
 
 #[derive(Clone, Debug)]

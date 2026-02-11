@@ -1,11 +1,9 @@
 use std::{collections::HashMap};
 
 use crate::shared::{
-    binops::BinaryOperator, 
+    definitions::{BinaryOperator, GenTypeVariable, FuncId, VarId, TypevarId},
     tables::GenericTypetable, 
     typing::GenericType, 
-    utils::{GenTypeVariable},
-    ids::{FuncId, VarId, TypevarId},
     callgraph::CallGraph,
 };
 

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     shared::{
-        ids::{CellId, IdFactory, NewtypeId}, 
+        definitions::{CellId, IdFactory, NewtypeId}, 
         tables::{ConcreteShape, GenericTypetable}, 
         typing::ConcreteType,
     }, 

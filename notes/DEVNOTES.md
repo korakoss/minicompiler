@@ -75,3 +75,4 @@ So the whole thing is not actually sound yet. Debug and fxix, then proceed with 
 - Get rid of GenTypeVariable, just store types?
 - directory reorg
     - merge some files in shared/ for instance
+- binops typecheck as a method?
