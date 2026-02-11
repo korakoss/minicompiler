@@ -87,7 +87,7 @@ impl GenericTypetable {
             ConcreteType::Prim(..) => 0,
             ConcreteType::Reference(ref_typ) => self.get_genericity_rank(ref_typ) + 1,
             ConcreteType::NewType(id, type_params) => {
-                let type_shape = self.monomorphize(id.clone(), type_params.clone());
+                let type_shape = self.monomorphize(*id, type_params.clone());
                 match type_shape {
                     ConcreteShape::Struct { fields } => {
                         fields

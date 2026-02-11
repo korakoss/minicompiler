@@ -1,4 +1,6 @@
 use std::hash::Hash; 
+use anyhow::{Result, bail};
+
 use crate::shared::typing::*;
 
 
@@ -28,34 +30,34 @@ pub enum BinaryOperator {
     Modulo
 }
 
-pub fn binop_typecheck(op: &BinaryOperator, left_type: &GenericType, right_type: &GenericType) -> Option<GenericType> {
-    
-    match op {
-        &BinaryOperator::Add | &BinaryOperator::Sub | &BinaryOperator::Mul| &BinaryOperator::Modulo=>{
-            if left_type == &GenericType::Prim(PrimType::Integer) && right_type == &GenericType::Prim(PrimType::Integer){
-                Some(GenericType::Prim(PrimType::Integer))
-            } else {
-                None
-            }
-        }
-        &BinaryOperator::Equals => {
-            if left_type == right_type {
-                // TODO: careful later
-                Some(GenericType::Prim(PrimType::Bool))
-            } else {
-                None
-            }
-        }
-        &BinaryOperator::Less => {
-            if left_type == &GenericType::Prim(PrimType::Integer) && right_type == &GenericType::Prim(PrimType::Integer){
-                Some(GenericType::Prim(PrimType::Bool))
-            } else {
-                None
-            }
-        } 
-    }
-}
+const INT_TYPE: GenericType = GenericType::Prim(PrimType::Integer);
+const BOOL_TYPE: GenericType = GenericType::Prim(PrimType::Bool);
 
+impl BinaryOperator {
+
+    // TODO: change to Result
+    pub fn type_result(&self, left: &GenericType, right: &GenericType) -> Result<GenericType> {
+        match self {
+            BinaryOperator::Add | BinaryOperator::Sub | BinaryOperator::Mul | BinaryOperator::Modulo => {
+                if left == &INT_TYPE && right == &INT_TYPE {
+                    return Ok(INT_TYPE);
+                }
+            },
+            BinaryOperator::Equals => {
+                if left == right {
+                    return Ok(BOOL_TYPE);
+                } 
+            }
+            BinaryOperator::Less => {
+                if left == &INT_TYPE && right == &INT_TYPE {
+                     return Ok(BOOL_TYPE);
+                } 
+            }
+        }
+        bail!("Binop typecheck failed");
+    }
+
+}
 
 pub trait Id: Copy + Eq + Hash {
     fn from_raw(id: usize) -> Self;

@@ -1,9 +1,8 @@
-use std::collections::BTreeMap;
-use std::{collections::HashMap};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::stages::{ast::*, hir::*};
 use crate::shared::{
-    definitions::{binop_typecheck, GenTypeVariable, FuncSignature, FuncId, VarId, IdFactory, TypevarId, Id},
+    definitions::{GenTypeVariable, FuncSignature, FuncId, VarId, IdFactory, TypevarId, Id},
     callgraph::CallGraph,
     typing::{GenericType, PrimType},
     tables::{GenericTypetable, GenericShape},
@@ -241,8 +240,7 @@ impl HIRBuilder {
             ASTExpression::BinOp{ op, left, right} => {
                 let left_hir = self.lower_expression(scope_context, *left);
                 let right_hir = self.lower_expression(scope_context, *right);
-                let result_type = binop_typecheck(&op, &left_hir.typ, &right_hir.typ)
-                    .expect("Binop typecheck failed");
+                let result_type = op.type_result(&left_hir.typ, &right_hir.typ).unwrap();
                 HIRExpression {
                     typ: result_type,
                     expr: HIRExpressionKind::BinOp{ 

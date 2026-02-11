@@ -30,7 +30,7 @@ impl GenericType {
                     .iter()
                     .map(|p| p.bind(bindings))
                     .collect();
-                GenericType::NewType(id.clone(), resolved_params)
+                GenericType::NewType(*id, resolved_params)
                 
             }
             Self::Reference(typ) => {
@@ -51,7 +51,7 @@ impl GenericType {
                     .iter()
                     .map(|p| p.monomorphize(type_params))
                     .collect();
-                Ok(ConcreteType::NewType(id.clone(), resolved_params?))
+                Ok(ConcreteType::NewType(*id, resolved_params?))
             }
             Self::Reference(typ) => {
                 Ok(ConcreteType::Reference(Box::new(typ.monomorphize(type_params)?)))

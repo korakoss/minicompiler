@@ -24,15 +24,15 @@ impl LayoutTable {
         let mut concrete_newtypes = concrete_newtypes
             .into_iter()
             .collect::<Vec<_>>();
-        concrete_newtypes.sort_by_key(|(id, typ)| typetable.get_genericity_rank(&ConcreteType::NewType(id.clone(), typ.clone())));
+        concrete_newtypes.sort_by_key(|(id, typ)| typetable.get_genericity_rank(&ConcreteType::NewType(*id, typ.clone())));
         for (id, tparams) in concrete_newtypes {
-            let type_shape = typetable.monomorphize(id.clone(), tparams.clone());
+            let type_shape = typetable.monomorphize(id, tparams.clone());
             let type_layout = match type_shape {
                 ConcreteShape::Struct { fields } => {
                     let fields: Vec<(String, ConcreteType)> = fields.into_iter().collect();
                     ChunkLayout {
                         size: fields.iter().map(|(_ ,ftyp)| table.get_layout(ftyp).size).sum(),
-                        typ: ConcreteType::NewType(id.clone(), tparams.clone()),
+                        typ: ConcreteType::NewType(id, tparams.clone()),
                         kind: LayoutKind::Struct(fields),
                     }
                 },
@@ -49,7 +49,7 @@ impl LayoutTable {
         match typ {
             ConcreteType::Prim(..) => ChunkLayout { size: 8, typ: typ.clone(), kind: LayoutKind::Atomic },
             ConcreteType::Reference(..) => ChunkLayout { size: 8, typ: typ.clone(), kind: LayoutKind::Atomic },
-            ConcreteType::NewType(id, tparams) => self.layouts[&(id.clone(), tparams.clone())].clone(),
+            ConcreteType::NewType(id, tparams) => self.layouts[&(*id, tparams.clone())].clone(),
         }
     }
 }
