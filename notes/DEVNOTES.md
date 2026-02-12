@@ -1,15 +1,39 @@
 
-# CURRENT FOCUS: **Generic functions** 
-
-> Currently debugging why gen2.yum is not compiling. The issues currently center around concretize_mir
-
-I think I largely finished the CMIR addition stuff. Yum test cases run again. However, there are issues
-- running gen1.yum printed 7, which would mean that struct fields are scrambled
-- I wrote a small generic function program, gen2.yum, which fails to compile
-
-So the whole thing is not actually sound yet. Debug and fxix, then proceed with the rest of the todos.
+# Status
+Finished generic functions. Or at least some text programs using them can compile and run.
 
 
+# Next topics
+
+There should be a lot of polishing before starting something substantial (likely return type checking next?) again. 
+I think most of the following should be cleared:
+
+## A minimal CLI
+Use the _clap_ crate for example. The goal is to replace with code the current messy collection of scripts – run scripts, test script, various things.
+A simple command with a number of subcommands and potentially arguments, like:
+    - _yum build [filepath]_ for making an exe    
+    - _yum run [filepath]_ for build and run  
+    - _yum test_ for running the test suite
+We should have flags for things like whether the IRs should be saved and so forth.
+
+## Much more tests
+We should add Rust unit tests wherever possible. It'd be particularly important for parsing and the monomorphization machinery, I think, but generally anywhere too.
+We should also add a bunch of Yum tests as wel, especially:
+    - break/continue    
+    - edge cases involving structs, pointers, or generics
+        - for example, circular struct definitions
+    - functions with too many arguments for the current ABI
+    - functions calling each other back and forth   
+
+- clean up in the code  
+    - example: _HIR->MIR_ pass still seems messy
+- write more tests
+- fix bugs
+
+## Polishing
+
+
+# Old
 ## Things about the current code that I'm unsure about
 - Is parsing stable now? Can it parse function type params? In defs and funccalls?
 - Are type parameters inside every IR now that they need to be in?
@@ -37,25 +61,9 @@ So the whole thing is not actually sound yet. Debug and fxix, then proceed with 
 - can the two MIRs be made generic?
 - type IDs, so they can implement copy  
     - currently the two Type types can't, because the Newtype variants aren't sized
-- store struct literals as Vec<fieldname, fieldtype>
-    - corresponds to fixed layout, could be nice
-- collect what _new types_ do monomorphizations of certain generic functions induce, collect and produce them in one pass (in MIR->CMIR) after collecting func monos
-# TODOS AFTERWARDS
-- add a bunch of Rust tests, esp. for:
-    - parsing
-    - monomorphization machinery
-    - but basically for everything we can
-- also add a bunch of Yum tests, esp.:
-    - break and continue
-    - various struct and pointer ones
-        - circular struct defs  
-    - some functions calling each other back and forth  
-    - functions with many arguments 
-    - negative tests (that shouldn't compile)
-    - many generic function tests once we have them
-        - divergent monos
+    - well, it's probably too much indirection for generic types which we want to use semantically a bunch of times, but could work for concrete types
+
 - fix bugs in INSECTS.md
-- make run/test scripts nicer
 - the literal //TODO-s across the code
 
 # OTHER
@@ -73,6 +81,4 @@ So the whole thing is not actually sound yet. Debug and fxix, then proceed with 
 
 # TODOs
 - Get rid of GenTypeVariable, just store types?
-- directory reorg
-    - merge some files in shared/ for instance
-- binops typecheck as a method?
+

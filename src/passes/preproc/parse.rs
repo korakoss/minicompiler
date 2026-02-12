@@ -9,7 +9,6 @@ use crate::shared::{
     typing::*,
 };
 
-
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>, 
     functions: HashMap<GenericFuncSignature, ASTFunction>,

@@ -6,7 +6,7 @@ mod stages;
 mod passes;
 
 use passes::{
-    preproc::{lex::*, parse::*},
+    preproc::{lex::lex, parse::Parser},
     make_hir::lower_ast,
     hir_to_mir::*,
     concretize_mir::concretize_mir,
