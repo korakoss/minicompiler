@@ -1,5 +1,8 @@
 use std::fs;
 use std::env;
+use std::path::PathBuf;
+
+use clap::{Parser as ClapParser, Subcommand};
 
 mod shared;
 mod stages;
@@ -14,6 +17,14 @@ use passes::{
     lir_codegen::*,
 };
 
+
+fn test() {
+    unimplemented!();
+}
+
+fn run(source_path: &PathBuf) {
+    unimplemented!();
+}
 
 fn main() {
     
