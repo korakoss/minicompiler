@@ -5,8 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	"golang.org/x/tools/go/analysis/passes/printf"
 )
 
 
