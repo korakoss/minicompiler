@@ -9,7 +9,7 @@ import (
 func main() {
     var noBuild bool
     var keepIR bool
-var noSync bool
+	var noSync bool
 
     rootCmd := &cobra.Command{
 		Use: "yum",
