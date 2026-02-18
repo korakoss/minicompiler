@@ -42,7 +42,7 @@ func makeCobraRunCmd() *cobra.Command {
         Args:  cobra.ExactArgs(1),
         Run: func(cmd *cobra.Command, args []string) {
 			programName := args[0]
-			output := runYumProgram(programName, "yum/src/", "yum/target")
+			output := runYumProgram(programName, "yum/src/", "yum/target/")
 			fmt.Println(output)
         },
     }
@@ -94,7 +94,7 @@ func executeCommandListOnPi(commands []exec.Cmd) (cmdOutput string){
 		cmdStrings = append(cmdStrings, cmdString)
 	}
 	cmdStrings = append([]string{"cd /home/akos/programming_projects/minicompiler"}, cmdStrings...)
-	cmdStrings = append([]string{"pwd"}, cmdStrings...)
+	//cmdStrings = append([]string{"pwd"}, cmdStrings...)
 	hostname, err := os.Hostname()
 	if err != nil {
 		os.Exit(1)
@@ -109,12 +109,14 @@ func executeCommandListOnPi(commands []exec.Cmd) (cmdOutput string){
 			os.Exit(1)
 		}
 	case "mac":
-		bigRemoteCmd := exec.Command("ssh", "pi", "zsh", "-l", "-c", strings.Join(cmdStrings, " && "))
+		remoteCmdString := "zsh -l -c \"" + strings.Join(cmdStrings, " && ") + "\""
+		bigRemoteCmd := exec.Command("ssh", "pi", remoteCmdString)
+		fmt.Println(bigRemoteCmd)
 		output, err := bigRemoteCmd.CombinedOutput()
 		cmdOutput = string(output)
 		if err != nil {
-			fmt.Println("Execution error: %s", err)
-			os.Exit(1)
+			fmt.Printf("Execution error: %e", err)
+			//os.Exit(1)
 		}
 	default:
 		os.Exit(1)
