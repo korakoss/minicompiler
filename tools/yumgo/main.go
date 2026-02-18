@@ -78,10 +78,9 @@ func runYumProgram(programName, srcRoot, targetRoot string) (stdOutput string) {
 	cmdSequence := []exec.Cmd {
 		*exec.Command("rm", "-rf", targetDir),
 		*exec.Command("mkdir", targetDir),
-		*exec.Command("RUST_BACKTRACE=1", "bin/yumc", sourcePath, targetDir),	// TODO: backtrace=1 should be dropped
+		*exec.Command("bin/yumc", sourcePath, targetDir),	
 		*exec.Command("as", "-o", objPath, asmPath),
 		*exec.Command("gcc", "-o", exePath, objPath),
-		*exec.Command("rm", objPath),	// TODO: could be removed from here
 		*exec.Command(exePath),
 	}
 	stdOutput = executeCommandListOnPi(cmdSequence)
