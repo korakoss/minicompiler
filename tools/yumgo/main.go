@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+
 // TODO: verbose flag
 func main() {
     var noBuild bool
@@ -16,8 +17,12 @@ func main() {
 		Short: "Build and test tool for the Yum language",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if !noBuild {
-				buildCommand := []exec.Cmd{*exec.Command("cargo", "build")}
-				executeCommandListOnPi(buildCommand)
+				output, err := exec.Command("ssh", "pi", "zsh -l -c 'cd /home/akos/programming_projects/minicompiler && source /home/akos/.cargo/env && cargo build'").CombinedOutput()
+				println(string(output))
+				if err != nil {
+					println(err)
+					os.Exit(1)
+				}
 			}
 		},
 	}
@@ -37,7 +42,7 @@ func makeCobraRunCmd() *cobra.Command {
         Args:  cobra.ExactArgs(1),
         Run: func(cmd *cobra.Command, args []string) {
 			programName := args[0]
-			programTargetDir := "yum/target/" + programName
+			programTargetDir := "yum/target/" + programName + "/"
 			commands := []exec.Cmd{
 				*exec.Command("rm", "-rf", programTargetDir),
 				*exec.Command("mkdir", programTargetDir),
@@ -73,34 +78,33 @@ func makeCobraTestCmd() *cobra.Command {
 
 
 func executeCommandListOnPi(commands []exec.Cmd) {
+	var cmdStrings []string	
+	for _, cmd := range commands {
+		cmdString := strings.Join(cmd.Args, " ") // strings.Join(cmd.Env, " ") + " " + 
+		cmdStrings = append(cmdStrings, cmdString)
+	}
+	cmdStrings = append([]string{"cd /home/akos/programming_projects/minicompiler"}, cmdStrings...)
+	cmdStrings = append([]string{"pwd"}, cmdStrings...)
 	hostname, err := os.Hostname()
 	if err != nil {
 		os.Exit(1)
 	}
+	fmt.Println(cmdStrings)
 	switch hostname {		
 	case "pi":
-		for _,cmd := range commands {
-			output, err := cmd.CombinedOutput()
-			fmt.Printf("%s", output)
-			if err != nil {
-				os.Exit(1)
-			}
-		}
-	case "mac":
-		var cmdStrings []string	
-		cmdStrings = append(cmdStrings, "source ~/.zshrc")
-		cmdStrings = append(cmdStrings, "cd ~/programming_projects/minicompiler")
-		for _, cmd := range commands {
-			var cmdString string	
-			cmdString += strings.Join(cmd.Env, " ")
-			cmdString += strings.Join(cmd.Args, " ")
-			cmdStrings = append(cmdStrings, cmdString)
-		}
-		bigCmdString := strings.Join(cmdStrings, " && ")
-		bigRemoteCmd := exec.Command("ssh", "pi", "-t", bigCmdString) 
+		bigRemoteCmd := exec.Command("sh", "-c", strings.Join(cmdStrings, " && "))
 		output, err := bigRemoteCmd.CombinedOutput()
 		fmt.Println(string(output))
 		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	case "mac":
+		bigRemoteCmd := exec.Command("ssh", "pi", "zsh", "-l", "-c", strings.Join(cmdStrings, " && "))
+		output, err := bigRemoteCmd.CombinedOutput()
+		fmt.Println(string(output))
+		if err != nil {
+			fmt.Println(err)
 			os.Exit(1)
 		}
 	default:
