@@ -111,33 +111,6 @@ func executeCommandListOnPi(commands []exec.Cmd) {
 	}
 }
 
-func executeCommandOnPi(command exec.Cmd) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		os.Exit(1)
-	}
-	switch hostname {		
-	case "pi":
-		output, err := command.CombinedOutput()
-		fmt.Printf("%s", output)
-		if err != nil {
-			os.Exit(1)
-		}
-	case "mac":
-		commandString := strings.Join(command.Env, " ") + " " + strings.Join(command.Args, " ")
-		commandString = "source ~/zshrc && cd/programming_projects/minicompiler && " + commandString 
-		remoteCmd := exec.Command("ssh", "pi", "-t", commandString) 
-		output, err := remoteCmd.CombinedOutput()
-		fmt.Println(string(output))
-		if err != nil {
-			os.Exit(1)
-		}
-	default:
-		os.Exit(1)
-	}
-}
-
-
 func makeRunCmds (programSrcPath, programTargetDir string) (cmdSequence []exec.Cmd) {
 	// TODO: Make the corresponding API changes in Rust main	
 
