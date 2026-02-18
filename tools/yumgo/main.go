@@ -37,15 +37,12 @@ func makeCobraRunCmd() *cobra.Command {
         Args:  cobra.ExactArgs(1),
         Run: func(cmd *cobra.Command, args []string) {
 			programName := args[0]
-			programSrcPath := "yum/src/" + programName + ".yum"
 			programTargetDir := "yum/target/" + programName
-			//onMac := amOnMac()
 			commands := []exec.Cmd{
 				*exec.Command("rm", "-rf", programTargetDir),
-				*exec.Command("pwd"),
 				*exec.Command("mkdir", programTargetDir),
 			}
-			commands = append(commands, makeRunCmds(programSrcPath, programTargetDir)...)
+			commands = append(commands, makeRunCmds("yum/src/" + programName + ".yum", programTargetDir)...)
 			executeCommandListOnPi(commands)
         },
     }
@@ -112,12 +109,9 @@ func executeCommandListOnPi(commands []exec.Cmd) {
 }
 
 func makeRunCmds (programSrcPath, programTargetDir string) (cmdSequence []exec.Cmd) {
-	// TODO: Make the corresponding API changes in Rust main	
-
 	assPath := programTargetDir + "/asm.s"
 	tempObjPath := programTargetDir + "/TEMP.o"
 	exPath := programTargetDir + "/exec"
-
 	cmdSequence = []exec.Cmd{
 		*exec.Command("RUST_BACKTRACE=1", "bin/yumc", programSrcPath, programTargetDir),
 		*exec.Command("as", "-o", tempObjPath, assPath),
