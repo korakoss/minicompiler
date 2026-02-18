@@ -42,13 +42,14 @@ func makeCobraRunCmd() *cobra.Command {
         Args:  cobra.ExactArgs(1),
         Run: func(cmd *cobra.Command, args []string) {
 			programName := args[0]
-			programTargetDir := "yum/target/" + programName + "/"
+			programTargetDir := "yum/target/" + programName 
 			commands := []exec.Cmd{
 				*exec.Command("rm", "-rf", programTargetDir),
 				*exec.Command("mkdir", programTargetDir),
 			}
 			commands = append(commands, makeRunCmds("yum/src/" + programName + ".yum", programTargetDir)...)
-			executeCommandListOnPi(commands)
+			output := executeCommandListOnPi(commands)
+			fmt.Println(output)
         },
     }
 }
@@ -62,25 +63,35 @@ func makeCobraTestCmd() *cobra.Command {
 				
 			positiveTestCases := []string{"primetest", "nonparam_func", "long_ass_binop"}
 			for _, testName := range positiveTestCases {
-				runCmds := makeRunCmds("tests/src/" + testName, "tests/target" + testName)
-				executeCommandListOnPi(runCmds)
-				// Check stdout
+				targetDir := "tests/target" + testName
+				commands := []exec.Cmd{
+					*exec.Command("rm", "-rf", targetDir),
+					*exec.Command("mkdir", targetDir),
+				}
+				commands = append(commands, makeRunCmds("tests/src/" + testName + ".yum", targetDir)...)
+				output := executeCommandListOnPi(commands)
+				fmt.Println(output)
 			}
 			negativeTestCases := []string{"bad_branch"}
 			for _, testName := range negativeTestCases {
-				runCmds := makeRunCmds("tests/src/" + testName, "tests/target" + testName)
-				executeCommandListOnPi(runCmds)
-				// Check stdout
+				targetDir := "tests/target" + testName
+				commands := []exec.Cmd{
+					*exec.Command("rm", "-rf", targetDir),
+					*exec.Command("mkdir", targetDir),
+				}
+				commands = append(commands, makeRunCmds("tests/src/" + testName + ".yum", targetDir)...)
+				output := executeCommandListOnPi(commands)
+				fmt.Println(output)
 			}
         },
     }
 }
 
 
-func executeCommandListOnPi(commands []exec.Cmd) {
+func executeCommandListOnPi(commands []exec.Cmd) (cmdOutput string){
 	var cmdStrings []string	
 	for _, cmd := range commands {
-		cmdString := strings.Join(cmd.Args, " ") // strings.Join(cmd.Env, " ") + " " + 
+		cmdString := strings.Join(cmd.Args, " ") 
 		cmdStrings = append(cmdStrings, cmdString)
 	}
 	cmdStrings = append([]string{"cd /home/akos/programming_projects/minicompiler"}, cmdStrings...)
@@ -102,14 +113,15 @@ func executeCommandListOnPi(commands []exec.Cmd) {
 	case "mac":
 		bigRemoteCmd := exec.Command("ssh", "pi", "zsh", "-l", "-c", strings.Join(cmdStrings, " && "))
 		output, err := bigRemoteCmd.CombinedOutput()
-		fmt.Println(string(output))
+		cmdOutput = string(output)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Execution error: %s", err)
 			os.Exit(1)
 		}
 	default:
 		os.Exit(1)
 	}
+	return
 }
 
 func makeRunCmds (programSrcPath, programTargetDir string) (cmdSequence []exec.Cmd) {
