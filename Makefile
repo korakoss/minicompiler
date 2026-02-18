@@ -3,7 +3,7 @@
 all: build
 
 build: clean
-	@rsync -av --exclude "target" --exclude ".git" "/Users/akoskorosi/programming_projects/yum/minicompiler/" "pi:/home/akos/programming_projects/minicompiler"	
+	@rsync -av --exclude "/target" --exclude ".git" "/Users/akoskorosi/programming_projects/yum/minicompiler/" "pi:/home/akos/programming_projects/minicompiler"	
 	@cargo build	
 	@cp target/debug/minicompiler ./bin/yumc
 	@cd tools/yumgo && go build -o ../../bin/yum .

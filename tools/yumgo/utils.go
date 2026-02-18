@@ -9,7 +9,7 @@ import (
 )
 
 
-func executeCommandsOnPi(commands []exec.Cmd) {
+func executeCommandListOnPi(commands []exec.Cmd) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		os.Exit(1)
@@ -36,7 +36,7 @@ func executeCommandsOnPi(commands []exec.Cmd) {
 		bigCmdString := strings.Join(cmdStrings, " && ")
 		bigRemoteCmd := exec.Command("ssh", "pi", "-t", bigCmdString) 
 		output, err := bigRemoteCmd.CombinedOutput()
-		fmt.Println(output)
+		fmt.Println(string(output))
 		if err != nil {
 			os.Exit(1)
 		}
@@ -45,26 +45,37 @@ func executeCommandsOnPi(commands []exec.Cmd) {
 	}
 }
 
-
-func doSyncing() {
-	fmt.Println("Syncing..")
+func executeCommandOnPi(command exec.Cmd) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		os.Exit(1)
 	}
-	macPath := "/Users/akoskorosi/programming_projects/yum/minicompiler/"
-	piPath := "/home/akos/programming_projects/minicompiler/"
-	var macDir, piDir string
-	if hostname == "mac" {
-		macDir = macPath
-		piDir = "pir:" + piPath
-	} else if hostname == "pi" {
-		macDir = "mac:" + macPath
-		piDir = piPath
-	} else {
-		fmt.Println("Unrecognized hostname")
+	switch hostname {		
+	case "pi":
+		output, err := command.CombinedOutput()
+		fmt.Printf("%s", output)
+		if err != nil {
+			os.Exit(1)
+		}
+	case "mac":
+		commandString := strings.Join(command.Env, " ") + " " + strings.Join(command.Args, " ")
+		commandString = "source ~/zshrc && cd/programming_projects/minicompiler && " + commandString 
+		remoteCmd := exec.Command("ssh", "pi", "-t", commandString) 
+		output, err := remoteCmd.CombinedOutput()
+		fmt.Println(string(output))
+		if err != nil {
+			os.Exit(1)
+		}
+	default:
 		os.Exit(1)
 	}
+}
+
+func doSyncing() {
+	fmt.Println("Syncing..")
+	onMac := amOnMac()
+	macDir := absPathMac(&onMac, "")
+	piDir := absPathPi(&onMac, "")
 	syncCmd := exec.Command("rsync", "-av", macDir, piDir)
 	fmt.Println(syncCmd)
 	output, err := syncCmd.CombinedOutput()
@@ -72,6 +83,40 @@ func doSyncing() {
 		log.Printf("rsync failed: %v\nOutput: %s", err, output)
 		os.Exit(1)
 	}
+}
+
+func amOnMac() (onMac bool) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		os.Exit(1)
+	}
+	switch hostname {
+	case "mac":
+		onMac = true	
+	case "pi":
+		onMac = false	
+	default:
+		fmt.Println("Unrecognized hostname")
+		os.Exit(1)
+	}
+	return
+}
+
+func absPathPi(fromMac *bool, path string) (piPath string) {
+	piPath = "/home/akos/programming_projects/minicompiler/" + path
+	if *fromMac {
+		piPath = "pir:" + piPath
+	}
+	return
+}
+	
+
+func absPathMac(fromMac *bool, path string) (macPath string) {
+	macPath = "/Users/akoskorosi/programming_projects/yum/minicompiler/" + path
+	if !*fromMac {
+		macPath = "mac:" + macPath
+	}
+	return
 }
 
 

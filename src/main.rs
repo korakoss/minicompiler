@@ -44,7 +44,7 @@ fn main() {
     fs::write(target_dir.join("lir.txt"), format!("{:#?}", lir)).unwrap();
 
     let assembly = LIRCompiler::compile(lir);
-    fs::write(target_dir.join("asm.txt"), assembly).unwrap();
+    fs::write(target_dir.join("asm.s"), assembly).unwrap();
 }
 
 
