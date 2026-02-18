@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"log"
 )
 
 
@@ -69,54 +68,6 @@ func executeCommandOnPi(command exec.Cmd) {
 	default:
 		os.Exit(1)
 	}
-}
-
-func doSyncing() {
-	fmt.Println("Syncing..")
-	onMac := amOnMac()
-	macDir := absPathMac(&onMac, "")
-	piDir := absPathPi(&onMac, "")
-	syncCmd := exec.Command("rsync", "-av", macDir, piDir)
-	fmt.Println(syncCmd)
-	output, err := syncCmd.CombinedOutput()
-	if err != nil {
-		log.Printf("rsync failed: %v\nOutput: %s", err, output)
-		os.Exit(1)
-	}
-}
-
-func amOnMac() (onMac bool) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		os.Exit(1)
-	}
-	switch hostname {
-	case "mac":
-		onMac = true	
-	case "pi":
-		onMac = false	
-	default:
-		fmt.Println("Unrecognized hostname")
-		os.Exit(1)
-	}
-	return
-}
-
-func absPathPi(fromMac *bool, path string) (piPath string) {
-	piPath = "/home/akos/programming_projects/minicompiler/" + path
-	if *fromMac {
-		piPath = "pir:" + piPath
-	}
-	return
-}
-	
-
-func absPathMac(fromMac *bool, path string) (macPath string) {
-	macPath = "/Users/akoskorosi/programming_projects/yum/minicompiler/" + path
-	if !*fromMac {
-		macPath = "mac:" + macPath
-	}
-	return
 }
 
 
