@@ -55,24 +55,12 @@ func makeCobraTestCmd() *cobra.Command {
         Run: func(cmd *cobra.Command, args []string) {
 			positiveTestCases := []string{"primetest", "nonparam_func", "long_ass_binop"}
 			for _, testName := range positiveTestCases {
-				targetDir := "tests/target" + testName
-				commands := []exec.Cmd{
-					*exec.Command("rm", "-rf", targetDir),
-					*exec.Command("mkdir", targetDir),
-				}
-				commands = append(commands, makeRunCmds("tests/src/" + testName + ".yum", targetDir)...)
-				output := executeCommandListOnPi(commands)
+				output := runYumProgram(testName, "tests/src/", "tests/target")
 				fmt.Println(output)
 			}
 			negativeTestCases := []string{"bad_branch"}
 			for _, testName := range negativeTestCases {
-				targetDir := "tests/target" + testName
-				commands := []exec.Cmd{
-					*exec.Command("rm", "-rf", targetDir),
-					*exec.Command("mkdir", targetDir),
-				}
-				commands = append(commands, makeRunCmds("tests/src/" + testName + ".yum", targetDir)...)
-				output := executeCommandListOnPi(commands)
+				output := runYumProgram(testName, "tests/src/", "tests/target")
 				fmt.Println(output)
 			}
         },
@@ -97,20 +85,6 @@ func runYumProgram(programName, srcRoot, targetRoot string) (stdOutput string) {
 		*exec.Command(exePath),
 	}
 	stdOutput = executeCommandListOnPi(cmdSequence)
-	return
-}
-
-func makeRunCmds (programSrcPath, programTargetDir string) (cmdSequence []exec.Cmd) {
-	assPath := programTargetDir + "/asm.s"
-	tempObjPath := programTargetDir + "/TEMP.o"
-	exPath := programTargetDir + "/exec"
-	cmdSequence = []exec.Cmd{
-		*exec.Command("RUST_BACKTRACE=1", "bin/yumc", programSrcPath, programTargetDir),
-		*exec.Command("as", "-o", tempObjPath, assPath),
-		*exec.Command("gcc", "-o", exPath, tempObjPath),
-		*exec.Command("rm", tempObjPath),
-		*exec.Command(exPath),
-	}
 	return
 }
 
