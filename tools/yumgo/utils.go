@@ -14,7 +14,8 @@ func executeCommandsOnPi(commands []exec.Cmd) {
 	if err != nil {
 		os.Exit(1)
 	}
-	if hostname == "pi" {
+	switch hostname {		
+	case "pi":
 		for _,cmd := range commands {
 			output, err := cmd.CombinedOutput()
 			fmt.Printf("%s", output)
@@ -22,7 +23,7 @@ func executeCommandsOnPi(commands []exec.Cmd) {
 				os.Exit(1)
 			}
 		}
-	} else if hostname == "mac" {
+	case "mac":
 		var cmdStrings []string	
 		cmdStrings = append(cmdStrings, "source ~/.zshrc")
 		cmdStrings = append(cmdStrings, "cd ~/programming_projects/minicompiler")
@@ -35,11 +36,11 @@ func executeCommandsOnPi(commands []exec.Cmd) {
 		bigCmdString := strings.Join(cmdStrings, " && ")
 		bigRemoteCmd := exec.Command("ssh", "pi", "-t", bigCmdString) 
 		output, err := bigRemoteCmd.CombinedOutput()
-		fmt.Printf("%s", output)
+		fmt.Println(output)
 		if err != nil {
 			os.Exit(1)
 		}
-	} else {
+	default:
 		os.Exit(1)
 	}
 }
@@ -51,12 +52,12 @@ func doSyncing() {
 	if err != nil {
 		os.Exit(1)
 	}
-	macPath := "/Users/akoskorosi/programming_projects/yum/minicompiler"
-	piPath := "/home/akos/programming_projects/minicompiler"
+	macPath := "/Users/akoskorosi/programming_projects/yum/minicompiler/"
+	piPath := "/home/akos/programming_projects/minicompiler/"
 	var macDir, piDir string
 	if hostname == "mac" {
 		macDir = macPath
-		piDir = "pi:" + piPath
+		piDir = "pir:" + piPath
 	} else if hostname == "pi" {
 		macDir = "mac:" + macPath
 		piDir = piPath
@@ -64,7 +65,8 @@ func doSyncing() {
 		fmt.Println("Unrecognized hostname")
 		os.Exit(1)
 	}
-	syncCmd := exec.Command("rsync", "-vv", "--exclude", "target", macDir, piDir)
+	syncCmd := exec.Command("rsync", "-av", macDir, piDir)
+	fmt.Println(syncCmd)
 	output, err := syncCmd.CombinedOutput()
 	if err != nil {
 		log.Printf("rsync failed: %v\nOutput: %s", err, output)
@@ -76,12 +78,12 @@ func doSyncing() {
 func makeRunCmds (programSrcPath, programTargetDir string) (cmdSequence []exec.Cmd) {
 	// TODO: Make the corresponding API changes in Rust main	
 
-	assPath := programTargetDir + "/assembly.s"
+	assPath := programTargetDir + "/asm.s"
 	tempObjPath := programTargetDir + "/TEMP.o"
 	exPath := programTargetDir + "/exec"
 
 	cmdSequence = []exec.Cmd{
-		*exec.Command("RUST_BACKTRACE=1", "target/debug/minicompiler", programSrcPath, programTargetDir),
+		*exec.Command("RUST_BACKTRACE=1", "bin/yumc", programSrcPath, programTargetDir),
 		*exec.Command("as", "-o", tempObjPath, assPath),
 		*exec.Command("gcc", "-o", exPath, tempObjPath),
 		*exec.Command("rm", tempObjPath),
