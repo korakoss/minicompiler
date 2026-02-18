@@ -20,7 +20,6 @@ func main() {
 				output, err := exec.Command("ssh", "pi", "zsh -l -c 'cd /home/akos/programming_projects/minicompiler && source /home/akos/.cargo/env && cargo build'").CombinedOutput()
 				println(string(output))
 				if err != nil {
-					println(err)
 					os.Exit(1)
 				}
 			}
@@ -60,7 +59,6 @@ func makeCobraTestCmd() *cobra.Command {
         Args:  cobra.NoArgs,
         Run: func(cmd *cobra.Command, args []string) {
 			// TODO: keeping the colored prints would be cool
-				
 			positiveTestCases := []string{"primetest", "nonparam_func", "long_ass_binop"}
 			for _, testName := range positiveTestCases {
 				targetDir := "tests/target" + testName
@@ -100,7 +98,6 @@ func executeCommandListOnPi(commands []exec.Cmd) (cmdOutput string){
 	if err != nil {
 		os.Exit(1)
 	}
-	fmt.Println(cmdStrings)
 	switch hostname {		
 	case "pi":
 		bigRemoteCmd := exec.Command("sh", "-c", strings.Join(cmdStrings, " && "))
