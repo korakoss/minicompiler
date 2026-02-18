@@ -8,7 +8,8 @@ import (
 	"strings"
 )
 
-
+// TODO: using some lib for path handling
+// TODO: colored prints
 // TODO: verbose flag
 func main() {
     var noBuild bool
@@ -41,13 +42,7 @@ func makeCobraRunCmd() *cobra.Command {
         Args:  cobra.ExactArgs(1),
         Run: func(cmd *cobra.Command, args []string) {
 			programName := args[0]
-			programTargetDir := "yum/target/" + programName 
-			commands := []exec.Cmd{
-				*exec.Command("rm", "-rf", programTargetDir),
-				*exec.Command("mkdir", programTargetDir),
-			}
-			commands = append(commands, makeRunCmds("yum/src/" + programName + ".yum", programTargetDir)...)
-			output := executeCommandListOnPi(commands)
+			output := runYumProgram(programName, "yum/src/", "yum/target")
 			fmt.Println(output)
         },
     }
@@ -58,7 +53,6 @@ func makeCobraTestCmd() *cobra.Command {
         Use:   "test",
         Args:  cobra.NoArgs,
         Run: func(cmd *cobra.Command, args []string) {
-			// TODO: keeping the colored prints would be cool
 			positiveTestCases := []string{"primetest", "nonparam_func", "long_ass_binop"}
 			for _, testName := range positiveTestCases {
 				targetDir := "tests/target" + testName
@@ -85,6 +79,40 @@ func makeCobraTestCmd() *cobra.Command {
     }
 }
 
+func runYumProgram(programName, srcRoot, targetRoot string) (stdOutput string) {
+	sourcePath := srcRoot + programName + ".yum"
+	targetDir := targetRoot + programName
+
+	asmPath := targetDir + "/asm.s"
+	objPath := targetDir + "/TEMP.o"
+	exePath := targetDir + "/exec"
+
+	cmdSequence := []exec.Cmd {
+		*exec.Command("rm", "-rf", targetDir),
+		*exec.Command("mkdir", targetDir),
+		*exec.Command("RUST_BACKTRACE=1", "bin/yumc", sourcePath, targetDir),	// TODO: backtrace=1 should be dropped
+		*exec.Command("as", "-o", objPath, asmPath),
+		*exec.Command("gcc", "-o", exePath, objPath),
+		*exec.Command("rm", objPath),	// TODO: could be removed from here
+		*exec.Command(exePath),
+	}
+	stdOutput = executeCommandListOnPi(cmdSequence)
+	return
+}
+
+func makeRunCmds (programSrcPath, programTargetDir string) (cmdSequence []exec.Cmd) {
+	assPath := programTargetDir + "/asm.s"
+	tempObjPath := programTargetDir + "/TEMP.o"
+	exPath := programTargetDir + "/exec"
+	cmdSequence = []exec.Cmd{
+		*exec.Command("RUST_BACKTRACE=1", "bin/yumc", programSrcPath, programTargetDir),
+		*exec.Command("as", "-o", tempObjPath, assPath),
+		*exec.Command("gcc", "-o", exPath, tempObjPath),
+		*exec.Command("rm", tempObjPath),
+		*exec.Command(exPath),
+	}
+	return
+}
 
 func executeCommandListOnPi(commands []exec.Cmd) (cmdOutput string){
 	var cmdStrings []string	
@@ -121,17 +149,5 @@ func executeCommandListOnPi(commands []exec.Cmd) (cmdOutput string){
 	return
 }
 
-func makeRunCmds (programSrcPath, programTargetDir string) (cmdSequence []exec.Cmd) {
-	assPath := programTargetDir + "/asm.s"
-	tempObjPath := programTargetDir + "/TEMP.o"
-	exPath := programTargetDir + "/exec"
-	cmdSequence = []exec.Cmd{
-		*exec.Command("RUST_BACKTRACE=1", "bin/yumc", programSrcPath, programTargetDir),
-		*exec.Command("as", "-o", tempObjPath, assPath),
-		*exec.Command("gcc", "-o", exPath, tempObjPath),
-		*exec.Command("rm", tempObjPath),
-		*exec.Command(exPath),
-	}
-	return
-}
+
 
