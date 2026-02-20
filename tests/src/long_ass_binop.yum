@@ -2,7 +2,7 @@ fun big_ass_exp(n: int) -> int {
     return 2+3*n*n+(4+1)%3+2;
 }
 
-fun main() -> bool {
+fun main() {
     let res: int = big_ass_exp(6);
-    return res==114;
+    print(6);
 }

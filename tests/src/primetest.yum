@@ -18,6 +18,10 @@ fun is_prime(n: int) -> bool  {
 	return true;
 }
 
-fun main() -> bool {
-    return is_prime(42)==false;
+fun main() -> int {
+    if is_prime(42) == false {
+        return 0;
+    } else {
+        return 1;
+    }
 }

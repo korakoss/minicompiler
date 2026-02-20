@@ -194,7 +194,7 @@ impl HIRBuilder {
             ASTStatement::Return(expr) => {
                 let hir_expr = self.lower_expression(scope_context, expr);
                 if hir_expr.typ != scope_context.ambient_func.2.clone() {
-                    panic!("Return statement has unexpected type");
+                    panic!("Expected return type {:?}, found expression with type {:?}", scope_context.ambient_func.2, hir_expr.typ);
                 }
                 HIRStatement::Return(Some(hir_expr))
             }

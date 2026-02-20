@@ -55,13 +55,13 @@ func makeCobraTestCmd() *cobra.Command {
         Run: func(cmd *cobra.Command, args []string) {
 			positiveTestCases := []string{"primetest", "nonparam_func", "long_ass_binop"}
 			for _, testName := range positiveTestCases {
-				output := runYumProgram(testName, "tests/src/", "tests/target")
-				fmt.Println(output)
+				output := runYumProgram(testName, "tests/src/", "tests/target/")
+				fmt.Println(string(output))
 			}
-			negativeTestCases := []string{"bad_branch"}
+			negativeTestCases := []string{"badbranch"}
 			for _, testName := range negativeTestCases {
-				output := runYumProgram(testName, "tests/src/", "tests/target")
-				fmt.Println(output)
+				output := runYumProgram(testName, "tests/src/", "tests/target/")
+				fmt.Println(string(output))
 			}
         },
     }
