@@ -2,6 +2,10 @@ fun nonp() -> int {
     return 42;
 }
 
-fun main() -> bool {
-    return nonp()==42;
+fun main() -> int {
+    if nonp() == 42 {
+        return 0;
+    } else {
+        return 1;
+    }
 }

@@ -87,6 +87,24 @@ func runYumProgram(programName, srcRoot, targetRoot string) (stdOutput string) {
 	return
 }
 
+
+func localizeCommandSeqToMachine(cmdStrings []string) (localizedCmd *exec.Cmd) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		os.Exit(1)
+	}
+	switch hostname {
+	case "pi":
+		localizedCmd = exec.Command("sh", "-c", strings.Join(cmdStrings, " && "))
+	case "mac":
+		piCmdString := "zsh -l -c \"" + strings.Join(cmdStrings, " && ") + "\""
+		localizedCmd = exec.Command("ssh", "pi", piCmdString)
+	default:
+		os.Exit(1)
+	}
+	return
+}
+
 func executeCommandListOnPi(commands []exec.Cmd) (cmdOutput string){
 	var cmdStrings []string	
 	for _, cmd := range commands {
@@ -94,7 +112,6 @@ func executeCommandListOnPi(commands []exec.Cmd) (cmdOutput string){
 		cmdStrings = append(cmdStrings, cmdString)
 	}
 	cmdStrings = append([]string{"cd /home/akos/programming_projects/minicompiler"}, cmdStrings...)
-	//cmdStrings = append([]string{"pwd"}, cmdStrings...)
 	hostname, err := os.Hostname()
 	if err != nil {
 		os.Exit(1)
@@ -102,21 +119,28 @@ func executeCommandListOnPi(commands []exec.Cmd) (cmdOutput string){
 	switch hostname {		
 	case "pi":
 		bigRemoteCmd := exec.Command("sh", "-c", strings.Join(cmdStrings, " && "))
-		output, err := bigRemoteCmd.CombinedOutput()
-		fmt.Println(string(output))
+		err := bigRemoteCmd.Run()
+		
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitCode := exitErr.ExitCode()
+				println(exitCode)
+			} else {
+				os.Exit(1)
+			}
 		}
 	case "mac":
 		remoteCmdString := "zsh -l -c \"" + strings.Join(cmdStrings, " && ") + "\""
 		bigRemoteCmd := exec.Command("ssh", "pi", remoteCmdString)
-		fmt.Println(bigRemoteCmd)
-		output, err := bigRemoteCmd.CombinedOutput()
-		cmdOutput = string(output)
+		err := bigRemoteCmd.Run()
+
 		if err != nil {
-			fmt.Printf("Execution error: %e", err)
-			//os.Exit(1)
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitCode := exitErr.ExitCode()
+				println(exitCode)
+			} else {
+				os.Exit(1)
+			}
 		}
 	default:
 		os.Exit(1)
