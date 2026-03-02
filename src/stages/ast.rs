@@ -18,7 +18,7 @@ pub struct ASTProgram {
 pub struct ASTFunction {
     pub name: String,
     pub typvars: Vec<TypevarId>,
-    pub args: HashMap<String, GenericType>,    // TODO: Does this lose argument order?
+    pub args: Vec<(String, GenericType)>,    // TODO: Does this lose argument order?
     pub body: Vec<ASTStatement>,
     pub ret_type: GenericType,
 }
@@ -29,7 +29,10 @@ impl ASTFunction {
         GenericFuncSignature { 
             name: self.name.clone(), 
             typevars: self.typvars.clone(),
-            argtypes: self.args.values().cloned().collect()
+            argtypes: self.args
+                .iter()
+                .map(|(_, typ)| typ.clone())
+                .collect()
         }
     }
 }

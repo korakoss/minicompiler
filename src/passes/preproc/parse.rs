@@ -88,23 +88,23 @@ impl Parser {
         let type_vars = self.collect_type_vars();
 
         self.expect_unparametric_token(Token::LeftParen);
-        let args:HashMap<String, GenericType> = match *self.tokens.peek().unwrap() {
+        let args: Vec<(String, GenericType)> = match *self.tokens.peek().unwrap() {
             Token::RightParen => {
-                HashMap::new()
+                Vec::new()
             }
             Token::Identifier(_) => {
                 let name1 = self.expect_identifier();
                 self.expect_unparametric_token(Token::Colon);
                 let typ1 = self.expect_generic_type_annotation(&type_vars);
-                let mut args = HashMap::new();
-                args.insert(name1, typ1);
+                let mut args = Vec::new();
+                args.push((name1, typ1));
 
                 while self.tokens.peek().unwrap() == &Token::Comma {
                     self.tokens.next();
                     let arg_name = self.expect_identifier();
                     self.expect_unparametric_token(Token::Colon);
                     let arg_type = self.expect_generic_type_annotation(&type_vars);
-                    args.insert(arg_name, arg_type);
+                    args.push((arg_name, arg_type));
                 }
                 args
             }
