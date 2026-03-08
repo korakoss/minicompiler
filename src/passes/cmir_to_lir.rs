@@ -13,8 +13,8 @@ use crate::{
 };
 
 
-struct LayoutTable {
-    layouts: HashMap<(NewtypeId, Vec<ConcreteType>), ChunkLayout>,
+pub struct LayoutTable {
+    pub layouts: HashMap<(NewtypeId, Vec<ConcreteType>), ChunkLayout>,
 }
 
 impl LayoutTable {
@@ -57,7 +57,7 @@ impl LayoutTable {
 
 #[derive(Clone, Debug)]
 pub struct ChunkLayout {
-    size: usize,                        // NOTE: maybe align etc here too
+    pub size: usize,                        // NOTE: maybe align etc here too
     typ: ConcreteType,
     kind: LayoutKind,
 }
@@ -117,11 +117,7 @@ impl LIRBuilder {
                 .map(|(id, block)| (id, self.lower_block(block)))
                 .collect(),
             entry: func.entry,
-            chunks: self.chunk_table
-                .clone()
-                .into_iter()
-                .map(|(id, ch_lay)| (id, ch_lay.size))
-                .collect(),
+            chunks: StackFrame::from_layouts(&self.chunk_table),
             args: func.args
                 .into_iter()
                 .map(|id| self.cell_chunk_map[&id])

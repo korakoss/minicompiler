@@ -1,28 +1,5 @@
-use std::collections::HashMap;
-
 use crate::stages::lir::*;
 use crate::shared::definitions::{BinaryOperator, BlockId, CellId, FuncId, Id};
-
-#[derive(Debug, Clone)]
-struct StackFrame {
-    size: usize,
-    offsets: HashMap<CellId, usize>,
-}
-
-impl StackFrame {
-    fn make(chunks: HashMap<CellId, usize>) -> StackFrame {
-        let mut offsets: HashMap<CellId, usize> = HashMap::new();
-        let mut curr_offset = 8;
-        for (id, chunk_size) in chunks {
-            offsets.insert(id, curr_offset);
-            curr_offset += chunk_size; 
-        }
-        StackFrame {
-            size: curr_offset,
-            offsets,
-        }
-    }
-}
 
 
 pub struct LIRCompiler {
@@ -73,27 +50,28 @@ impl LIRCompiler {
     fn compile_function(&mut self, func_id: FuncId,lir_func: LIRFunction) {
 
         let LIRFunction { blocks, entry, chunks, args } = lir_func;
-        let frame = StackFrame::make(chunks);
+
+        let frame_size = chunks.size();
         
         self.emit(&format!("func_{}:", func_id.raw()));
         self.emit("    push {fp, lr}");     
         self.emit("    mov fp, sp");     
-        self.emit(&format!("    sub sp, sp, #{}", frame.size)); 
+        self.emit(&format!("    sub sp, sp, #{}", frame_size)); 
 
         for (i,arg) in args.iter().enumerate() {
-            let arg_offset = frame.offsets[arg];
+            let arg_offset = chunks.get_offset(arg).unwrap();
             self.emit(&format!("    str r{}, [fp, #-{}]", i+1, arg_offset));
 }
 
         self.emit(&format!("    b block_{}", entry.raw()));
 
         for (id, block) in blocks.into_iter() {
-            self.compile_block(id, block, &frame, func_id);
+            self.compile_block(id, block, &chunks, func_id);
         }
 
         self.emit(&format!("ret_{}:", func_id.raw()));        
         self.emit("    str r0, [r12]");
-        self.emit(&format!("    add sp, sp, #{}", frame.size));         
+        self.emit(&format!("    add sp, sp, #{}", frame_size));         
         self.emit("    pop {fp, lr}");
         self.emit("    bx lr");
 
@@ -139,16 +117,16 @@ impl LIRCompiler {
                 self.emit("    push {r12}"); 
                 match dest.place {
                     LIRPlaceKind::Local { base, offset } => {
-                        let base_offset = frame.offsets
-                            .get(&base)
-                            .unwrap_or_else(|| panic!("Cell ID {:?} not found in table \n \n {:?}", base, frame.offsets));
+                        let base_offset = frame.get_offset(&base)
+                            .unwrap_or_else(|| panic!("Cell ID {:?} not found in frame", base));
                         let target_offset = base_offset + offset;
                         self.emit(&format!("    sub r12, fp, #{}", target_offset));
                         self.emit(&format!("    bl func_{}", func.raw()));
                     }
                     LIRPlaceKind::Deref { pointer, offset } => {
-                        let pointer_st_offset = frame.offsets[&pointer];
-                        self.emit(&format!("    ldr r0, [fp, #-{}]", pointer_st_offset));  
+                        let pointer_offset = frame.get_offset(&pointer)
+                            .unwrap_or_else(|| panic!("Cell ID {:?} not found in frame", pointer));
+                        self.emit(&format!("    ldr r0, [fp, #-{}]", pointer_offset));  
                         self.emit(&format!("    ldr r0, [r0, #-{}]", offset));  
                         self.emit(&format!("    bl func_{}", func.raw()));                       
                     }
@@ -222,12 +200,15 @@ impl LIRCompiler {
             LIRValueKind::Place(place) => {
                 match place.place {
                     LIRPlaceKind::Local { base, offset } => {
-                        let place_offset = frame.offsets[&base] + offset;
+                        let base_offset = frame.get_offset(&base)
+                           .unwrap_or_else(|| panic!("Cell ID {:?} not found in frame", base));
+                        let place_offset = base_offset + offset;
                         self.emit(&format!("    ldr r0, [fp, #-{}]", place_offset));
                     }
                     LIRPlaceKind::Deref { pointer, offset } => {
-                        let pointer_st_offs = frame.offsets[&pointer];
-                        self.emit(&format!("    ldr r0, [fp, #-{}]", pointer_st_offs));  
+                        let pointer_offset = frame.get_offset(&pointer)
+                            .unwrap_or_else(|| panic!("Cell ID {:?} not found in frame", pointer));
+                        self.emit(&format!("    ldr r0, [fp, #-{}]", pointer_offset));  
                         self.emit(&format!("    ldr r0, [r0, #-{}]", offset));  
                     }
                 }
@@ -244,7 +225,9 @@ impl LIRCompiler {
             LIRValueKind::Reference(refd) => {
                 match refd.place {
                     LIRPlaceKind::Local { base, offset } => {
-                        let place_offset = frame.offsets[&base] + offset;
+                        let base_offset = frame.get_offset(&base)
+                            .unwrap_or_else(|| panic!("Unsuccessful offset lookup for cell ID {:?}", base));
+                        let place_offset = base_offset + offset;
                         self.emit(&format!("    sub r0, fp, #{}", place_offset));  
                     }
                     LIRPlaceKind::Deref {..} => {
@@ -258,15 +241,15 @@ impl LIRCompiler {
     fn emit_place_store(&mut self, place: LIRPlace, frame: &StackFrame) {
         match place.place {
             LIRPlaceKind::Local { base, offset } => {
-                let base_offset = frame.offsets
-                    .get(&base)
-                    .unwrap_or_else(|| panic!("Unsuccessful offset lookup for cell ID {:?}. \n Offset table: \n {:?}", base, frame.offsets));
+                let base_offset = frame.get_offset(&base)
+                    .unwrap_or_else(|| panic!("Unsuccessful offset lookup for cell ID {:?}", base));
                 let place_offset = base_offset + offset;
                 self.emit(&format!("    str r0, [fp, #-{}]", place_offset));
             }
             LIRPlaceKind::Deref { pointer, offset } => {
                 // TODO: this fails for >8B values probably
-                let pointer_st_offs = frame.offsets[&pointer];
+                let pointer_st_offs = frame.get_offset(&pointer)
+                    .unwrap_or_else(|| panic!("Unsuccessful offset lookup for cell ID {:?}", pointer));
                 self.emit(&format!("    ldr r1, [fp, #-{}]", pointer_st_offs));  
                 self.emit(&format!("    str r0, [r1, #-{}]", offset));  
             }
