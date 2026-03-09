@@ -1,5 +1,5 @@
 use crate::stages::lir::*;
-use crate::shared::definitions::{BinaryOperator, BlockId, CellId, FuncId, Id};
+use crate::shared::definitions::{BinaryOperator, BlockId, FuncId, Id};
 
 
 pub struct LIRCompiler {
@@ -17,30 +17,31 @@ impl LIRCompiler {
 
 
     fn compile_program(&mut self, program: LIRProgram) -> String {
-
-        self.emit(".global main");
-        self.emit(".extern printf");
-        self.emit(".align 8");
-        self.emit(".data");
-        self.emit(r#"fmt: .asciz "%d\n""#);
-        self.emit(".text");
-        
+        self.emit_mult(&vec![
+            ".global main",
+            ".extern printf",
+            ".align 8",
+            ".data",
+            r#"fmt: .asciz "%d\n""#,
+            ".text",
+        ]);
+                
         for (f_id, func) in program.functions.into_iter() {
             self.compile_function(f_id, func);
         }
-        
-        self.emit("main:");
-        self.emit("    push {fp, lr}");
 
-        self.emit("    mov fp, sp");     
-        self.emit("    sub sp, sp, #16"); 
-        self.emit("    sub r12, fp, #8");
-        self.emit(&format!("    bl func_{}", program.entry.raw()));
-        self.emit("    ldr r0, [r12]");
-        self.emit("    add sp, sp, #16"); 
-        self.emit("    pop {fp, lr}");
-        self.emit("    bx lr");
-
+        self.emit_mult(&vec![
+            "main:",
+            "    push {fp, lr}",
+            "    mov fp, sp",  
+            "    sub sp, sp, #16",
+            "    sub r12, fp, #8",
+            &format!("    bl func_{}", program.entry.raw()),
+            "    ldr r0, [r12]",
+            "    add sp, sp, #16",
+            "    pop {fp, lr}",
+            "    bx lr",
+        ]);
         self.output.clone()
 
        
@@ -158,19 +159,25 @@ impl LIRCompiler {
                 self.emit("    mul r0, r1, r0");   
             }
             BinaryOperator::Equals => {
-                self.emit("    cmp r1, r0");
-                self.emit("    mov r0, #0");
-                self.emit("    moveq r0, #1");
+                self.emit_mult(&vec![
+                    "    cmp r1, r0",
+                    "    mov r0, #0",
+                    "    moveq r0, #1",
+                ]);
             }
             BinaryOperator::Less=> {
-                self.emit("    cmp r1, r0");
-                self.emit("    mov r0, #0");
-                self.emit("    movlt r0, #1");
+                self.emit_mult(&vec![
+                    "    cmp r1, r0",
+                    "    mov r0, #0",
+                    "    movlt r0, #1",
+                ]);
             }
             BinaryOperator::Modulo => {
-                self.emit("    sdiv r2, r1, r0"); 
-                self.emit("    mul r2, r0, r2"); 
-                self.emit("    sub r0, r1, r2");
+                self.emit_mult(&vec![
+                    "    sdiv r2, r1, r0",
+                    "    mul r2, r0, r2",
+                    "    sub r0, r1, r2",
+                ]);
             }
         }
     }
@@ -261,7 +268,11 @@ impl LIRCompiler {
         self.output.push('\n');
     }
 
-
+    fn emit_mult(&mut self, lines: &[&str]) {
+        for line in lines {
+            self.emit(line);
+        }
+    }
 }
 
 
