@@ -157,12 +157,11 @@ impl LIRBuilder {
                 let mut arg_places: Vec<LIRPlace> = Vec::new();
                 let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();
                 for arg in args {
-                    let arg_place = LIRPlace {
-                        size: self.layout_table.get_layout(&arg.typ).size,
-                        place: LIRPlaceKind::Local { 
-                            base: self.add_temp_chunk(&arg.typ),
-                            offset: 0, 
-                        }
+                    let size = self.layout_table.get_layout(&arg.typ).size;
+                    let arg_place = LIRPlace::Local { 
+                        size,
+                        base: self.add_temp_chunk(&arg.typ),
+                        offset: 0, 
                     };
                     arg_places.push(arg_place.clone());
                     arg_stmts_coll.extend(self
@@ -214,29 +213,30 @@ impl LIRBuilder {
         match value.value {
             CMIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                (LIRValue {size, value: LIRValueKind::Place(lir_val_place)}, Vec::new())
+                (LIRValue::Place(lir_val_place), Vec::new())
             },
             CMIRValueKind::IntLiteral(num) => {
-                (LIRValue {size, value: LIRValueKind::IntLiteral(num)}, Vec::new())
+                (LIRValue::IntLiteral(num), Vec::new())
             },
             CMIRValueKind::BoolTrue => {
-                (LIRValue {size, value: LIRValueKind::BoolTrue}, Vec::new())
+                (LIRValue::BoolTrue, Vec::new())
             }
             CMIRValueKind::BoolFalse => {
-                (LIRValue {size, value: LIRValueKind::BoolFalse}, Vec::new())
+                (LIRValue::BoolFalse, Vec::new())
             }
             CMIRValueKind::StructLiteral {..} => {
                 let temp_chunk_id = self.add_temp_chunk(&value.typ);
-                let temp_place = LIRPlace {
+                let temp_place = LIRPlace::Local { 
                     size,
-                    place: LIRPlaceKind::Local { base: temp_chunk_id, offset: 0}
+                    base: temp_chunk_id, 
+                    offset: 0
                 };
                 let stmts = self.lower_value_into_place(value, temp_place.clone());
-                (LIRValue{ size, value: LIRValueKind::Place(temp_place)}, stmts)
+                (LIRValue::Place(temp_place), stmts)
             }
             CMIRValueKind::Reference(refd) => {
                 let refd_place = self.lower_place(refd);
-                (LIRValue {size, value: LIRValueKind::Reference(refd_place)}, vec![]) 
+                (LIRValue::Reference(refd_place), vec![]) 
             }
         }
     }
@@ -258,39 +258,27 @@ impl LIRBuilder {
         match value.value {
             CMIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
-                vec![LIRStatement::Store{
+                vec![LIRStatement::Store {
                     dest: target, 
-                    value: LIRValue { 
-                        size: layout.size, 
-                        value: LIRValueKind::Place(lir_val_place)
-                    }
-                }] 
+                    value: LIRValue::Place(lir_val_place),
+                }]
             },
             CMIRValueKind::IntLiteral(num) => {
-                vec![LIRStatement::Store{
+                vec![LIRStatement::Store {
                     dest: target, 
-                    value: LIRValue{ 
-                        size: layout.size, 
-                        value: LIRValueKind::IntLiteral(num)
-                    }
+                    value: LIRValue::IntLiteral(num),
                 }]
             },
             CMIRValueKind::BoolTrue => {
-                vec![LIRStatement::Store{
+                vec![LIRStatement::Store {
                     dest: target, 
-                    value: LIRValue { 
-                        size: layout.size, 
-                        value: LIRValueKind::BoolTrue
-                    }
+                    value: LIRValue::BoolTrue,
                 }]
             }
             CMIRValueKind::BoolFalse => {
-                vec![LIRStatement::Store{
+                vec![LIRStatement::Store {
                     dest: target, 
-                    value: LIRValue { 
-                        size: layout.size, 
-                        value: LIRValueKind::BoolFalse
-                    }
+                    value: LIRValue::BoolFalse,
                 }]
             }
             CMIRValueKind::StructLiteral { fields } => {
@@ -300,11 +288,8 @@ impl LIRBuilder {
                     unreachable!();
                 };
                 for (fname, ftyp) in type_fields {
+                    let f_target = target.increment_offset(curr_field_offset);
                     let fsize = self.layout_table.get_layout(&ftyp).size;
-                    let f_target = LIRPlace {
-                        size: fsize,
-                        place: target.increment_offset(curr_field_offset),
-                    };
                     curr_field_offset += fsize;
                     stmts.extend(self.lower_value_into_place(fields[&fname].clone(), f_target));
                 }
@@ -314,10 +299,7 @@ impl LIRBuilder {
                 let refd_place = self.lower_place(refd);
                 let stmt = LIRStatement::Store { 
                     dest: target, 
-                    value: LIRValue { 
-                        size: layout.size, 
-                        value: LIRValueKind::Reference(refd_place)
-                    }
+                    value: LIRValue::Reference(refd_place),
                 }; 
                 vec![stmt]
             }
@@ -326,23 +308,20 @@ impl LIRBuilder {
 
 
     fn lower_place(&mut self, place: CMIRPlace) -> LIRPlace {
-        let kind = match place.base {
+        match place.base {
             CMIRPlaceBase::Cell(cell_id) => {
                 let chunk_id = self.cell_chunk_map[&cell_id];
                 let base_type = self.chunk_table[&chunk_id].typ.clone();
                 let offset = self.lower_field_access_chain(&base_type, &place.fieldchain);
-                LIRPlaceKind::Local { base: chunk_id, offset}
+                let size = self.layout_table.get_layout(&place.typ).size; 
+                LIRPlace::Local { size, base: chunk_id, offset}
             },
             CMIRPlaceBase::Deref(ref_id) => {
                 let ref_type = self.chunk_table[&self.cell_chunk_map[&ref_id]].typ.clone();
                 let ConcreteType::Reference(typ) = ref_type else {unreachable!()};
                 let offset = self.lower_field_access_chain(&typ, &place.fieldchain);
-                LIRPlaceKind::Deref { pointer: ref_id, offset}
+                LIRPlace::Deref { pointer: ref_id, offset}
             }
-        };
-        LIRPlace { 
-            size: self.layout_table.get_layout(&place.typ).size, 
-            place: kind, 
         }
     } 
 
@@ -368,14 +347,3 @@ impl LIRBuilder {
     }
 }
 
-
-
-impl LIRPlace {
-
-    fn increment_offset(&self, increment: usize) -> LIRPlaceKind {
-        match self.place {
-            LIRPlaceKind::Local { base, offset } => LIRPlaceKind::Local { base, offset: offset + increment },
-            LIRPlaceKind::Deref { pointer, offset } => LIRPlaceKind::Deref { pointer, offset: offset + increment},
-        }
-    }
-}

@@ -1,7 +1,7 @@
 use std::{collections::HashMap};
 
 use crate::shared::definitions::{BinaryOperator, BlockId, FuncId, CellId};
-use crate::passes::cmir_to_lir::{LayoutTable, ChunkLayout};
+use crate::passes::cmir_to_lir::ChunkLayout;
 
 #[derive(Clone, Debug)]
 pub struct LIRProgram {
@@ -93,14 +93,7 @@ pub enum LIRTerminator {
 
 
 #[derive(Clone, Debug)]
-pub struct LIRValue {
-    pub size: usize,
-    pub value: LIRValueKind,
-}
-
-
-#[derive(Clone, Debug)]
-pub enum LIRValueKind {
+pub enum LIRValue {
     Place(LIRPlace), 
     IntLiteral(i32),
     BoolTrue,
@@ -108,15 +101,11 @@ pub enum LIRValueKind {
     Reference(LIRPlace),
 }
 
-#[derive(Clone, Debug)]
-pub struct LIRPlace {
-    pub size: usize,
-    pub place: LIRPlaceKind
-}
 
 #[derive(Clone, Debug)]
-pub enum LIRPlaceKind {
+pub enum LIRPlace {
     Local {
+        size: usize,        // TODO: actually make use of this rather than having the stack frame represent it
         base: CellId,
         offset: usize,
     },
@@ -126,4 +115,19 @@ pub enum LIRPlaceKind {
     }
 }
 
+impl LIRPlace {
+    pub fn increment_offset(&self, increment: usize) -> Self {
+        match self {
+            LIRPlace::Local { size, base, offset } => Self::Local {
+                size: *size,
+                base: *base,
+                offset: offset + increment,
+            },
+            LIRPlace::Deref { pointer, offset } => Self::Deref { 
+                pointer: *pointer, 
+                offset: offset + increment 
+            }
+        }
+    }
+}
 
