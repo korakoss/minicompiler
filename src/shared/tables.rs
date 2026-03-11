@@ -1,4 +1,4 @@
-use std::{collections::{BTreeMap, HashMap}, hash::Hash};
+use std::{collections::{BTreeMap, HashMap, HashSet}, hash::Hash};
 
 use crate::shared::typing::*;
 use crate::shared::definitions::{IdFactory, NewtypeId, TypevarId};
@@ -128,3 +128,58 @@ pub enum NewtypeShape<T>{
     },
 }
 
+
+
+pub struct LayoutTable {
+    pub layouts: HashMap<(NewtypeId, Vec<ConcreteType>), ChunkLayout>,
+}
+
+impl LayoutTable {
+
+    pub fn make(typetable: GenericTypetable ,concrete_newtypes: HashSet<(NewtypeId, Vec<ConcreteType>)>) -> Self {
+        let mut table = Self { layouts: HashMap::new() };
+        let mut concrete_newtypes = concrete_newtypes
+            .into_iter()
+            .collect::<Vec<_>>();
+        concrete_newtypes.sort_by_key(|(id, typ)| typetable.get_genericity_rank(&ConcreteType::NewType(*id, typ.clone())));
+        for (id, tparams) in concrete_newtypes {
+            let type_shape = typetable.monomorphize(id, tparams.clone());
+            let type_layout = match type_shape {
+                ConcreteShape::Struct { fields } => {
+                    let fields: Vec<(String, ConcreteType)> = fields.into_iter().collect();
+                    ChunkLayout {
+                        size: fields.iter().map(|(_ ,ftyp)| table.get_layout(ftyp).size).sum(),
+                        typ: ConcreteType::NewType(id, tparams.clone()),
+                        kind: LayoutKind::Struct(fields),
+                    }
+                },
+                ConcreteShape::Enum {..} => {
+                    unimplemented!();
+                },
+            };
+            table.layouts.insert((id, tparams), type_layout);
+        }
+        table
+    }
+
+    pub fn get_layout(&self, typ: &ConcreteType) -> ChunkLayout {
+        match typ {
+            ConcreteType::Prim(..) => ChunkLayout { size: 8, typ: typ.clone(), kind: LayoutKind::Atomic },
+            ConcreteType::Reference(..) => ChunkLayout { size: 8, typ: typ.clone(), kind: LayoutKind::Atomic },
+            ConcreteType::NewType(id, tparams) => self.layouts[&(*id, tparams.clone())].clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ChunkLayout {
+    pub size: usize,                        // NOTE: maybe align etc here too
+    pub typ: ConcreteType,
+    pub kind: LayoutKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum LayoutKind {
+    Atomic,                                 // primitives, pointers -- no internal structure basically
+    Struct(Vec<(String, ConcreteType)>),    // it's been given a fixed order
+}

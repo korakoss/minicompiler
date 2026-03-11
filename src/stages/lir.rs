@@ -1,7 +1,9 @@
 use std::{collections::HashMap};
 
-use crate::shared::definitions::{BinaryOperator, BlockId, FuncId, CellId};
-use crate::passes::cmir_to_lir::ChunkLayout;
+use crate::shared::{
+    definitions::{BinaryOperator, BlockId, FuncId, CellId},
+    tables::ChunkLayout,
+};
 
 #[derive(Clone, Debug)]
 pub struct LIRProgram {
@@ -16,38 +18,6 @@ pub struct LIRFunction {
     pub chunks: StackFrame,     // TODO: rename to "frame"?
     pub args: Vec<CellId>
 }
-
-
-#[derive(Clone, Debug)]
-pub struct StackFrame {
-    chunk_sizes: Vec<(CellId, usize)>,
-}
-
-impl StackFrame {
-
-    pub fn from_layouts(layouts: &HashMap<CellId, ChunkLayout>) -> Self {
-        Self {
-            chunk_sizes: layouts.iter().map(|(id, layout)| (*id, layout.size)).collect()
-        }
-    }
-    
-    pub fn size(&self) -> usize {
-        self.chunk_sizes.iter().map(|(_, size)| size).sum()
-    }
-    
-    pub fn get_offset(&self, chunk: &CellId) -> Option<usize> {
-        let mut offset_acc = 8;
-        for (id, size) in self.chunk_sizes.iter() {
-            if chunk == id {
-                return Some(offset_acc);
-            }
-            offset_acc += size;
-        }
-        None
-    }
-}
-
-
 
 #[derive(Clone, Debug)]
 pub struct LIRBlock {
@@ -105,7 +75,6 @@ pub enum LIRValue {
 #[derive(Clone, Debug)]
 pub enum LIRPlace {
     Local {
-        size: usize,        // TODO: actually make use of this rather than having the stack frame represent it
         base: CellId,
         offset: usize,
     },
@@ -118,8 +87,7 @@ pub enum LIRPlace {
 impl LIRPlace {
     pub fn increment_offset(&self, increment: usize) -> Self {
         match self {
-            LIRPlace::Local { size, base, offset } => Self::Local {
-                size: *size,
+            LIRPlace::Local { base, offset } => Self::Local {
                 base: *base,
                 offset: offset + increment,
             },
@@ -128,6 +96,44 @@ impl LIRPlace {
                 offset: offset + increment 
             }
         }
+    }
+}
+
+
+#[derive(Clone, Debug, Copy)]
+pub struct Cell {
+    id: CellId,
+    size: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct StackFrame {
+    cells: Vec<Cell>,
+}
+
+impl StackFrame {
+
+    pub fn from_layouts(layouts: &HashMap<CellId, ChunkLayout>) -> Self {
+        Self {
+            cells: layouts.iter()
+                .map(|(id, layout)| Cell { id: *id, size: layout.size})
+                .collect()
+        }
+    }
+    
+    pub fn size(&self) -> usize {
+        self.cells.iter().map(|cell| cell.size).sum()
+    }
+    
+    pub fn get_offset(&self, chunk: &CellId) -> Option<usize> {
+        let mut offset_acc = 8;
+        for cell in self.cells.iter() {
+            if cell.id == *chunk {
+                return Some(offset_acc);
+            }
+            offset_acc += cell.size;
+        }
+        None
     }
 }
 

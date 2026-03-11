@@ -1,9 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::{
     shared::{
-        definitions::{CellId, IdFactory, NewtypeId}, 
-        tables::{ConcreteShape, GenericTypetable}, 
+        definitions::{CellId, IdFactory}, 
+        tables::{LayoutTable, ChunkLayout, LayoutKind}, 
         typing::ConcreteType,
     }, 
     stages::{
@@ -11,64 +11,6 @@ use crate::{
         lir::*,
     },
 };
-
-
-pub struct LayoutTable {
-    pub layouts: HashMap<(NewtypeId, Vec<ConcreteType>), ChunkLayout>,
-}
-
-impl LayoutTable {
-
-    fn make(typetable: GenericTypetable ,concrete_newtypes: HashSet<(NewtypeId, Vec<ConcreteType>)>) -> Self {
-        let mut table = Self { layouts: HashMap::new() };
-        let mut concrete_newtypes = concrete_newtypes
-            .into_iter()
-            .collect::<Vec<_>>();
-        concrete_newtypes.sort_by_key(|(id, typ)| typetable.get_genericity_rank(&ConcreteType::NewType(*id, typ.clone())));
-        for (id, tparams) in concrete_newtypes {
-            let type_shape = typetable.monomorphize(id, tparams.clone());
-            let type_layout = match type_shape {
-                ConcreteShape::Struct { fields } => {
-                    let fields: Vec<(String, ConcreteType)> = fields.into_iter().collect();
-                    ChunkLayout {
-                        size: fields.iter().map(|(_ ,ftyp)| table.get_layout(ftyp).size).sum(),
-                        typ: ConcreteType::NewType(id, tparams.clone()),
-                        kind: LayoutKind::Struct(fields),
-                    }
-                },
-                ConcreteShape::Enum {..} => {
-                    unimplemented!();
-                },
-            };
-            table.layouts.insert((id, tparams), type_layout);
-        }
-        table
-    }
-
-    fn get_layout(&self, typ: &ConcreteType) -> ChunkLayout {
-        match typ {
-            ConcreteType::Prim(..) => ChunkLayout { size: 8, typ: typ.clone(), kind: LayoutKind::Atomic },
-            ConcreteType::Reference(..) => ChunkLayout { size: 8, typ: typ.clone(), kind: LayoutKind::Atomic },
-            ConcreteType::NewType(id, tparams) => self.layouts[&(*id, tparams.clone())].clone(),
-        }
-    }
-}
-
-
-#[derive(Clone, Debug)]
-pub struct ChunkLayout {
-    pub size: usize,                        // NOTE: maybe align etc here too
-    typ: ConcreteType,
-    kind: LayoutKind,
-}
-
-#[derive(Clone, Debug)]
-pub enum LayoutKind {
-    Atomic,                             // primitives, pointers -- no internal structure basically
-    Struct(Vec<(String, ConcreteType)>),     // it's been given a fixed order
-}
-
-
 
 
 pub fn lower_cmir(program: CMIRProgram) -> LIRProgram {
@@ -157,9 +99,7 @@ impl LIRBuilder {
                 let mut arg_places: Vec<LIRPlace> = Vec::new();
                 let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();
                 for arg in args {
-                    let size = self.layout_table.get_layout(&arg.typ).size;
                     let arg_place = LIRPlace::Local { 
-                        size,
                         base: self.add_temp_chunk(&arg.typ),
                         offset: 0, 
                     };
@@ -209,7 +149,6 @@ impl LIRBuilder {
     }
         
    fn lower_value(&mut self, value: CMIRValue) -> (LIRValue, Vec<LIRStatement>) {
-        let size = self.layout_table.get_layout(&value.typ).size;
         match value.value {
             CMIRValueKind::Place(val_place) => {
                 let lir_val_place = self.lower_place(val_place);
@@ -227,7 +166,6 @@ impl LIRBuilder {
             CMIRValueKind::StructLiteral {..} => {
                 let temp_chunk_id = self.add_temp_chunk(&value.typ);
                 let temp_place = LIRPlace::Local { 
-                    size,
                     base: temp_chunk_id, 
                     offset: 0
                 };
@@ -313,8 +251,7 @@ impl LIRBuilder {
                 let chunk_id = self.cell_chunk_map[&cell_id];
                 let base_type = self.chunk_table[&chunk_id].typ.clone();
                 let offset = self.lower_field_access_chain(&base_type, &place.fieldchain);
-                let size = self.layout_table.get_layout(&place.typ).size; 
-                LIRPlace::Local { size, base: chunk_id, offset}
+                LIRPlace::Local { base: cell_id, offset}
             },
             CMIRPlaceBase::Deref(ref_id) => {
                 let ref_type = self.chunk_table[&self.cell_chunk_map[&ref_id]].typ.clone();
