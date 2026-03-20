@@ -82,6 +82,7 @@ define_id!(CellId);
 define_id!(VarId);
 define_id!(NewtypeId);
 define_id!(TypevarId);
+define_id!(VregId);
 
 
 #[derive(Debug, Clone)]

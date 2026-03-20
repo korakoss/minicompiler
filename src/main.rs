@@ -12,7 +12,7 @@ use passes::{
     hir_to_mir::*,
     concretize_mir::concretize_mir,
     cmir_to_lir::*,
-    lir_codegen::*,
+    lir_codegen::compile_lir,
 };
 
 
@@ -43,7 +43,7 @@ fn main() {
     let lir = lower_cmir(cmir);
     fs::write(target_dir.join("lir.txt"), format!("{:#?}", lir)).unwrap();
 
-    let assembly = LIRCompiler::compile(lir);
+    let assembly = compile_lir(lir);
     fs::write(target_dir.join("asm.s"), assembly).unwrap();
 }
 

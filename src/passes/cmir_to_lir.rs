@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::{
     shared::{
-        definitions::{CellId, IdFactory}, 
-        tables::{LayoutTable, ChunkLayout, LayoutKind}, 
+        definitions::{CellId, IdFactory, VregId}, 
+        tables::{ChunkLayout, LayoutKind, LayoutTable}, 
         typing::ConcreteType,
     }, 
     stages::{
@@ -29,9 +29,10 @@ pub fn lower_cmir(program: CMIRProgram) -> LIRProgram {
 
 struct LIRBuilder {
     layout_table: LayoutTable,
-    cell_chunk_map: HashMap<CellId, CellId>,
-    chunk_table: HashMap<CellId, ChunkLayout>,
+    cell_addresses: HashMap<CellId, Address>,   // maps old cells to new adresses
+    current_locals: HashMap<CellId, ChunkLayout>,
     chunk_id_factory: IdFactory<CellId>,
+    vreg_id_factory: IdFactory<VregId>,
 }
 
 impl LIRBuilder {
@@ -39,19 +40,31 @@ impl LIRBuilder {
     fn new(layout_table: LayoutTable) -> Self {
         Self { 
             layout_table,
-            cell_chunk_map: HashMap::new(),
-            chunk_table: HashMap::new(), 
+            cell_addresses: HashMap::new(),
+            current_locals: HashMap::new(),
             chunk_id_factory: IdFactory::new(),
+            vreg_id_factory: IdFactory::new(),
         }
     }
 
     fn lower_function(&mut self, func: CMIRFunction) -> LIRFunction {
-        self.cell_chunk_map = HashMap::new();
-        self.chunk_table = HashMap::new();
+        self.cell_addresses = HashMap::new();
+        self.current_locals = HashMap::new();
+
+        let mut args: Vec<VregId> = Vec::new();
         for (cell_id, cell_type) in func.cells.iter() {
-            let chunk_id = self.chunk_id_factory.next_id();
-            self.cell_chunk_map.insert(*cell_id, chunk_id);
-            self.chunk_table.insert(chunk_id, self.layout_table.get_layout(cell_type));
+            if func.args.contains(cell_id) {
+                let vreg_id = self.vreg_id_factory.next_id();
+                let vreg_addr = Address::Dereference(MemoryChunk::VReg(vreg_id));
+                self.cell_addresses.insert(*cell_id, vreg_addr);
+                args.push(vreg_id);
+            } else {
+                let chunk_id = self.chunk_id_factory.next_id();
+                let chunk_addr = Address::Chunk(MemoryChunk::Local(chunk_id));
+                self.cell_addresses.insert(*cell_id, chunk_addr);
+                let chunk_layout = self.layout_table.get_layout(cell_type);
+                self.current_locals.insert(chunk_id, chunk_layout);
+            }
         }
         LIRFunction {
             blocks: func.blocks
@@ -59,11 +72,8 @@ impl LIRBuilder {
                 .map(|(id, block)| (id, self.lower_block(block)))
                 .collect(),
             entry: func.entry,
-            chunks: StackFrame::from_layouts(&self.chunk_table),
-            args: func.args
-                .into_iter()
-                .map(|id| self.cell_chunk_map[&id])
-                .collect(),
+            frame: StackFrame::from_layouts(&self.current_locals),
+            args, 
         }
     }
 
@@ -99,9 +109,10 @@ impl LIRBuilder {
                 let mut arg_places: Vec<LIRPlace> = Vec::new();
                 let mut arg_stmts_coll: Vec<LIRStatement> = Vec::new();
                 for arg in args {
-                    let arg_place = LIRPlace::Local { 
-                        base: self.add_temp_chunk(&arg.typ),
-                        offset: 0, 
+                    let temp_id = self.add_temp_chunk(&arg.typ);
+                    let arg_place = LIRPlace {
+                        base: Address::Chunk(MemoryChunk::Local(temp_id)),
+                        offset: 0,
                     };
                     arg_places.push(arg_place.clone());
                     arg_stmts_coll.extend(self
@@ -165,9 +176,9 @@ impl LIRBuilder {
             }
             CMIRValueKind::StructLiteral {..} => {
                 let temp_chunk_id = self.add_temp_chunk(&value.typ);
-                let temp_place = LIRPlace::Local { 
-                    base: temp_chunk_id, 
-                    offset: 0
+                let temp_place = LIRPlace {
+                    base: Address::Chunk(MemoryChunk::Local(temp_chunk_id)),
+                    offset: 0,
                 };
                 let stmts = self.lower_value_into_place(value, temp_place.clone());
                 (LIRValue::Place(temp_place), stmts)
@@ -182,7 +193,7 @@ impl LIRBuilder {
     fn add_temp_chunk(&mut self, typ: &ConcreteType) -> CellId {
         let id = self.chunk_id_factory.next_id();
         let chunk_layout = self.layout_table.get_layout(typ);
-        self.chunk_table.insert(id, chunk_layout);
+        self.current_locals.insert(id, chunk_layout);
         id
     }
 
@@ -226,7 +237,7 @@ impl LIRBuilder {
                     unreachable!();
                 };
                 for (fname, ftyp) in type_fields {
-                    let f_target = target.increment_offset(curr_field_offset);
+                    let f_target = target.increase_offset(curr_field_offset);
                     let fsize = self.layout_table.get_layout(&ftyp).size;
                     curr_field_offset += fsize;
                     stmts.extend(self.lower_value_into_place(fields[&fname].clone(), f_target));
@@ -246,19 +257,20 @@ impl LIRBuilder {
 
 
     fn lower_place(&mut self, place: CMIRPlace) -> LIRPlace {
-        match place.base {
-            CMIRPlaceBase::Cell(cell_id) => {
-                let chunk_id = self.cell_chunk_map[&cell_id];
-                let base_type = self.chunk_table[&chunk_id].typ.clone();
-                let offset = self.lower_field_access_chain(&base_type, &place.fieldchain);
-                LIRPlace::Local { base: cell_id, offset}
+        let addr = match place.base {
+            CMIRPlaceBase::Cell(id) => {
+                self.cell_addresses[&id]
             },
             CMIRPlaceBase::Deref(ref_id) => {
-                let ref_type = self.chunk_table[&self.cell_chunk_map[&ref_id]].typ.clone();
-                let ConcreteType::Reference(typ) = ref_type else {unreachable!()};
-                let offset = self.lower_field_access_chain(&typ, &place.fieldchain);
-                LIRPlace::Deref { pointer: ref_id, offset}
+                let ref_addr = self.cell_addresses[&ref_id];
+                let Address::Chunk(MemoryChunk::Local(ref_chunk)) = ref_addr else {unreachable!()};
+                Address::Dereference(MemoryChunk::Local(ref_chunk))
             }
+        };
+        let offset = self.lower_field_access_chain(&place.typ, &place.fieldchain);
+        LIRPlace {
+            base: addr,
+            offset,
         }
     } 
 

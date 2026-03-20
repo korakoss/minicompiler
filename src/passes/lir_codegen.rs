@@ -1,73 +1,74 @@
+use std::collections::HashMap;
+
 use crate::stages::lir::*;
-use crate::shared::definitions::{BinaryOperator, BlockId, FuncId, Id};
+use crate::shared::definitions::{BinaryOperator, BlockId, FuncId, Id, VregId};
+
+
+pub fn compile_lir(lir_program: LIRProgram) -> String {
+    let mut comp = LIRCompiler::new();
+    comp.emit_mult(&vec![
+        ".global main",
+        ".extern printf",
+        ".align 8",
+        ".data",
+        r#"fmt: .asciz "%d\n""#,
+        ".text",
+    ]);
+
+    for (f_id, func) in lir_program.functions.into_iter() {
+        comp.compile_function(f_id, func);
+    }
+
+    comp.emit_mult(&vec![
+        "main:",
+        "    push {fp, lr}",
+        "    mov fp, sp",  
+        "    sub sp, sp, #16",
+        "    sub r12, fp, #8",
+        &format!("    bl func_{}", lir_program.entry.raw()),
+        "    ldr r0, [r12]",
+        "    add sp, sp, #16",
+        "    pop {fp, lr}",
+        "    bx lr",
+    ]);
+    comp.output
+}
 
 
 pub struct LIRCompiler {
     output: String,
+    vreg_offsets: HashMap<VregId, usize>,
 }
 
 impl LIRCompiler {
-    
-    pub fn compile(lir_program: LIRProgram) -> String {
-        let mut comp = LIRCompiler {
-            output: String::new(),
-        };
-        comp.compile_program(lir_program)
+
+    fn new() -> Self {
+        Self { output: String::new(), vreg_offsets: HashMap::new() }
     }
-
-
-    fn compile_program(&mut self, program: LIRProgram) -> String {
-        self.emit_mult(&vec![
-            ".global main",
-            ".extern printf",
-            ".align 8",
-            ".data",
-            r#"fmt: .asciz "%d\n""#,
-            ".text",
-        ]);
-                
-        for (f_id, func) in program.functions.into_iter() {
-            self.compile_function(f_id, func);
-        }
-
-        self.emit_mult(&vec![
-            "main:",
-            "    push {fp, lr}",
-            "    mov fp, sp",  
-            "    sub sp, sp, #16",
-            "    sub r12, fp, #8",
-            &format!("    bl func_{}", program.entry.raw()),
-            "    ldr r0, [r12]",
-            "    add sp, sp, #16",
-            "    pop {fp, lr}",
-            "    bx lr",
-        ]);
-        self.output.clone()
-
-       
-    }
-
 
     fn compile_function(&mut self, func_id: FuncId,lir_func: LIRFunction) {
 
-        let LIRFunction { blocks, entry, chunks, args } = lir_func;
+        self.vreg_offsets = HashMap::new();
 
-        let frame_size = chunks.size();
+        let LIRFunction { blocks, entry, frame, args } = lir_func;
+
+        let frame_size = frame.size();
         
         self.emit(&format!("func_{}:", func_id.raw()));
         self.emit("    push {fp, lr}");     
         self.emit("    mov fp, sp");     
         self.emit(&format!("    sub sp, sp, #{}", frame_size)); 
 
-        for (i,arg) in args.iter().enumerate() {
-            let arg_offset = chunks.get_offset(arg).unwrap();
-            self.emit(&format!("    str r{}, [fp, #-{}]", i+1, arg_offset));
-}
+        // NEW
+        for (i, arg) in args.iter().rev().enumerate() {
+            let offset = (i+1) * 8;
+            self.vreg_offsets.insert(*arg, offset);
+        }
 
         self.emit(&format!("    b block_{}", entry.raw()));
 
         for (id, block) in blocks.into_iter() {
-            self.compile_block(id, block, &chunks, func_id);
+            self.compile_block(id, block, &frame, func_id);
         }
 
         self.emit(&format!("ret_{}:", func_id.raw()));        
@@ -88,63 +89,24 @@ impl LIRCompiler {
         self.compile_terminator(terminator, frame, func);
     }
 
-    fn compile_stmt(&mut self, stmt: LIRStatement, frame: &StackFrame) {
-        
-        match stmt {
-            LIRStatement::Store { dest, value } => {
-                self.emit_operand_load(value, frame);
-                self.emit_place_store(dest, frame);
+    fn compile_terminator(&mut self, term: LIRTerminator, frame: &StackFrame, func_id: FuncId) {
+        match term {
+            LIRTerminator::Goto{dest} => {
+                self.emit(&format!("    b block_{}", dest.raw()));
             }
-            LIRStatement::BinOp { dest, op, left, right } => {
-                self.emit_operand_load(left, frame);
-                self.emit("    mov r1, r0");
-                self.emit_operand_load(right, frame);
-                self.compile_binop(op);
-                self.emit_place_store(dest, frame);
+            LIRTerminator::Branch { condition, then_block, else_block } => {
+                self.emit_operand_load(condition, frame);
+                self.emit("    cmp r0, #1");
+                self.emit(&format!("    beq block_{}", then_block.raw()));
+                self.emit(&format!("    b block_{}", else_block.raw()));
             }
-            LIRStatement::Call { dest, func, args } => {
-                // TODO: change this for stack usage
-                // This is a quick solution to check LIR at all
-
-                if args.len() > 3 {
-                    panic!("Only up to 3 args supported at the moment");
+            LIRTerminator::Return(operand_opt) => {
+                if let Some(operand) = operand_opt {
+                    self.emit_operand_load(operand, frame);
                 }
-
-                for (i, arg) in args.into_iter().enumerate() {
-                    self.emit_operand_load(LIRValue::Place(arg), frame);
-                    self.emit(&format!("     mov r{}, r0", i+1));
-                }
-                
-                self.emit("    push {r12}"); 
-                match dest {
-                    LIRPlace::Local { base, offset } => {
-                        let base_offset = frame.get_offset(&base)
-                            .unwrap_or_else(|| panic!("Cell ID {:?} not found in frame", base));
-                        let target_offset = base_offset + offset;
-                        self.emit(&format!("    sub r12, fp, #{}", target_offset));
-                        self.emit(&format!("    bl func_{}", func.raw()));
-                    }
-                    LIRPlace::Deref { pointer, offset } => {
-                        let pointer_offset = frame.get_offset(&pointer)
-                            .unwrap_or_else(|| panic!("Cell ID {:?} not found in frame", pointer));
-                        self.emit(&format!("    ldr r0, [fp, #-{}]", pointer_offset));  
-                        self.emit(&format!("    ldr r0, [r0, #-{}]", offset));  
-                        self.emit(&format!("    bl func_{}", func.raw()));                       
-                    }
-                }
-                self.emit("    pop {r12}"); 
-
-            }
-            LIRStatement::Print(operand) => {
-                self.emit_operand_load(operand, frame);
-                self.emit("    mov r1, r0");
-                self.emit("    ldr r0, =fmt");
-                self.emit("    push {r12}"); 
-                self.emit("    bl printf");
-                self.emit("    pop {r12}"); 
+                self.emit(&format!("    b ret_{}", func_id.raw()));
             }
         }
-
     }
 
     fn compile_binop(&mut self, op: BinaryOperator) {
@@ -182,22 +144,40 @@ impl LIRCompiler {
         }
     }
 
-    fn compile_terminator(&mut self, term: LIRTerminator, frame: &StackFrame, func_id: FuncId) {
-        match term {
-            LIRTerminator::Goto{dest} => {
-                self.emit(&format!("    b block_{}", dest.raw()));
+    fn compile_stmt(&mut self, stmt: LIRStatement, frame: &StackFrame) {
+        
+        match stmt {
+            LIRStatement::Store { dest, value } => {
+                self.emit_operand_load(value, frame);
+                self.emit_place_store(dest, frame);
             }
-            LIRTerminator::Branch { condition, then_block, else_block } => {
-                self.emit_operand_load(condition, frame);
-                self.emit("    cmp r0, #1");
-                self.emit(&format!("    beq block_{}", then_block.raw()));
-                self.emit(&format!("    b block_{}", else_block.raw()));
+            LIRStatement::BinOp { dest, op, left, right } => {
+                self.emit_operand_load(left, frame);
+                self.emit("    mov r1, r0");
+                self.emit_operand_load(right, frame);
+                self.compile_binop(op);
+                self.emit_place_store(dest, frame);
             }
-            LIRTerminator::Return(operand_opt) => {
-                if let Some(operand) = operand_opt {
-                    self.emit_operand_load(operand, frame);
+            LIRStatement::Call { dest, func, args } => {
+
+                for arg in args.into_iter().rev() {
+                    self.emit_operand_load(LIRValue::Reference(arg), frame);
+                    self.emit("     push {r0}");
                 }
-                self.emit(&format!("    b ret_{}", func_id.raw()));
+                
+                self.emit_operand_load(LIRValue::Reference(dest), frame);
+                self.emit("     push {r0}");
+                self.emit(&format!("    bl func_{}", func.raw()));                       
+            }
+            LIRStatement::Print(operand) => {
+                self.emit_operand_load(operand, frame);
+                self.emit_mult(&[
+                    "    mov r1, r0",
+                    "    ldr r0, =fmt",
+                    "    push {r12}",
+                    "    bl printf",
+                    "    pop {r12}",
+                ]);
             }
         }
     }
@@ -205,20 +185,9 @@ impl LIRCompiler {
     fn emit_operand_load(&mut self, operand: LIRValue, frame: &StackFrame) {
         match operand {
             LIRValue::Place(place) => {
-                match place {
-                    LIRPlace::Local { base, offset } => {
-                        let base_offset = frame.get_offset(&base)
-                           .unwrap_or_else(|| panic!("Cell ID {:?} not found in frame", base));
-                        let place_offset = base_offset + offset;
-                        self.emit(&format!("    ldr r0, [fp, #-{}]", place_offset));
-                    }
-                    LIRPlace::Deref { pointer, offset } => {
-                        let pointer_offset = frame.get_offset(&pointer)
-                            .unwrap_or_else(|| panic!("Cell ID {:?} not found in frame", pointer));
-                        self.emit(&format!("    ldr r0, [fp, #-{}]", pointer_offset));  
-                        self.emit(&format!("    ldr r0, [r0, #-{}]", offset));  
-                    }
-                }
+                let LIRPlace { base, offset } = place;
+                self.emit_address_calc(base, frame);
+                self.emit(&format!("    ldr r0, [r1, #-{}]]", offset));
             }
             LIRValue::IntLiteral(num) => {
                 self.emit(&format!("     ldr r0, ={}", num));
@@ -229,36 +198,42 @@ impl LIRCompiler {
             LIRValue::BoolFalse => {
                 self.emit("    ldr r0, =0");   
             }
-            LIRValue::Reference(refd) => {
-                match refd {
-                    LIRPlace::Local { base, offset } => {
-                        let base_offset = frame.get_offset(&base)
-                            .unwrap_or_else(|| panic!("Unsuccessful offset lookup for cell ID {:?}", base));
-                        let place_offset = base_offset + offset;
-                        self.emit(&format!("    sub r0, fp, #{}", place_offset));  
-                    }
-                    LIRPlace::Deref {..} => {
-                        unimplemented!();       // Shouldn't really happen, maybe refactor stuff
-                    }
-                }
+            LIRValue::Reference(ref_place) => {
+                let LIRPlace { base, offset } = ref_place;
+                self.emit_address_calc(base, frame);
+                self.emit(&format!("    sub r0, r1, #{}", offset));  
             }
         }
     }
 
     fn emit_place_store(&mut self, place: LIRPlace, frame: &StackFrame) {
-        match place {
-            LIRPlace::Local { base, offset } => {
-                let base_offset = frame.get_offset(&base)
-                    .unwrap_or_else(|| panic!("Unsuccessful offset lookup for cell ID {:?}", base));
-                let place_offset = base_offset + offset;
-                self.emit(&format!("    str r0, [fp, #-{}]", place_offset));
+        let LIRPlace { base, offset } = place;
+        self.emit_address_calc(base, frame);
+        self.emit(&format!("    str r0, [r1, #-{}]]", offset));
+    }
+
+    fn emit_address_calc(&mut self, address: Address, frame: &StackFrame) {
+        match address {
+            Address::Chunk(chunk) => {
+                self.emit_memory_chunk_calc(chunk, frame);
             }
-            LIRPlace::Deref { pointer, offset } => {
-                // TODO: this fails for >8B values probably
-                let pointer_st_offs = frame.get_offset(&pointer)
-                    .unwrap_or_else(|| panic!("Unsuccessful offset lookup for cell ID {:?}", pointer));
-                self.emit(&format!("    ldr r1, [fp, #-{}]", pointer_st_offs));  
-                self.emit(&format!("    str r0, [r1, #-{}]", offset));  
+            Address::Dereference(ref_chunk) => {
+                self.emit_memory_chunk_calc(ref_chunk, frame);
+                self.emit("    ldr r1, [r1]");
+            }
+        }
+    }
+
+    fn emit_memory_chunk_calc(&mut self, chunk: MemoryChunk, frame: &StackFrame) {
+        match chunk {
+            MemoryChunk::Local(cell_id) => {
+                let cell_offset = frame.get_offset(&cell_id)
+                  .unwrap_or_else(|| panic!("Unsuccessful offset lookup for cell ID {:?}", cell_id));
+                self.emit(&format!("    sub r1, fp, #{}", cell_offset));
+            },
+            MemoryChunk::VReg(vreg_id) => {
+                let offs = self.vreg_offsets[&vreg_id];
+                self.emit(&format!("    add r1, fp, #{}", offs));
             }
         }
     }

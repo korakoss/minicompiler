@@ -1,22 +1,22 @@
 use std::{collections::HashMap};
 
 use crate::shared::{
-    definitions::{BinaryOperator, BlockId, FuncId, CellId},
+    definitions::{BinaryOperator, BlockId, CellId, FuncId, VregId},
     tables::ChunkLayout,
 };
 
 #[derive(Clone, Debug)]
 pub struct LIRProgram {
     pub functions: HashMap<FuncId, LIRFunction>,
-    pub entry: FuncId
+    pub entry: FuncId,
 }
 
 #[derive(Clone, Debug)]
 pub struct LIRFunction {
     pub blocks: HashMap<BlockId, LIRBlock>,
     pub entry: BlockId,
-    pub chunks: StackFrame,     // TODO: rename to "frame"?
-    pub args: Vec<CellId>
+    pub frame: StackFrame, 
+    pub args: Vec<VregId>,
 }
 
 #[derive(Clone, Debug)]
@@ -71,32 +71,31 @@ pub enum LIRValue {
     Reference(LIRPlace),
 }
 
-
-#[derive(Clone, Debug)]
-pub enum LIRPlace {
-    Local {
-        base: CellId,
-        offset: usize,
-    },
-    Deref {
-        pointer: CellId,
-        offset: usize,
-    }
+#[derive(Clone, Copy, Debug)]
+pub struct LIRPlace {
+    pub base: Address,
+    pub offset: usize,
 }
 
 impl LIRPlace {
-    pub fn increment_offset(&self, increment: usize) -> Self {
-        match self {
-            LIRPlace::Local { base, offset } => Self::Local {
-                base: *base,
-                offset: offset + increment,
-            },
-            LIRPlace::Deref { pointer, offset } => Self::Deref { 
-                pointer: *pointer, 
-                offset: offset + increment 
-            }
+    pub fn increase_offset(&self, increment: usize) -> Self {
+        Self {
+            base: self.base,
+            offset: self.offset + increment,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Address {
+    Chunk(MemoryChunk),
+    Dereference(MemoryChunk),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum MemoryChunk {
+    Local(CellId),
+    VReg(VregId),
 }
 
 
